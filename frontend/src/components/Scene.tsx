@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Billboard, CameraControls, Html, Line, MeshDistortMaterial, useGLTF } from '@react-three/drei'
+import { Billboard, CameraControls, Html, Line, useGLTF } from '@react-three/drei'
 import { Box3, MathUtils, Vector3, type Mesh } from 'three'
 import type { Line2 } from 'three-stdlib'
 import { useStore } from '../store'
@@ -11,6 +11,9 @@ import type { Star } from '../types'
 const STATUE_URL = '/litmus-statue.glb'
 const STATUE_COLOR = '#e3e8ef' // cool marble, close to the ground so the statue reads as a relief in the same material
 const BLOB_COLOR = '#2b2f34'
+const NODE_FACE_COLOR = '#3b4048' // a touch lighter than the fingertip, so each flat facet catches the light
+const NODE_DETAIL = 1 // icosahedron subdivisions: 80 flat faces, a low-poly sphere
+const SPIN_IDLE = 0.25, SPIN_TRAINING = 1.6 // radians per second
 const BLOB_RADIUS = 4.2
 const ROOT_RADIUS = 5.6
 const EDGE_SEGMENTS = 24
@@ -59,6 +62,7 @@ type Live = Map<string, Vector3>
 function StarBlob({ star, target, live, dim, selected }: { star: Star; target: Pos; live: Live; dim: boolean; selected: boolean }) {
   const select = useStore((s) => s.select)
   const group = useRef<import('three').Group>(null)
+  const body = useRef<Mesh>(null)
   const [hover, setHover] = useState(false)
   const tone = starTone(star)
   const r = star.parent_id ? BLOB_RADIUS : ROOT_RADIUS
@@ -79,6 +83,8 @@ function StarBlob({ star, target, live, dim, selected }: { star: Star; target: P
     g.position.copy(p)
     const s = MathUtils.lerp(g.scale.x, selected ? 1.3 : hover ? 1.14 : 1, k)
     g.scale.setScalar(s)
+    // the node turns slowly, and faster while its experiment trains, so the facets glint
+    if (body.current && !reducedMotion()) { body.current.rotation.y += dt * (running ? SPIN_TRAINING : SPIN_IDLE); body.current.rotation.x += dt * 0.4 * (running ? SPIN_TRAINING : SPIN_IDLE) }
   })
   const g = star.grade
   const value = !g ? (running ? 'training' : star.status === 'waiting' ? 'needs you' : star.status === 'failed' ? 'stopped' : '')
@@ -86,13 +92,13 @@ function StarBlob({ star, target, live, dim, selected }: { star: Star; target: P
   return (
     <group ref={group}>
       <mesh
+        ref={body}
         onClick={(e) => { e.stopPropagation(); select(star.id) }}
         onPointerOver={(e) => { e.stopPropagation(); setHover(true); document.body.style.cursor = 'pointer' }}
         onPointerOut={() => { setHover(false); document.body.style.cursor = '' }}
       >
-        <icosahedronGeometry args={[r, 10]} />
-        <MeshDistortMaterial color={BLOB_COLOR} roughness={0.38} metalness={0.2} distort={running ? 0.42 : 0.24} speed={reducedMotion() ? 0 : running ? 3.2 : 1.1}
-          transparent opacity={dim ? 0.18 : shadow ? 0.55 : 1} />
+        <icosahedronGeometry args={[r, NODE_DETAIL]} />
+        <meshStandardMaterial color={NODE_FACE_COLOR} roughness={0.5} metalness={0.15} flatShading transparent opacity={dim ? 0.18 : shadow ? 0.55 : 1} />
       </mesh>
       <Billboard>
         <mesh>
