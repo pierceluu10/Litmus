@@ -1,10 +1,10 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { Billboard, CameraControls, Html, Line, MeshDistortMaterial, useGLTF } from '@react-three/drei'
+import { Billboard, CameraControls, Html, Line, useGLTF } from '@react-three/drei'
 import { Box3, MathUtils, Vector3, type Mesh } from 'three'
 import type { Line2 } from 'three-stdlib'
 import { useStore } from '../store'
-import { FIRST_STEP, layoutStars, STEP, yFor, type Pos } from '../lib/layout'
+import { FIRST_STEP, layoutStars, type Pos } from '../lib/layout'
 import { agentDetail, agentName, pts, progressFraction, provMatches, starTone, type Tone } from '../lib/format'
 import type { Star } from '../types'
 import { statueAnchor, type Point } from '../lib/statueAnchor'
@@ -12,6 +12,9 @@ import { statueAnchor, type Point } from '../lib/statueAnchor'
 const STATUE_URL = '/litmus-statue.glb'
 const STATUE_COLOR = '#e3e8ef' // cool marble, close to the ground so the statue reads as a relief in the same material
 const BLOB_COLOR = '#2b2f34'
+const NODE_FACE_COLOR = '#3b4048' // a touch lighter than the fingertip, so each flat facet catches the light
+const NODE_DETAIL = 1 // icosahedron subdivisions: 80 flat faces, a low-poly sphere
+const SPIN_IDLE = 0.25, SPIN_TRAINING = 1.6 // radians per second
 const BLOB_RADIUS = 4.2
 const ROOT_RADIUS = 5.6
 const EDGE_SEGMENTS = 24
@@ -23,12 +26,14 @@ const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').match
 
 // Camera framing: a fixed offset from the focused star, slightly from the right so sibling depth reads,
 // aimed left of and below the star so the statue stays in frame and the star clears the proposal dock.
-// A locked view of the accuracy plane: the user can zoom within limits but never rotate or pan. The default is swung a little
+// A locked view of the tree: the user can zoom within limits but never rotate or pan. The default is swung a little
 // toward the nodes' side, so the tree is met more head-on.
 const VIEW = new Vector3(-48, 30, 345)
 const MIN_DISTANCE = 170
-const MAX_DISTANCE = 480
-const AIM = new Vector3(-14, -18, 0)
+const MAX_DISTANCE = 760
+const FOV_HALF_TAN = Math.tan(MathUtils.degToRad(15)) // the canvas's fov is 30
+const USABLE_HEIGHT = 0.62 // share of the canvas free of the top buttons and the bottom dock
+const AIM = new Vector3(26, -18, 0) // aimed right of the star, so the graph sits in the open part of the scene beside the results card
 // Opening shot: from just behind the statue's head and ear, looking over its shoulder toward the arm.
 // The head is near (-69, 16, -5) in scene units. The camera then glides to the default view, once per session.
 const EAR_CAM = new Vector3(-70, 24, -70)
@@ -82,6 +87,7 @@ type Live = Map<string, Vector3>
 function StarBlob({ star, target, live, dim, selected }: { star: Star; target: Pos; live: Live; dim: boolean; selected: boolean }) {
   const select = useStore((s) => s.select)
   const group = useRef<import('three').Group>(null)
+  const body = useRef<Mesh>(null)
   const [hover, setHover] = useState(false)
   const tone = starTone(star)
   const r = star.parent_id ? BLOB_RADIUS : ROOT_RADIUS
@@ -102,6 +108,8 @@ function StarBlob({ star, target, live, dim, selected }: { star: Star; target: P
     g.position.copy(p)
     const s = MathUtils.lerp(g.scale.x, selected ? 1.3 : hover ? 1.14 : 1, k)
     g.scale.setScalar(s)
+    // the node turns slowly, and faster while its experiment trains, so the facets glint
+    if (body.current && !reducedMotion()) { body.current.rotation.y += dt * (running ? SPIN_TRAINING : SPIN_IDLE); body.current.rotation.x += dt * 0.4 * (running ? SPIN_TRAINING : SPIN_IDLE) }
   })
   const g = star.grade
   const value = !g ? (running ? 'training' : star.status === 'waiting' ? 'needs you' : star.status === 'failed' ? 'stopped' : '')
@@ -109,13 +117,13 @@ function StarBlob({ star, target, live, dim, selected }: { star: Star; target: P
   return (
     <group ref={group}>
       <mesh
+        ref={body}
         onClick={(e) => { e.stopPropagation(); select(star.id) }}
         onPointerOver={(e) => { e.stopPropagation(); setHover(true); document.body.style.cursor = 'pointer' }}
         onPointerOut={() => { setHover(false); document.body.style.cursor = '' }}
       >
-        <icosahedronGeometry args={[r, 10]} />
-        <MeshDistortMaterial color={BLOB_COLOR} roughness={0.38} metalness={0.2} distort={running ? 0.42 : 0.24} speed={reducedMotion() ? 0 : running ? 3.2 : 1.1}
-          transparent opacity={dim ? 0.18 : shadow ? 0.55 : 1} />
+        <icosahedronGeometry args={[r, NODE_DETAIL]} />
+        <meshStandardMaterial color={NODE_FACE_COLOR} roughness={0.5} metalness={0.15} flatShading transparent opacity={dim ? 0.18 : shadow ? 0.55 : 1} />
       </mesh>
       <Billboard>
         <mesh>
@@ -142,7 +150,7 @@ function Edge({ star, live, dim, onPath }: { star: Star; live: Live; dim: boolea
   useFrame((_, dt) => {
     const a = star.parent_id ? live.get(star.parent_id) : origin, b = live.get(star.id)
     if (!a || !b || !line.current) return
-    // a soft arc: leave the parent horizontally, then bend toward the child's height
+    // a soft arc: leave the parent horizontally, then bend toward the child's slot in its column
     for (let i = 0; i <= EDGE_SEGMENTS; i++) {
       const t = i / EDGE_SEGMENTS, e = t * t * (3 - 2 * t)
       points[i].set(MathUtils.lerp(a.x, b.x, t), MathUtils.lerp(a.y, b.y, e), MathUtils.lerp(a.z, b.z, e))
@@ -152,25 +160,6 @@ function Edge({ star, live, dim, onPath }: { star: Star; live: Live; dim: boolea
   })
   const color = shadow ? '#9aa2ac' : onPath ? '#16191d' : '#4a5058'
   return <Line ref={line} points={points} color={color} lineWidth={onPath ? 2.6 : 1.5} dashed={running || shadow} dashSize={running ? 2.2 : 3} gapSize={running ? 1.6 : 2.4} transparent opacity={dim ? 0.15 : 1} />
-}
-
-// Faint reference lines for accuracy, so height reads as a number.
-function AccuracyScale({ baseline, low, high, length }: { baseline: number; low: number; high: number; length: number }) {
-  const ticks: number[] = []
-  for (let v = Math.ceil(low * 200) / 200; v <= high + 1e-9; v += 0.005) ticks.push(+v.toFixed(3))
-  return (
-    <group>
-      {ticks.map((v) => {
-        const y = yFor(v, baseline)
-        return (
-          <group key={v}>
-            <Line points={[[-20, y, -40], [length, y, -40]]} color="#aab2bc" lineWidth={1} dashed dashSize={1.2} gapSize={2.4} transparent opacity={0.6} />
-          </group>
-        )
-      })}
-      <Line points={[[-20, 0, -40], [length, 0, -40]]} color="#16191d" lineWidth={1} transparent opacity={0.35} />
-    </group>
-  )
 }
 
 function Fingertip() {
@@ -184,10 +173,12 @@ function CameraRig({ positions, parents }: { positions: Map<string, Pos>; parent
   const [ctl, setCtl] = useState<CameraControls | null>(null)
   const { focusId, fitAll } = useStore()
   const consulting = useStore((s) => !!s.thought && !s.thought.landed)
-  // frame the branch, not just the star: halfway between the focused star and the one it grew from
+  // frame the whole column the focused star belongs to (its generation), at the midpoint between it and its parent
   const star = focusId ? positions.get(focusId) : undefined
   const from = focusId ? positions.get(parents.get(focusId) ?? '') ?? star : undefined
-  const focus = star && from ? { x: (star.x + from.x) / 2, y: (star.y + from.y) / 2, z: (star.z + from.z) / 2 } : { x: FIRST_STEP, y: 0, z: 0 }
+  const column = star ? [...positions.values()].filter((p) => Math.abs(p.x - star.x) < 1).map((p) => p.y) : []
+  const half = column.length ? (Math.max(...column) - Math.min(...column)) / 2 : 0 // half the column's height
+  const focus = star && from ? { x: (star.x + from.x) / 2, y: column.length ? (Math.max(...column) + Math.min(...column)) / 2 : star.y, z: (star.z + from.z) / 2 } : { x: FIRST_STEP, y: 0, z: 0 }
   const portrait = useThree((s) => s.size.width / s.size.height) < PORTRAIT_ASPECT // narrow screens see less width: pull back
   const introDone = useRef(false)
   const wasFit = useRef(false)
@@ -196,7 +187,9 @@ function CameraRig({ positions, parents }: { positions: Map<string, Pos>; parent
     const c = ctl
     if (!c) return
     const t = new Vector3(focus.x, focus.y, focus.z).add(AIM)
-    const dist = keepZoom && c.distance ? c.distance : VIEW.length() * (portrait ? PORTRAIT_PULLBACK : 1)
+    // far enough that the whole column fits; a taller column zooms out, and a zoom the user chose is kept if it is wider
+    const fits = (half + 18) / (FOV_HALF_TAN * USABLE_HEIGHT)
+    const dist = Math.max(VIEW.length() * (portrait ? PORTRAIT_PULLBACK : 1), fits, keepZoom && c.distance ? c.distance : 0)
     const view = VIEW.clone().setLength(Math.min(MAX_DISTANCE, Math.max(MIN_DISTANCE, dist)))
     c.setLookAt(t.x + view.x, t.y + view.y, t.z + view.z, t.x, t.y, t.z, animated)
   }
@@ -216,7 +209,7 @@ function CameraRig({ positions, parents }: { positions: Map<string, Pos>; parent
       return () => window.clearTimeout(go)
     }
     toDefault(!reducedMotion(), true)
-  }, [ctl, focus.x, focus.y, focus.z, portrait]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ctl, focus.x, focus.y, focus.z, half, portrait]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const c = ctl
     if (!c || !introDone.current) return
@@ -248,12 +241,8 @@ function Stars({ stars }: { stars: Star[] }) {
   const path = new Set<string>()
   for (let s = selectedId ? byId.get(selectedId) : undefined; s; s = s.parent_id ? byId.get(s.parent_id) : undefined) path.add(s.id)
   const dim = (s: Star) => !!hoveredClaim && !s.provenance.some((p) => provMatches(p, hoveredClaim))
-  const baseline = stars[0]?.grade?.mean_child
-  const ys = stars.filter((s) => s.grade).map((s) => s.grade!.mean_child)
-  const maxX = Math.max(FIRST_STEP + 4 * STEP, ...[...positions.values()].map((p) => p.x)) + 400 // lines run off-screen; labels are pinned
   return (
     <>
-      {baseline !== undefined && <AccuracyScale baseline={baseline} low={Math.min(baseline - 0.005, ...ys)} high={Math.max(baseline + 0.005, ...ys)} length={maxX + 30} />}
       {stars.map((s) => <Edge key={`e${s.id}`} star={s} live={live} dim={dim(s)} onPath={path.has(s.id)} />)}
       {stars.map((s) => <StarBlob key={s.id} star={s} target={positions.get(s.id)!} live={live} dim={dim(s)} selected={s.id === selectedId} />)}
       <CameraRig positions={positions} parents={parents} />
@@ -271,7 +260,7 @@ export function Scene() {
   const stars = useStore((s) => s.app.session?.stars ?? NO_STARS)
   return (
     <Canvas className="!absolute inset-0" camera={{ fov: 30, near: 1, far: 3000, position: [12, -4, 300] }} dpr={[1, 2]}
-      aria-label="Research tree: each star is an experiment, higher is more accurate">
+      aria-label="Research tree: each node is an experiment, each column a generation">
       <Background />
       <hemisphereLight args={['#ffffff', '#a6b4c8', 0.9]} />
       <directionalLight position={[-140, 160, 140]} intensity={2.1} />

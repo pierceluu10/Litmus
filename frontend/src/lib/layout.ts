@@ -1,32 +1,33 @@
 import type { Star } from '../types'
 
 // Scene units are the statue's (its fingertip is the origin, it stands ~120 tall).
-// x = generations from the fingertip (siblings fan out one column each, so labels never collide),
-// y = measured accuracy, z = a little depth per sibling for parallax.
+// A neural-network layout: x = generation (every star of a generation shares one column, a "layer"),
+// y = its slot in that column, evenly spaced and centred on the baseline's height, so a parent fans out into a
+// vertical stack of children. Accuracy is read from the labels and the leaderboard, not from height.
 export const FIRST_STEP = 18
-export const STEP = 40
-export const COLUMN = 34
-export const Z_SPREAD = 14
-export const UNITS_PER_POINT = 22 // one accuracy point (0.01) of height
+export const LAYER_GAP = 64
+export const SLOT_GAP = 25
 
 export type Pos = { x: number; y: number; z: number }
 
-export const yFor = (accuracy: number, baseline: number) => (accuracy - baseline) * 100 * UNITS_PER_POINT
-
-// A star sits at its measured accuracy once graded; until then it rides at its parent's height,
-// so the moment a result lands the star visibly rises or sinks.
 export function layoutStars(stars: Star[]): Map<string, Pos> {
   const out = new Map<string, Pos>()
-  const baseline = stars[0]?.grade?.mean_child
-  const children = new Map<string, Star[]>()
-  for (const s of stars) if (s.parent_id) children.set(s.parent_id, [...(children.get(s.parent_id) ?? []), s])
-  for (const s of stars) {
-    const parent = s.parent_id ? out.get(s.parent_id) : undefined
-    if (!parent) { out.set(s.id, { x: FIRST_STEP, y: 0, z: 0 }); continue }
-    const siblings = children.get(s.parent_id!)!
-    const i = siblings.indexOf(s)
-    const graded = s.grade && baseline !== undefined && s.status !== 'failed'
-    out.set(s.id, { x: parent.x + STEP + i * COLUMN, y: graded ? yFor(s.grade!.mean_child, baseline) : parent.y, z: parent.z + (i - (siblings.length - 1) / 2) * Z_SPREAD })
+  const byId = new Map(stars.map((s) => [s.id, s]))
+  const depth = new Map<string, number>()
+  const depthOf = (s: Star): number => {
+    if (!s.parent_id || !byId.has(s.parent_id)) return 0
+    if (!depth.has(s.id)) depth.set(s.id, depthOf(byId.get(s.parent_id)!) + 1)
+    return depth.get(s.id)!
+  }
+  const layers = new Map<number, Star[]>()
+  for (const s of stars) layers.set(depthOf(s), [...(layers.get(depthOf(s)) ?? []), s])
+  const slot = new Map<string, number>() // slot within the layer, ordered by parent then creation
+  for (const d of [...layers.keys()].sort((a, b) => a - b)) {
+    const row = layers.get(d)!.slice().sort((a, b) => (slot.get(a.parent_id ?? '') ?? 0) - (slot.get(b.parent_id ?? '') ?? 0))
+    row.forEach((s, i) => {
+      slot.set(s.id, i)
+      out.set(s.id, { x: FIRST_STEP + d * LAYER_GAP, y: ((row.length - 1) / 2 - i) * SLOT_GAP, z: 0 })
+    })
   }
   return out
 }

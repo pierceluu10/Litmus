@@ -19,8 +19,7 @@ const facing = (c: P, center: P, r: () => number) => {
 }
 
 // a trapezoid cut into a jittered grid
-type Shading = (center: P, meshCenter: P, r: () => number) => number
-function gridMesh(top: [number, number, number], bottom: [number, number, number], cols: number, rows: number, seed: number, tint?: number[], light: Shading = facing): Tri[] {
+function gridMesh(top: [number, number, number], bottom: [number, number, number], cols: number, rows: number, seed: number, tint?: number[]): Tri[] {
   const r = seeded(seed), out: Tri[] = []
   const pt = (c: number, rw: number): P => {
     const f = rw / rows, y = top[2] + (bottom[2] - top[2]) * f
@@ -32,7 +31,7 @@ function gridMesh(top: [number, number, number], bottom: [number, number, number
   const cx = (top[0] + top[1]) / 2, cy = (top[2] + bottom[2]) / 2
   for (let rw = 0; rw < rows; rw++) for (let c = 0; c < cols; c++) {
     const a = pt(c, rw), b = pt(c + 1, rw), d = pt(c, rw + 1), e = pt(c + 1, rw + 1)
-    out.push(tri(a, b, d, light(mid(a, b, d), [cx, cy], r), tint), tri(b, e, d, light(mid(b, e, d), [cx, cy], r) - 0.04, tint))
+    out.push(tri(a, b, d, facing(mid(a, b, d), [cx, cy], r), tint), tri(b, e, d, facing(mid(b, e, d), [cx, cy], r) - 0.04, tint))
   }
   return out
 }
@@ -60,22 +59,34 @@ function column(cx: number, top: number, bottom: number, w: number, seed: number
 }
 
 const AEGEAN = [112, 146, 188]
-const FACET_TINT = [196, 210, 228]
-const FACET_CELL = 56
-const FACET_LIGHT = 0.66, FACET_SPREAD = 0.36
-// a rail is tall and narrow, so light it evenly with per-facet jitter instead of from the mesh's centre
-const evenLight: Shading = (_c, _m, r) => FACET_LIGHT + (r() - 0.5) * FACET_SPREAD
-
-// The landing's faceted sky, as a quiet ground behind the workspace rails. Sized in CSS pixels so facets
-// keep the same scale whatever the rail's height.
-export function Facets({ seed, width = 400, height = 1400 }: { seed: number; width?: number; height?: number }) {
-  const tris = gridMesh([0, width, 0], [0, width, height], Math.ceil(width / FACET_CELL), Math.ceil(height / FACET_CELL), seed, FACET_TINT, evenLight)
+// The workspace's backdrop: irregular triangles on a staggered lattice, lit smoothly from the top left, so it reads as soft
+// low-poly sky instead of a patchwork. Sized to its container (slice), so it stays quiet behind the statue and the graph.
+const SKY_LIGHT = [248, 250, 253], SKY_DEEP = [196, 210, 232]
+export function SceneBackdrop({ seed, className }: { seed: number; className?: string }) {
+  const W = 1600, H = 1000, S = 200, ROW = S * 0.866
+  const r = seeded(seed)
+  const rows = Math.ceil(H / ROW) + 3, cols = Math.ceil(W / S) + 3
+  const v: P[][] = Array.from({ length: rows }, (_, i) => Array.from({ length: cols }, (_, j) => [
+    (j - 1) * S + (i % 2 ? S / 2 : 0) + (r() - 0.5) * S * 0.5,
+    (i - 1) * ROW + (r() - 0.5) * S * 0.45,
+  ]))
+  const tris: [P, P, P][] = []
+  for (let i = 0; i < rows - 1; i++) for (let j = 1; j < cols - 1; j++) {
+    if (i % 2 === 0) tris.push([v[i][j], v[i + 1][j - 1], v[i + 1][j]], [v[i][j], v[i][j + 1], v[i + 1][j]])
+    else tris.push([v[i][j], v[i + 1][j], v[i + 1][j + 1]], [v[i][j], v[i][j + 1], v[i + 1][j + 1]])
+  }
   return (
-    <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMinYMin slice" aria-hidden="true">
-      {tris.map((t, i) => <polygon key={i} points={t.pts.map((p) => p.join(',')).join(' ')} fill={t.fill} stroke={t.fill} strokeWidth={0.6} strokeLinejoin="round" />)}
+    <svg className={className ?? 'pointer-events-none absolute inset-0 h-full w-full'} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      {tris.map((t, i) => {
+        const cx = (t[0][0] + t[1][0] + t[2][0]) / 3 / W, cy = (t[0][1] + t[1][1] + t[2][1]) / 3 / H
+        const k = Math.max(0, Math.min(1, 0.95 - 0.5 * (0.55 * cx + 0.45 * cy) * 1.6 + (r() - 0.5) * 0.12))
+        const fill = `rgb(${mix(SKY_DEEP, SKY_LIGHT, k).join(',')})`
+        return <polygon key={i} points={t.map((p) => p.map((n) => n.toFixed(1)).join(',')).join(' ')} fill={fill} stroke={fill} strokeWidth={0.7} strokeLinejoin="round" />
+      })}
     </svg>
   )
 }
+
 // As `exit` goes 0 → 1 the intro plays backwards and stops short: the roof lifts off, the columns sink, and the
 // statue and sky settle into a faint backdrop instead of vanishing.
 const RECEDED = 0.14, SKY_RECEDED = 0.55

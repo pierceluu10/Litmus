@@ -89,15 +89,7 @@ body {
 .star-label[data-selected] .star-label-name, .star-label[data-selected] .star-label-value { text-shadow: none; }
 @media (hover: hover) and (pointer: fine) { .star-label:hover { background: color-mix(in srgb, var(--color-surface) 80%, transparent); } }
 
-.rail { background: var(--color-paper); isolation: isolate; }
-/* facets gather in the bottom-right corner and dissolve toward the top-left */
-.rail > svg { -webkit-mask-image: radial-gradient(140% 80% at 100% 100%, #000 0%, rgb(0 0 0 / 0.55) 38%, transparent 72%); mask-image: radial-gradient(140% 80% at 100% 100%, #000 0%, rgb(0 0 0 / 0.55) 38%, transparent 72%); }
 .plate { border-radius: 10px; background: var(--color-surface); box-shadow: 0 1px 2px rgb(21 24 28 / 0.05), 0 8px 24px -8px rgb(43 58 82 / 0.14); }
-
-/* a claim lifts into a marble plaque when hovered or opened */
-.claim { border-radius: 10px; transition: background-color 180ms var(--ease-out), box-shadow 220ms var(--ease-out); }
-@media (hover: hover) and (pointer: fine) { .claim:hover { background: color-mix(in srgb, var(--color-surface) 62%, transparent); } }
-.claim[data-expanded] { background: var(--color-surface); box-shadow: 0 1px 2px rgb(21 24 28 / 0.06), 0 10px 28px -6px rgb(43 58 82 / 0.16); }
 
 .tabs { display: flex; gap: 6px; }
 .tabs > button { height: 26px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--color-rule); font-size: 12px; font-weight: 500; color: var(--color-muted); transition: background-color 160ms, color 160ms, border-color 160ms; }
@@ -106,8 +98,16 @@ body {
 .tabs.on-scene > button:not([aria-selected="true"]) { background: var(--color-surface); box-shadow: 0 1px 2px rgb(21 24 28 / 0.06); }
 @media (hover: hover) and (pointer: fine) { .tabs > button:hover:not([aria-selected="true"]) { color: var(--color-ink); border-color: var(--color-faint); } }
 
-@keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
-.skeleton { border-radius: 4px; background: linear-gradient(90deg, color-mix(in srgb, var(--color-surface) 50%, transparent) 25%, var(--color-surface) 50%, color-mix(in srgb, var(--color-surface) 50%, transparent) 75%); background-size: 200% 100%; animation: shimmer 1.6s linear infinite; }
+/* the conversation: your words are graphite (the same matter as the mote), Litmus answers in marble */
+.msg-human { margin: 0; max-width: 85%; align-self: flex-end; padding: 8px 12px; border-radius: 14px 14px 4px 14px; background: var(--color-graphite); color: var(--color-surface); font-size: 13px; line-height: 1.4; box-shadow: 0 6px 16px -8px rgb(21 24 28 / 0.45); }
+.msg-litmus { padding: 9px 12px; border-radius: 4px 14px 14px 14px; background: linear-gradient(180deg, var(--color-surface), var(--color-marble)); border: 1px solid var(--color-rule); font-size: 13px; line-height: 1.55; color: var(--color-ink); box-shadow: 0 1px 2px rgb(21 24 28 / 0.04), 0 8px 20px -12px rgb(43 58 82 / 0.22); }
+.thread-note { margin: 0; display: flex; align-items: center; gap: 10px; font-size: 11.5px; line-height: 1.35; color: var(--color-muted); }
+.thread-note::before, .thread-note::after { content: ""; flex: 1; min-width: 12px; height: 1px; background: var(--color-rule); }
+@keyframes typing { 0%, 80%, 100% { opacity: 0.25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-2px); } }
+.typing { display: inline-flex; gap: 4px; padding: 12px 14px; }
+.typing span { width: 5px; height: 5px; border-radius: 1px; background: var(--color-faint); transform-origin: center; animation: typing 1.1s ease-in-out infinite; rotate: 45deg; }
+.typing span:nth-child(2) { animation-delay: 0.15s; }
+.typing span:nth-child(3) { animation-delay: 0.3s; }
 
 /* the question in flight: a mote of the same graphite as the experiments */
 .mote { width: 13px; height: 13px; border-radius: 999px; background: radial-gradient(circle at 35% 30%, #6a7079, #15181c 70%); box-shadow: 0 0 0 4px rgb(47 90 134 / 0.1), 0 6px 16px -2px rgb(21 24 28 / 0.35); will-change: transform; }
@@ -132,7 +132,7 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .intro-in { animation: none; opacity: 1; }
-  .live-dot, .skeleton { animation: none; }
-  .claim, .tabs > button, .switch-track, .switch-thumb { transition: none; }
+  .live-dot, .typing span, .spark, .spark line, .thinking-text { animation: none; }
+  .tabs > button, .switch-track, .switch-thumb { transition: none; }
   .btn, .star-label { transition: none; }
 }
