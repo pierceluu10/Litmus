@@ -1,6 +1,6 @@
 import { Fragment, useState } from 'react'
 import { api, useStore } from '../store'
-import { agentDetail, agentName, chosenLabel, pct, progressFraction, pts, starTone, toneVar } from '../lib/format'
+import { agentDetail, agentName, pct, progressFraction, pts, starTone, toneVar } from '../lib/format'
 import type { Star } from '../types'
 import { PathChart } from './PathChart'
 import { ProvChip, ProvList } from './Prov'
@@ -125,58 +125,32 @@ function Verdict({ s }: { s: Star }) {
   )
 }
 
-function Seeds({ s }: { s: Star }) {
-  const [open, setOpen] = useState(false)
-  if (!s.runs.length) return null
-  return (
-    <section>
-      <button className="flex w-full items-baseline justify-between text-left" aria-expanded={open} onClick={() => setOpen(!open)}>
-        <h3 className="m-0 text-[12px] font-semibold text-muted">Per-seed runs</h3><span className="label">{open ? 'hide' : `${s.runs.length} seeds`}</span>
-      </button>
-      {open && (
-        <table className="num mt-2 w-full border-collapse text-[11.5px]">
-          <thead><tr className="text-left text-faint"><th className="py-1 font-normal">seed</th><th className="font-normal">parent</th><th className="font-normal">this</th><th className="text-right font-normal">Δ</th></tr></thead>
-          <tbody>
-            {s.runs.map((r) => {
-              const p = s.parent_runs.find((x) => x.seed === r.seed)
-              const acc = r.tta_val_acc ?? r.val_acc, pacc = p ? p.tta_val_acc ?? p.val_acc : undefined
-              return <tr key={r.seed} className="border-t border-rule"><td className="py-1">{r.seed}</td><td>{pacc !== undefined ? pct(pacc) : '–'}</td><td>{pct(acc)}</td><td className="text-right">{pacc !== undefined ? pts(acc - pacc) : ''}</td></tr>
-            })}
-          </tbody>
-        </table>
-      )}
-    </section>
-  )
-}
-
 function Actions({ s }: { s: Star }) {
-  const { branch, feedback, explain, explained, explainBusy, stopBranch, app } = useStore()
-  const [mode, setMode] = useState<null | 'branch' | 'challenge'>(null)
+  const { branch, explain, explained, explainBusy, stopBranch, app } = useStore()
+  const [mode, setMode] = useState(false)
   const [text, setText] = useState('')
   const ex = explained[s.id]
   const live = s.status === 'running' || s.status === 'queued'
   const pending = app.session?.proposals.some((p) => p.star_id === s.id && p.status === 'open')
   const submit = async () => {
-    if (mode === 'branch') await branch(s.id, text)
-    else if (mode === 'challenge') await feedback(s.id, 'challenge', text.trim() || 'Could be seed noise.')
-    setText(''); setMode(null)
+    await branch(s.id, text)
+    setText(''); setMode(false)
   }
   return (
     <section className="space-y-2.5">
       <div className="flex flex-wrap gap-2">
-        <button className="btn btn-primary" disabled={live || pending} onClick={() => setMode(mode === 'branch' ? null : 'branch')}>{pending ? 'Proposals ready below' : 'Branch from here'}</button>
-        {s.grade && s.grade.verdict !== 'baseline' && s.grade.n < 10 && <button className="btn" onClick={() => setMode(mode === 'challenge' ? null : 'challenge')}>Challenge</button>}
+        <button className="btn btn-primary" disabled={live || pending} onClick={() => setMode(!mode)}>{pending ? 'Proposals ready below' : 'Branch from here'}</button>
         <button className="btn" disabled={explainBusy || !s.grade} onClick={() => explain(s.id)}>{explainBusy ? 'Explaining…' : 'Explain'}</button>
         {live && <button className="btn" onClick={() => stopBranch(s.id)}>Stop</button>}
       </div>
       {mode && (
         <div className="space-y-2">
-          <label htmlFor="steer" className="label block">{mode === 'branch' ? 'Agents will propose experiments that start from this result. Steer them (optional):' : 'Why do you doubt it? The agent adds 5 seeds.'}</label>
+          <label htmlFor="steer" className="label block">Agents will propose experiments that start from this result. Steer them (optional):</label>
           <textarea id="steer" autoFocus value={text} onChange={(e) => setText(e.target.value)} rows={2}
-            placeholder={mode === 'branch' ? 'e.g. try it with longer training' : 'e.g. this looks like seed noise'}
+            placeholder="e.g. try it with longer training"
             className="w-full resize-none rounded-md border border-rule bg-surface p-2 focus:border-ink focus:outline-none"
             onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit() }} />
-          <button className="btn btn-primary" onClick={submit}>{mode === 'branch' ? 'Ask for proposals' : 'Add seeds'}</button>
+          <button className="btn btn-primary" onClick={submit}>Ask for proposals</button>
         </div>
       )}
       {ex && <div className="rounded-md bg-paper p-3 text-[12.5px] leading-relaxed"><p className="m-0">{ex.answer}</p></div>}
@@ -198,14 +172,13 @@ function Detail({ s }: { s: Star }) {
           {s.parent_id && <span className="num text-[12px] text-faint">{agentDetail(s)}</span>}
         </div>
         <p className="m-0 mt-1.5 leading-snug">{s.title}</p>
-        <p className="m-0 mt-0.5 text-[12px] text-muted">{chosenLabel(s.chosen_by)}{s.parent_id ? ` · from ${agentName(stars.find((x) => x.id === s.parent_id)!)}` : ''}</p>
+        <p className="m-0 mt-0.5 text-[12px] text-muted">{s.parent_id && `From ${agentName(stars.find((x) => x.id === s.parent_id)!)}`}</p>
       </section>
       <Verdict s={s} />
       <section><H>Accuracy along this path</H><PathChart stars={stars} highlight={s} /></section>
       {s.reflection && <p className="m-0 text-[13px] leading-relaxed">{s.reflection}</p>}
       {replans.map((r) => <p key={r.seq} className="m-0 text-[12.5px] text-human">“{r.because}” → {r.change}</p>)}
       {s.provenance.length > 0 && <section><H>Tested claim</H><ProvList items={s.provenance} /></section>}
-      <Seeds s={s} />
       <Actions s={s} key={s.id} />
     </div>
   )

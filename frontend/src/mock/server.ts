@@ -114,10 +114,9 @@ export class MockServer {
     if (!options.length) { this.think(`Nothing left to test from ${s.title} with the claims in your library.`, starId); return }
     // after a loss, more training is the cheapest way to tell "wrong" from "not converged"
     if (s.grade && s.grade.delta < 0) options.sort((a, b) => Number(b.m.key === 'longer') - Number(a.m.key === 'longer'))
-    const pick = options[0].m.key
     const proposals: Proposal[] = options.slice(0, starId === 'S0' && !because ? FIRST_WAVE.length : MAX_PROPOSALS).map(({ m, changes }) => ({
       id: uid('prop'), star_id: starId, title: m.title(s.knobs), hypothesis: m.hypothesis, predicted: m.predicted, knob_changes: changes,
-      condition_notes: m.note, provenance: because ? [...m.prov, { kind: 'human', id: uid('hum'), text: because }] : m.prov, agent_recommended: m.key === pick, status: 'open',
+      condition_notes: m.note, provenance: because ? [...m.prov, { kind: 'human', id: uid('hum'), text: because }] : m.prov, agent_recommended: false, status: 'open',
     }))
     this.think(because ? `Planning from ${s.title}, as you asked.` : `${proposals.length} experiments to run from ${s.title}.`, starId)
     this.emit('proposals.ready', { star_id: starId, proposals })
@@ -128,26 +127,18 @@ export class MockServer {
     const open = this.session.proposals.filter((p) => p.star_id === star_id && p.status === 'open')
     if (!open.length) throw new Error('No open proposals for this star')
     const chosen = selections.map((s) => open.find((p) => p.id === s.proposal_id)).filter((p): p is Proposal => !!p)
-    const rec = open.filter((p) => p.agent_recommended)
-    const skipped = rec.filter((r) => !chosen.includes(r))
-    const added = chosen.filter((c) => !c.agent_recommended)
     const decision: Decision = {
-      id: uid('dec'), star_id, kind: 'dispatch', agent_recommendation: rec.map((p) => p.title).join(' + '),
+      id: uid('dec'), star_id, kind: 'dispatch', agent_recommendation: '',
       human_choice: chosen.map((p) => p.title).join(' + ') + (instruction ? ` (“${instruction}”)` : ''),
-      agent_recommendation_ids: rec.map((p) => p.id), human_choice_ids: chosen.map((p) => p.id), changed_trajectory: skipped.length + added.length > 0,
-      note: skipped.length + added.length ? [...added.map((c) => `added ${c.title}`), ...skipped.map((r) => `skipped ${r.title}`)].join(', ') : 'You agreed with the agent.',
+      agent_recommendation_ids: [], human_choice_ids: chosen.map((p) => p.id), changed_trajectory: false, note: '',
       created_at: new Date().toISOString(),
     }
     this.emit('human.dispatched', { star_id, selections, decision })
     this.emit('session.status', { status: 'running' })
     chosen.forEach((p, i) => this.later(() => {
-      const st = this.newStar(star_id, p.title, p.hypothesis, p.knob_changes, p.provenance, p.agent_recommended ? 'agent' : 'human', p.predicted, { proposal_id: p.id })
+      const st = this.newStar(star_id, p.title, p.hypothesis, p.knob_changes, p.provenance, 'human', p.predicted, { proposal_id: p.id })
       this.later(() => this.run(st.id, SEEDS), 500)
     }, i * 350))
-    skipped.forEach((p, i) => this.later(() => {
-      const st = this.newStar(star_id, p.title, p.hypothesis, p.knob_changes, p.provenance, 'shadow', p.predicted, { shadow_of: decision.id, proposal_id: p.id })
-      this.later(() => this.run(st.id, SEEDS), 500)
-    }, 1200 + i * 350))
   }
 
   answer(question_id: string, option_id: string, comment?: string) {
@@ -173,10 +164,7 @@ export class MockServer {
     this.emit('feedback.received', { star_id, kind, text })
     this.later(() => {
       const s = this.star(star_id)
-      if (kind === 'challenge' && s.grade && s.grade.n < EXTRA_SEEDS.length * 2) {
-        this.emit('agent.replanned', { star_id, because: text, change: `5 more seeds on ${s.title}` })
-        this.run(star_id, EXTRA_SEEDS)
-      } else if (kind === 'suggest') {
+      if (kind === 'suggest') {
         this.emit('agent.replanned', { star_id, because: text, change: `New branches from ${s.title}` })
         this.propose(star_id, MOVES, text)
       } else {

@@ -59,7 +59,6 @@ export function starTone(s: Star): Tone {
   return s.grade?.verdict ?? 'inconclusive'
 }
 export const toneVar = (t: Tone) => `var(--color-${t})`
-export const chosenLabel = (c: Star['chosen_by']) => ({ human: 'Chosen by you', agent: 'Agent recommended, you agreed', auto: 'Automatic', shadow: 'Agent alone (shadow run)' })[c]
 
 export function progressFraction(s: Star): number {
   const seeds = Math.max(5, new Set((s.progress ?? []).map((p) => p.seed)).size)

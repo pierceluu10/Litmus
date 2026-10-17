@@ -13,7 +13,7 @@ const panel = 'mx-auto w-full max-w-[920px] rounded-xl border border-rule bg-sur
 function Proposals({ starId, items, background }: { starId: string; items: Proposal[]; background: boolean }) {
   const { dispatch, app, select } = useStore()
   const from = app.session!.stars.find((s) => s.id === starId)
-  const [sel, setSel] = useState<string[]>(() => items.filter((p) => p.agent_recommended).map((p) => p.id))
+  const [sel, setSel] = useState<string[]>([])
   const [instr, setInstr] = useState('')
   const [busy, setBusy] = useState(false)
   const [folded, setFolded] = useState<boolean | null>(null) // null: fold while something newer needs attention, until the human chooses
@@ -39,7 +39,6 @@ function Proposals({ starId, items, background }: { starId: string; items: Propo
                 </span>
                 <span className="num mt-1 pl-5 text-[11px] text-muted">{knobText(p.knob_changes)} · {EXPECTS[p.predicted]}</span>
                 <span className="mt-auto flex flex-wrap items-center gap-1.5 pl-5 pt-2">
-                  {p.agent_recommended && <span className="text-[11px] font-medium text-agent">agent’s pick</span>}
                   {claim && <ProvChip p={claim} />}
                 </span>
               </label>
@@ -54,7 +53,7 @@ function Proposals({ starId, items, background }: { starId: string; items: Propo
           Dispatch {sel.length || ''} agent{sel.length === 1 ? '' : 's'}
         </button>
       </div>
-      <p className="label m-0 mt-2">Pick up to {MAX_AGENTS}. If you skip the agent’s pick, it still runs on its own so you can compare.</p>
+      <p className="label m-0 mt-2">Pick up to {MAX_AGENTS}.</p>
       </>}
     </section>
   )
