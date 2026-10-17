@@ -15,6 +15,8 @@ export interface Api {
   warmup(): Promise<void>
   // Sends an uploaded library to the backend so sessions read it instead of the Papiers CLI.
   importLibrary(lib: Library): Promise<void>
+  // Gives the backend the user's own Papiers API token (kept in its memory only) so it reads their library; rejects when it is not valid.
+  connectPapiers(token: string): Promise<void>
   library(onStage: (stage: LibraryStage) => void, signal: AbortSignal): Promise<Library>
   createSession(body: { goal?: string; budget_gpu_seconds?: number; auto_mode?: boolean; fresh?: boolean }): Promise<string>
   replayDemo(): Promise<string>

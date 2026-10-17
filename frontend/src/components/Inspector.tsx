@@ -5,7 +5,6 @@ import { agentDetail, agentName, pct, pts, starTone, toneVar } from '../lib/form
 import type { Provenance } from '../types'
 import { PathChart } from './PathChart'
 import { ProvChip } from './Prov'
-import { Researching } from './Researching'
 import { Steering } from './Steering'
 import { SceneBackdrop } from './LowPolyScene'
 
@@ -23,7 +22,6 @@ function Overview() {
   const count = (v: string) => graded.filter((x) => x.grade!.verdict === v).length
   return (
     <div className="space-y-6 p-4">
-      <Researching inline />
       <section>
         <h2 className="m-0 text-[15px] font-semibold tracking-[-0.01em]">Results</h2>
         {graded.length > 0 && (

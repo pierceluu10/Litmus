@@ -389,7 +389,7 @@ export function Landing() {
   return (
     <main ref={main} className="h-full overflow-y-auto bg-surface" onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 40)}>
       <nav className={`sticky top-0 z-30 flex items-center justify-between px-[clamp(20px,4vw,56px)] py-3.5 transition-colors ${scrolled ? 'border-b border-rule bg-surface/95' : 'border-b border-transparent'}`}>
-        <button className="border-0 bg-transparent p-0 text-[20px] font-bold tracking-tight" onClick={() => main.current?.scrollTo({ top: 0, behavior: 'smooth' })}>Litmus</button>
+        <button className="inline-flex items-center gap-2 border-0 bg-transparent p-0 text-[20px] font-bold tracking-tight" onClick={() => main.current?.scrollTo({ top: 0, behavior: 'smooth' })}><img src="/litmus-face.svg" alt="" width={28} height={28} />Litmus</button>
         <div className="flex items-center gap-2">
           <DemoSwitch />
           {user ? (
