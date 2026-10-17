@@ -43,7 +43,7 @@ function SceneChrome() {
         <button className="btn h-7 px-2.5 text-[12px]" aria-pressed={follow} onClick={() => set({ follow: !follow })} style={follow ? { borderColor: 'var(--color-ink)' } : undefined}>
           {follow ? 'Following' : 'Follow'} new branches
         </button>
-        <button className="btn h-7 px-2.5 text-[12px]" aria-pressed={fitAll} title={fitAll ? 'Go back to the default view' : 'Zoom out to see every experiment'} onClick={() => set({ follow: false, fitAll: !fitAll })} style={fitAll ? { borderColor: 'var(--color-ink)' } : undefined}>{fitAll ? 'Default view' : 'Fit all'}</button>
+        <button className="btn h-7 px-2.5 text-[12px]" aria-pressed={fitAll} title={fitAll ? 'Go back to the default view' : 'Zoom out to see every experiment'} onClick={() => set({ follow: false, fitAll: !fitAll, proceedFor: null })} style={fitAll ? { borderColor: 'var(--color-ink)' } : undefined}>{fitAll ? 'Default view' : 'Fit all'}</button>
         <ClaimPicker />
       </div>
     </>

@@ -152,6 +152,9 @@ function StarBlob({ star, target, live, dim, selected }: { star: Star; target: P
   const proposals = useStore((s) => s.app.session?.proposals) // the store's own array: filtering inside the selector would return a new one every render
   const options = useMemo(() => (proposals ?? []).filter((p) => p.star_id === star.id && p.status === 'open'), [proposals, star.id])
   const hasOptions = options.length > 0 && star.status === 'done'
+  const claims = useStore((s) => s.app.claims)
+  const claim = star.parent_id ? claims.find((c) => star.provenance.some((p) => provMatches(p, c.id))) : undefined
+  const claimName = claim ? (claim.summary ?? claim.text.split(/\s+/).slice(0, 6).join(' ') + '…') : undefined
   const group = useRef<import('three').Group>(null)
   const body = useRef<Mesh>(null)
   const [hover, setHover] = useState(false)
@@ -209,8 +212,9 @@ function StarBlob({ star, target, live, dim, selected }: { star: Star; target: P
       {/* anchored by its top edge, just under the ring, so the name never sits over the sphere */}
       <Html position={[0, -r - 4, 0]} zIndexRange={[20, 0]} style={{ opacity: dim ? 0.25 : 1, transition: 'opacity 200ms' }}>
         <div style={{ transform: 'translateX(-50%)', marginTop: 3 }}>
-        <button type="button" className="star-label" data-selected={selected || undefined} onClick={() => select(star.id)} aria-label={`${agentName(star)}, ${star.title}`}>
+        <button type="button" className="star-label" data-selected={selected || undefined} onClick={() => select(star.id)} aria-label={`${agentName(star)}, ${star.title}`} title={claim ? `Testing: ${claim.text}` : undefined}>
           <span className="star-label-name">{agentName(star)}{shadow && <span className="text-muted"> · alone</span>}</span>
+          {claimName && <span className="star-label-claim">{claimName}</span>}
           <span className="star-label-value" style={{ color: toneColor(tone) }}>{[star.parent_id && agentDetail(star), value].filter(Boolean).join('  ')}</span>
         </button>
         </div>
