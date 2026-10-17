@@ -5,8 +5,7 @@ import { realApi } from './transport/real'
 import type { Api, ConnState, LibraryStage } from './transport/api'
 import type { ChatTurn, Provenance, Selection } from './types'
 
-// Live (the FastAPI backend, Modal A100s) unless the in-browser practice backend is chosen: the Tutorial does, for one visit;
-// developers can keep it on with ?demo=1.
+// Live (the FastAPI backend, Modal A100s) unless Demo mode is on: the front page's switch (remembered), or ?demo=1.
 const DEMO_KEY = 'litmus.demo'
 const savedDemo = () => { try { return localStorage.getItem(DEMO_KEY) === '1' || /[?&]demo=1\b/.test(location.search) } catch { return false } }
 export const apiFor = (demo: boolean): Api => (demo ? mockApi : realApi)

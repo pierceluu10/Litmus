@@ -43,7 +43,7 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
-Run `./dev.sh` (backend on :8000 with a Modal warmup, frontend on :5173): by default every experiment trains live on Modal A100s. The **Tutorial** button on the front page runs a guided tour on an in-browser backend instead: a simulated airbench calibrated from a recorded real session, graded by a port of the same locked grader, no keys or GPU needed.
+Run `./dev.sh` (backend on :8000 with a Modal warmup, frontend on :5173): by default every experiment trains live on Modal A100s. The **Demo mode** switch at the top right of the front page uses an in-browser backend instead: a simulated airbench calibrated from a recorded real session, graded by a port of the same locked grader, no keys or GPU needed.
 
 The statue is the Artemision Bronze, from the public-domain 3D scan by SMK, the National Gallery of Denmark.
 
