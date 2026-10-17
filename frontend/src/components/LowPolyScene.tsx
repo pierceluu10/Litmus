@@ -1,3 +1,4 @@
+import { bustPolys } from './bust'
 // A low-poly temple: pediment, columns and a marble bust, all flat-shaded triangles.
 // Generated from seeded jitter so it renders identically every time.
 type P = [number, number]
@@ -14,28 +15,6 @@ const tri = (a: P, b: P, c: P, t: number, tint?: number[]): Tri => ({ pts: [a, b
 const facing = (c: P, center: P, r: () => number) => {
   const dx = c[0] - center[0], dy = c[1] - center[1], len = Math.hypot(dx, dy) || 1
   return 0.6 - (dx / len * LIGHT[0] + dy / len * LIGHT[1]) * 0.42 + (r() - 0.5) * 0.22
-}
-
-function ellipseMesh(cx: number, cy: number, rx: number, ry: number, seed: number, tint?: number[], segs = 12, rings = 3): Tri[] {
-  const r = seeded(seed), out: Tri[] = []
-  const ring = (k: number): P[] => Array.from({ length: segs }, (_, i) => {
-    const a = (i / segs) * Math.PI * 2, f = k / rings, j = k === rings ? 1 : 0.85 + r() * 0.3
-    return [cx + Math.cos(a) * rx * f * j, cy + Math.sin(a) * ry * f * j] as P
-  })
-  let prev = ring(1)
-  const center: P = [cx - rx * 0.05, cy - ry * 0.05]
-  for (let i = 0; i < segs; i++) out.push(tri(center, prev[i], prev[(i + 1) % segs], facing([(prev[i][0] + prev[(i + 1) % segs][0]) / 2, (prev[i][1] + prev[(i + 1) % segs][1]) / 2], [cx, cy], r), tint))
-  for (let k = 2; k <= rings; k++) {
-    const cur = ring(k)
-    for (let i = 0; i < segs; i++) {
-      const j = (i + 1) % segs
-      const c1: P = [(prev[i][0] + cur[i][0] + cur[j][0]) / 3, (prev[i][1] + cur[i][1] + cur[j][1]) / 3]
-      const c2: P = [(prev[i][0] + prev[j][0] + cur[j][0]) / 3, (prev[i][1] + prev[j][1] + cur[j][1]) / 3]
-      out.push(tri(prev[i], cur[i], cur[j], facing(c1, [cx, cy], r), tint), tri(prev[i], cur[j], prev[j], facing(c2, [cx, cy], r), tint))
-    }
-    prev = cur
-  }
-  return out
 }
 
 // a trapezoid cut into a jittered grid
@@ -93,18 +72,17 @@ export function LowPolyScene({ className }: { className?: string }) {
     tri([40, 462], [860, 462], [40, 482], 0.92), tri([860, 462], [860, 482], [40, 482], 0.66),
     tri([20, 482], [880, 482], [20, 504], 0.88), tri([880, 482], [880, 504], [20, 504], 0.58),
   ]
-  const halo = ellipseMesh(450, 270, 190, 190, 5, [176, 196, 222], 14, 3)
-  const hair = ellipseMesh(450, 168, 62, 52, 31, [96, 108, 130], 12, 2)
-  const pedestal = gridMesh([380, 520, 430], [370, 530, 462], 4, 2, 41)
-  const chest = gridMesh([376, 524, 318], [326, 574, 430], 5, 3, 51)
-  const neck = gridMesh([428, 472, 262], [424, 476, 326], 2, 2, 61)
-  const head = ellipseMesh(450, 214, 49, 64, 71, undefined, 12, 3)
-  const face: Tri[] = [tri([450, 196], [441, 238], [459, 238], 0.5), tri([450, 196], [459, 238], [452, 200], 0.9)]
-  const marble = [...sky, ...floor, ...halo, ...behind, ...pediment, ...front, ...steps, ...pedestal, ...chest, ...neck, ...hair, ...head, ...face]
+  const halo: Tri[] = Array.from({ length: 16 }, (_, i) => {
+    const a0 = (i / 16) * Math.PI * 2, a1 = ((i + 1) / 16) * Math.PI * 2
+    return tri([450, 262], [450 + Math.cos(a0) * 175, 262 + Math.sin(a0) * 175], [450 + Math.cos(a1) * 175, 262 + Math.sin(a1) * 175], 0.62 + 0.22 * Math.cos(a0 - 3.9) * (i % 2 ? 1 : 0.7), [168, 190, 220])
+  })
+  const bust = bustPolys(450, 462, 4.1)
+  const marble = [...sky, ...floor, ...halo, ...behind, ...pediment, ...front, ...steps]
   const poly = (t: Tri, i: number) => <polygon key={i} points={t.pts.map((p) => p.join(',')).join(' ')} fill={t.fill} stroke={t.fill} strokeWidth={0.6} strokeLinejoin="round" />
   return (
     <svg viewBox="-240 -60 1380 700" className={className} preserveAspectRatio="xMidYMid meet" role="img" aria-label="A low-poly Greek temple with a marble bust between two columns">
       {marble.map(poly)}
+      {bust.map((b, i) => <polygon key={`b${i}`} points={b.points} fill={b.fill} stroke={b.fill} strokeWidth={0.5} strokeLinejoin="round" />)}
     </svg>
   )
 }
