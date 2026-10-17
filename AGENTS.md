@@ -18,7 +18,7 @@ Papiers CLI ──read──▶ papiers_client ──▶ library context (judgme
                                               │
 FastAPI (REST + WS) ◀──events── LangGraph engine (SQLite checkpoints, thread = session)
    ▲    │                           │  intake → baseline → propose → [interrupt: human selects]
-   │    └── human actions ──────────┘    → fan-out → branch ×N: plan → run → grade → reflect
+   │    └── human actions ──────────┘    → fan-out → branch ×N: run (+fair parent re-run) → grade → reflect
    │        dispatch/answer/feedback        (reflect: library search, question, follow-ups)
    │                                     → join → budget → loop | abstract → write-back
 Frontend (React)                 Modal app "litmus": train(knobs, seed) on A100, streams epochs
@@ -40,6 +40,17 @@ uv sync
 cp ../.env.example ../.env   # repo-root .env (backend/.env also read); fill OPENAI_API_KEY, OPENAI_MODEL
 uv run litmus --help
 ```
+
+## Demo runbook (judging)
+1. `cd backend && uv run litmus serve` (keep the terminal visible: it logs every engine step).
+2. ~2 minutes before judging: `uv run litmus warmup` (or `POST /api/warmup`); `GET /api/health` should show
+   `modal_warm, papiers_ok, openai_ok` all true. A container stays warm 10 minutes after its last use.
+3. Live session: `POST /api/sessions {"fresh": true}` so every star trains live with epoch progress. Expect
+   ~35s to the first proposals (library + baseline), ~1–2 min per wave, ~6 min for 3 waves, ≈300–500 GPU-s
+   (≈$0.30 on an A100).
+4. If Wi-Fi, Modal, or OpenAI fails: `GET /api/replay/demo` (the UI's "Replay demo") re-streams the recorded
+   real session offline, flagged `replay: true`.
+5. A crashed or restarted server resumes every unfinished session on startup (verified with `kill -9`).
 
 ## Env vars (repo-root `.env` or `backend/.env`, gitignored)
 | Var | Purpose |
