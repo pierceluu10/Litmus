@@ -51,7 +51,7 @@ export default function App() {
   return (
     <div className="flex h-full flex-col">
       <TopBar />
-      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[290px_minmax(0,1fr)_370px] lg:overflow-hidden">
+      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[270px_minmax(0,1fr)_350px] lg:overflow-hidden">
         <div className="flex min-h-0 flex-col border-r border-rule bg-surface max-lg:max-h-[60vh]"><Library /><Feed /></div>
         <div className="flex min-h-0 min-w-0 flex-col max-lg:h-[80vh]">
           <div className="relative min-h-0 flex-1"><StarMap /><Legend /><Dock /></div>

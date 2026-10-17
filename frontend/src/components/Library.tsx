@@ -20,8 +20,8 @@ export function Library() {
   const rows = useMemo(() => app.claims.slice().sort((a, b) => a.rank - b.rank).map((c) => ({ c, ...claimStatus(c, stars) })), [app.claims, stars])
   return (
     <section aria-label="Your Papiers library" className="flex min-h-0 flex-1 flex-col">
-      <h2 className="m-0 px-4 pb-1 pt-3 font-serif text-[16px] font-semibold">Your reading</h2>
-      <p className="m-0 px-4 pb-2 text-[12.5px] text-muted">Your highlights, ranked by engagement. Hover one to light up its stars.</p>
+      <h2 className="m-0 px-4 pb-1 pt-3 text-[15px] font-bold">Your reading</h2>
+      <p className="m-0 px-4 pb-2 text-[12px] text-muted">Hover a claim to light up its stars.</p>
       <ul className="m-0 min-h-0 flex-1 list-none space-y-2 overflow-y-auto px-3 pb-3">
         {!rows.length && <li className="px-1 text-muted">Loading your library…</li>}
         {rows.map(({ c, status, stars: ss }) => (
@@ -34,9 +34,8 @@ export function Library() {
                 <span className="tag" style={{ color: COLOR[status] }}>{status}</span>
                 <span className="num text-[11.5px] text-muted">#{c.rank}{c.page ? ` · p.${c.page}` : ''}</span>
               </span>
-              <span className="mt-1 block font-serif text-[13.5px] leading-snug">{c.text}</span>
-              {c.annotation && <span className="mt-1.5 block rounded border border-human/40 bg-human/5 px-2 py-1 text-[12.5px] italic text-human">Your note: {c.annotation}</span>}
-              <span className="mt-1.5 block truncate text-[11.5px] text-muted">{c.doc_title}</span>
+              <span className="mt-1 line-clamp-3 block text-[13px] leading-snug">{c.text}</span>
+              {c.annotation && <span className="mt-1.5 line-clamp-2 block text-[12px] italic text-human">“{c.annotation}”</span>}
             </button>
           </li>
         ))}

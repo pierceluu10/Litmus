@@ -17,7 +17,7 @@ function Proposals({ starId, items }: { starId: string; items: Proposal[] }) {
   return (
     <section aria-label="Proposed experiments" className="rounded-lg border border-waiting bg-surface p-3 shadow-[0_8px_24px_rgba(42,38,32,0.12)]">
       <h2 className="m-0 font-serif text-[17px] font-semibold">Where should the agents go next?</h2>
-      <p className="m-0 mb-2 text-[12.5px] text-muted">Each direction comes from something you read. Pick up to 4; they run in parallel. The agent’s recommendation is pre-selected, change it if you disagree.</p>
+      <p className="m-0 mb-2 text-[12.5px] text-muted">Each comes from something you read. Pick up to 4. The agent’s picks are pre-selected.</p>
       <ul className="m-0 grid list-none gap-2 p-0" style={{ gridTemplateColumns: `repeat(${Math.min(items.length, 4)}, minmax(0, 1fr))` }}>
         {items.map((p) => {
           const on = sel.includes(p.id)
@@ -26,12 +26,11 @@ function Proposals({ starId, items }: { starId: string; items: Proposal[] }) {
               <div className="flex h-full flex-col rounded-md border-2 p-2.5 text-left" style={{ borderColor: on ? 'var(--color-human)' : 'var(--color-rule)', background: on ? 'color-mix(in srgb, var(--color-human) 5%, var(--color-surface))' : undefined }}>
                 <label className="flex cursor-pointer items-start gap-2">
                   <input type="checkbox" className="mt-1" checked={on} onChange={() => toggle(p.id)} disabled={!on && sel.length >= 4} />
-                  <span className="font-medium leading-snug">{p.title}</span>
+                  <span className="font-medium leading-snug" title={p.condition_notes}>{p.title}</span>
                 </label>
                 {p.agent_recommended && <span className="tag mt-1" style={{ color: 'var(--color-agent)' }}>agent recommends</span>}
                 <p className="m-0 mt-1 font-serif text-[13px] leading-snug">{p.hypothesis}</p>
                 <p className="m-0 mt-1 text-[12px] text-muted"><span className="num">{knobText(p.knob_changes)}</span> · {PRED[p.predicted]}</p>
-                <p className="m-0 mt-1 text-[12px] text-muted">{p.condition_notes}</p>
                 <div className="mt-auto pt-2"><ProvList items={p.provenance.slice(0, 3)} /></div>
               </div>
             </li>

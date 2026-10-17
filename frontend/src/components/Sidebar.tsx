@@ -5,7 +5,7 @@ import type { Star } from '../types'
 import { PathChart } from './PathChart'
 import { ProvList } from './Prov'
 
-const H = ({ children }: { children: React.ReactNode }) => <h3 className="m-0 mb-1.5 font-serif text-[14.5px] font-semibold">{children}</h3>
+const H = ({ children }: { children: React.ReactNode }) => <h3 className="m-0 mb-1.5 text-[13px] font-semibold text-muted">{children}</h3>
 
 function Verdict({ s }: { s: Star }) {
   const g = s.grade
@@ -110,7 +110,7 @@ export function Sidebar() {
   const parent = stars.find((x) => x.id === s.parent_id)
   const replans = app.replans.filter((r) => r.star_id === s.id)
   return (
-    <aside className="space-y-4 p-4" aria-label={`Details for ${s.title}`}>
+    <aside className="space-y-5 p-4" aria-label={`Details for ${s.title}`}>
       <div>
         <div className="flex items-center gap-2">
           <span className="grid h-8 w-8 place-items-center rounded-full border-2 font-serif text-[18px]" style={{ borderColor: toneVar(starTone(s)), color: toneVar(starTone(s)) }}>{starLetter(s.id)}</span>
@@ -121,7 +121,10 @@ export function Sidebar() {
       </div>
       <section><H>Verdict</H><Verdict s={s} /></section>
       <section><H>Accuracy along this path</H><PathChart stars={stars} selected={s} /></section>
-      <section><H>Seeds</H><Runs s={s} parent={parent} /></section>
+      <details className="rounded-md border border-rule bg-surface px-3 py-2">
+        <summary className="cursor-pointer text-[13px] font-semibold">Seeds ({s.runs.length || (s.progress?.length ? 'running' : 0)})</summary>
+        <div className="mt-2"><Runs s={s} parent={parent} /></div>
+      </details>
       {s.reflection && <section><H>What the agent makes of it</H><p className="m-0 font-serif text-[14px] leading-snug">{s.reflection}</p></section>}
       {replans.length > 0 && (
         <section><H>Because of you</H>

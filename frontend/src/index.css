@@ -1,11 +1,11 @@
 @import "tailwindcss";
 
 @theme {
-  --color-paper: #f9f9f8;
+  --color-paper: #eef2f7;
   --color-surface: #ffffff;
-  --color-rule: #e4e3df;
-  --color-ink: #1e2227;
-  --color-muted: #646a73;
+  --color-rule: #dde3ea;
+  --color-ink: #1b2026;
+  --color-muted: #5d6671;
   --color-confirmed: #4f6b2e;
   --color-refuted: #a83b34;
   --color-inconclusive: #7a7f86;
@@ -14,8 +14,8 @@
   --color-waiting: #b9770e;
   --color-human: #7b2d62;
   --color-agent: #3a5f8a;
-  --font-sans: "IBM Plex Sans", system-ui, sans-serif;
-  --font-serif: "Source Serif 4", Georgia, serif;
+  --font-sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-serif: "Helvetica Neue", Helvetica, Arial, sans-serif;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
 }
 

@@ -86,3 +86,13 @@ export function LowPolyScene({ className }: { className?: string }) {
     </svg>
   )
 }
+
+// The same faceted sky as the opening page, for use as a quiet backdrop behind the star map.
+export function LowPolySky({ className }: { className?: string }) {
+  const sky = gridMesh([0, 1600, 0], [0, 1600, 900], 14, 8, 91, [214, 226, 240])
+  return (
+    <svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" className={className} aria-hidden>
+      {sky.map((t, i) => <polygon key={i} points={t.pts.map((p) => p.join(',')).join(' ')} fill={t.fill} stroke={t.fill} strokeWidth={0.6} />)}
+    </svg>
+  )
+}

@@ -3,6 +3,7 @@ import { useStore } from '../store'
 import { layoutStars, type Pos } from '../lib/layout'
 import { chosenVar, knobText, progressFraction, provLabel, provMatches, starLetter, starTone, toneVar } from '../lib/format'
 import type { Document, Star } from '../types'
+import { LowPolySky } from './LowPolyScene'
 
 const R = 20
 const reduced = () => typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
@@ -59,29 +60,30 @@ function useCountUp(target: number, ms = 750) {
   return v
 }
 
-function Edge({ star, from, to, docs, selected, dim }: { star: Star; from: Pos; to: Pos; docs: Document[]; selected: boolean; dim: boolean }) {
-  const x1 = from.x + R, y1 = from.y, x2 = to.x - R, y2 = to.y
-  const mx = (x1 + x2) / 2
-  const d = `M${x1} ${y1} C${mx} ${y1} ${mx} ${y2} ${x2} ${y2}`
+function Edge({ star, from, to, docs, selected, dim, labelled }: { star: Star; from: Pos; to: Pos; docs: Document[]; selected: boolean; dim: boolean; labelled: boolean }) {
+  const dx = to.x - from.x, dy = to.y - from.y, len = Math.hypot(dx, dy) || 1, ux = dx / len, uy = dy / len
+  const x1 = from.x + ux * R, y1 = from.y + uy * R, x2 = to.x - ux * R, y2 = to.y - uy * R
+  const mx = (x1 + x2) / 2 - uy * len * 0.07, my = (y1 + y2) / 2 + ux * len * 0.07 // a slight bow, so lines read as organic
+  const d = `M${x1} ${y1} Q${mx} ${my} ${x2} ${y2}`
   const shadow = star.chosen_by === 'shadow'
   const color = chosenVar(star.chosen_by)
   const prov = star.provenance.find((p) => p.kind === 'note' || p.kind === 'human') ?? star.provenance[0]
   const landing = useMemo(() => d, []) // the travelling dot keeps its launch path; the line itself keeps easing
   return (
     <g opacity={dim ? 0.18 : shadow ? 0.55 : 1} style={{ transition: 'opacity 200ms' }}>
-      <path d={d} fill="none" stroke={color} strokeWidth={selected ? 2.4 : 1.6} strokeDasharray={shadow ? '5 5' : undefined} pathLength={shadow ? undefined : 1} className={shadow ? undefined : 'line-draw'} />
+      <path d={d} fill="none" stroke={color} strokeWidth={selected ? 2.8 : 2} strokeDasharray={shadow ? '5 5' : undefined} pathLength={shadow ? undefined : 1} className={shadow ? undefined : 'line-draw'} />
       {star.status !== 'done' && star.status !== 'failed' && !shadow && (
         <circle r={4} fill={color} className="agent-dot"><animateMotion dur="1.2s" path={landing} fill="freeze" /></circle>
       )}
-      <g transform={`translate(${mx} ${(y1 + y2) / 2 - 8})`} textAnchor="middle" style={{ pointerEvents: 'none' }}>
-        <text fontSize={11.5} fill="var(--color-ink)" stroke="var(--color-paper)" strokeWidth={4} paintOrder="stroke">{knobText(star.knob_changes)}</text>
+      {(labelled || shadow) && <g transform={`translate(${mx} ${my - 4})`} textAnchor="middle" style={{ pointerEvents: 'none' }}>
+        <text fontSize={11} fill="var(--color-muted)" stroke="var(--color-paper)" strokeWidth={4} paintOrder="stroke">{knobText(star.knob_changes)}</text>
         {prov && (selected || shadow) && <text y={13} fontSize={10.5} fill={color} stroke="var(--color-paper)" strokeWidth={4} paintOrder="stroke">{shadow ? 'agent alone would run this' : `from ${provLabel(prov, docs)}`}</text>}
-      </g>
+      </g>}
     </g>
   )
 }
 
-function Node({ star, pos, selected, dim, onSelect }: { star: Star; pos: Pos; selected: boolean; dim: boolean; onSelect: () => void }) {
+function Node({ star, pos, selected, dim, onSelect, onHover }: { star: Star; pos: Pos; selected: boolean; dim: boolean; onSelect: () => void; onHover: (on: boolean) => void }) {
   const tone = starTone(star)
   const color = toneVar(tone)
   const g = star.grade
@@ -95,12 +97,12 @@ function Node({ star, pos, selected, dim, onSelect }: { star: Star; pos: Pos; se
     : star.status === 'waiting' ? 'waiting for you'
     : star.status === 'queued' ? 'queued'
     : star.status === 'failed' ? (star.error ?? 'failed')
-    : g ? (g.verdict === 'baseline' ? 'baseline' : `${g.verdict} · ${g.n} seeds`) : ''
+    : ''
   const effectLabel = g ? (g.verdict === 'baseline' ? `${effect.toFixed(1)}%` : `${effect >= 0 ? '+' : '−'}${Math.abs(effect).toFixed(2)} pts`) : ''
   return (
     <g transform={`translate(${pos.x} ${pos.y})`} opacity={dim ? 0.25 : shadow ? 0.6 : 1} style={{ transition: 'opacity 200ms' }}
        role="button" tabIndex={0} aria-label={`${star.title}, ${sub}`} aria-pressed={selected}
-       onClick={onSelect} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() } }} className="cursor-pointer outline-none">
+       onClick={onSelect} onPointerEnter={() => onHover(true)} onPointerLeave={() => onHover(false)} onFocus={() => onHover(true)} onBlur={() => onHover(false)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() } }} className="cursor-pointer outline-none">
       <title>{star.title}</title>
       {star.status === 'running' && <circle r={R} fill={color} className="star-pulse" />}
       {star.status === 'waiting' && <circle r={R + 4} fill={color} className="star-breathe" />}
@@ -125,6 +127,7 @@ function Node({ star, pos, selected, dim, onSelect }: { star: Star; pos: Pos; se
 
 export function StarMap() {
   const { app, selectedId, hoveredClaim, follow, select, set } = useStore()
+  const [hoverId, setHoverId] = useState<string | null>(null)
   const stars = app.session?.stars ?? []
   const docs = app.documents
   const box = useRef<HTMLDivElement>(null)
@@ -172,18 +175,19 @@ export function StarMap() {
     const pts = (ids?.length ? ids : stars.map((s) => s.id)).map((id) => target.get(id)).filter(Boolean) as Pos[]
     if (!pts.length) return
     const minX = Math.min(...pts.map((p) => p.x)) - 110, maxX = Math.max(...pts.map((p) => p.x)) + 150
-    const minY = Math.min(...pts.map((p) => p.y)) - 80, maxY = Math.max(...pts.map((p) => p.y)) + 110
-    const h = dockOpen ? size.h * 0.4 : size.h
-    const k = Math.max(0.5, Math.min(1.15, (size.w - 40) / (maxX - minX), (h - 40) / (maxY - minY)))
+    const minY = Math.min(...pts.map((p) => p.y)) - 60, maxY = Math.max(...pts.map((p) => p.y)) + 80
+    const h = dockOpen ? size.h * 0.5 : size.h
+    const k = Math.max(0.35, Math.min(1.15, (size.w - 40) / (maxX - minX), (h - 40) / (maxY - minY)))
     camTarget.current = { k, x: size.w / 2 - ((minX + maxX) / 2) * k, y: h / 2 - ((minY + maxY) / 2) * k }
   }
   const activeIds = stars.filter((s) => s.status === 'running' || s.status === 'waiting' || s.status === 'queued').map((s) => s.id)
   const activeKey = activeIds.join(',') + '|' + stars.length + '|' + size.w + 'x' + size.h + dockOpen
   useEffect(() => {
     if (!follow) return
+    // small graphs are framed whole; large ones follow the running branches
     const withParents = new Set(activeIds)
     activeIds.forEach((id) => { const p = parentOf.get(id); if (p) withParents.add(p) })
-    fit([...withParents])
+    fit(stars.length <= 9 ? undefined : [...withParents])
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeKey, follow, key])
 
@@ -210,8 +214,9 @@ export function StarMap() {
   const children = stars.filter((s) => s.parent_id)
 
   return (
-    <div ref={box} className="relative h-full w-full overflow-hidden">
-      <svg className="h-full w-full touch-none select-none" style={{ cursor: drag.current ? 'grabbing' : 'grab' }}
+    <div ref={box} className="relative h-full w-full overflow-hidden bg-[#eef2f7]">
+      <LowPolySky className="pointer-events-none absolute inset-0 h-full w-full" />
+      <svg className="relative h-full w-full touch-none select-none" style={{ cursor: drag.current ? 'grabbing' : 'grab' }}
         onPointerDown={(e) => { if (e.target === e.currentTarget || (e.target as Element).tagName === 'rect') { drag.current = { x: e.clientX, y: e.clientY }; (e.currentTarget as Element).setPointerCapture(e.pointerId) } }}
         onPointerMove={(e) => { if (!drag.current) return; const dx = e.clientX - drag.current.x, dy = e.clientY - drag.current.y; drag.current = { x: e.clientX, y: e.clientY }; camTarget.current = null; set({ follow: false }); setCam((c) => ({ ...c, x: c.x + dx, y: c.y + dy })) }}
         onPointerUp={() => { drag.current = null }}>
@@ -219,11 +224,11 @@ export function StarMap() {
         <g transform={`translate(${cam.x} ${cam.y}) scale(${cam.k})`}>
           {children.map((s) => {
             const a = pos.get(s.parent_id!), b = pos.get(s.id)
-            return a && b ? <Edge key={s.id} star={s} from={a} to={b} docs={docs} selected={selectedId === s.id} dim={dimmed(s)} /> : null
+            return a && b ? <Edge key={s.id} star={s} from={a} to={b} docs={docs} selected={selectedId === s.id} dim={dimmed(s)} labelled={selectedId === s.id || hoverId === s.id} /> : null
           })}
           {stars.map((s) => {
             const p = pos.get(s.id)
-            return p ? <Node key={s.id} star={s} pos={p} selected={selectedId === s.id} dim={dimmed(s)} onSelect={() => select(s.id)} /> : null
+            return p ? <Node key={s.id} star={s} pos={p} selected={selectedId === s.id} dim={dimmed(s)} onSelect={() => select(s.id)} onHover={(on) => setHoverId(on ? s.id : null)} /> : null
           })}
         </g>
       </svg>
