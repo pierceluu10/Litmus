@@ -257,9 +257,20 @@ async def detect_conflict(state: SessionState, s: Star, query: str, hits: list[P
     check = await structured("detect_conflict", ConflictCheck, star=star_summary(s), grade=grade_summary(s),
                              provenance=provenance_text(s.provenance), query=query, hits=hit_lines,
                              tree=tree(state), may_ask=str(may_ask).lower())
-    if not may_ask or not check.question or len(check.options) < 2:
-        check.conflict = False
+    if check.conflict and (not may_ask or not check.question or len(check.options) < 2):
+        demote_to_follow_up(check)
     return check
+
+
+def demote_to_follow_up(check: ConflictCheck) -> None:
+    """No question allowed (one per wave): keep the agent's preferred option as a follow-up for the next wave."""
+    check.conflict = False
+    if check.follow_up or not check.options:
+        return
+    index = check.agent_leaning_index if check.agent_leaning_index in range(len(check.options)) else 0
+    option = check.options[index]
+    check.follow_up = FollowUp(title=option.label, directive=option.directive,
+                               parent_star_id=option.parent_star_id, knob_changes=option.knob_changes)
 
 
 async def replan(state: SessionState, s: Star, kind: str, text: str, plan: str) -> Replan:

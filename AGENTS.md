@@ -142,6 +142,11 @@ branch subgraph: run → reflect → (run +5 seeds) | (ask ⟂) | END          �
 | `uv run pytest` | tests (CPU only) |
 
 ## Gotchas
+- One question per wave is enforced by a synchronous re-check right before `add_question` (branches run
+  concurrently and the LLM call is an await). A losing branch's idea becomes an agenda follow-up.
+- Results are cached by (config hash, seed) **across sessions**: re-running a demo is fast because repeated
+  configs replay from cache (events carry `run.cached: true`). Delete `backend/data/litmus.sqlite` results
+  table rows for a fully fresh run.
 - Local `torch` is a dev dependency for CPU tests only; the server never imports the trainer.
 - `train_run` is a generator so per-epoch progress streams live through `remote_gen`.
 
@@ -158,6 +163,13 @@ branch subgraph: run → reflect → (run +5 seeds) | (ask ⟂) | END          �
   S8 no whitening hurts (−1.24); mixup refutation → library search → question → answer → replanned; abstract
   with citations; export written. That run exposed and we fixed: epochs-only children compared with themselves,
   trivial epoch nudges to dodge dedupe, inconclusive results not getting more seeds.
+- 2026-10-17 human-loop (scripted human over HTTP against `litmus serve`):
+  `ses_4a61ce2ffe` — challenge "I think this is seed noise" on S2 (no TTA) → agent.replanned → 5 more seeds →
+  "With 10 seeds, S2 is confirmed: −0.80 [−0.94, −0.66]". Human skipped the agent's pick twice → shadow S7
+  (mixup α=0.2 @40 epochs) **confirmed +0.26 [+0.20, +0.32]** vs baseline@40, i.e. the ghost line found
+  something the human path didn't. `ses_c39e548c59` — mixup α=1 refuted → library search → question → answer →
+  wave 2 implements it (mixup @20 epochs) → wave-2 question → wave 3 (@40 epochs). Found and fixed a race where
+  two branches both asked in one wave.
 
 ## Frontend
 (owned by frontend agent)

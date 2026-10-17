@@ -246,8 +246,11 @@ async def reflect(bs: BranchState) -> dict:
                   f"zero, so 5 more paired seeds could decide it.")
     if action == "more_seeds" and not can_add_seeds:
         action = "search_library" if inconclusive or r.surprising else "accept"
+        reason = (f"Still {s.grade.verdict} after {s.grade.n} paired seeds, so I'm looking in your library for an explanation."
+                  if action == "search_library" else "The verdict stands.")
     if s.grade.verdict == "refuted" and action == "accept":
         action = "search_library"  # a refuted claim always gets an explanation from the library
+        reason = "The paper's claim failed here, so I'm looking in your library for why."
     s.reflection = r.reflection
 
     if action == "more_seeds":
@@ -275,8 +278,11 @@ async def reflect(bs: BranchState) -> dict:
             if check:
                 s.reflection = f"{r.reflection} {check.explanation}"
                 cited = [h for h in hits if h.id in check.cited_hit_ids] or hits[:2]
-                if check.conflict:
+                # Re-check synchronously: a sibling branch may have asked while we awaited the LLM (one question per wave).
+                if check.conflict and not any(q.wave == state.wave for q in state.questions):
                     return _ask(state, s, check, cited)
+                if check.conflict:
+                    agent.demote_to_follow_up(check)
                 if check.follow_up:
                     ops.add_agenda(state, source="reflection", star_id=s.id, text=check.follow_up.directive,
                                    knob_changes=agent._changes(check.follow_up.knob_changes),
