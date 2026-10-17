@@ -19,7 +19,7 @@ function useHash() {
 const LEGEND = [['confirmed', 'confirmed'], ['refuted', 'refuted'], ['inconclusive', 'inconclusive'], ['running', 'training'], ['waiting', 'needs you']] as const
 
 function SceneChrome() {
-  const { app, follow, set, fitRequest } = useStore()
+  const { app, follow, set, fitAll } = useStore()
   const latest = app.feed[app.feed.length - 1]
   return (
     <>
@@ -33,7 +33,7 @@ function SceneChrome() {
         <button className="btn h-7 px-2.5 text-[12px]" aria-pressed={follow} onClick={() => set({ follow: !follow })} style={follow ? { borderColor: 'var(--color-ink)' } : undefined}>
           {follow ? 'Following' : 'Follow'} new branches
         </button>
-        <button className="btn h-7 px-2.5 text-[12px]" onClick={() => set({ follow: false, fitRequest: fitRequest + 1 })}>Fit all</button>
+        <button className="btn h-7 px-2.5 text-[12px]" aria-pressed={fitAll} title={fitAll ? 'Go back to the default view' : 'Zoom out to see every experiment'} onClick={() => set({ follow: false, fitAll: !fitAll })} style={fitAll ? { borderColor: 'var(--color-ink)' } : undefined}>{fitAll ? 'Default view' : 'Fit all'}</button>
       </div>
     </>
   )

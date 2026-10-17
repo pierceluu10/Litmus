@@ -18,7 +18,7 @@ type Store = {
   hoveredClaim: string | null
   follow: boolean // the camera jumps to each new branch
   focusId: string | null // what the camera is centred on
-  fitRequest: number // bump to frame the whole tree
+  fitAll: boolean // frame the whole tree; off returns to the default view
   abstractOpen: boolean
   explainBusy: boolean
   explained: Record<string, { answer: string; provenance: Provenance[] }>
@@ -47,16 +47,16 @@ export const useStore = create<Store>((set, get) => {
   }
   return {
     app: initialState, sid: null, conn: 'closed', health: null, error: null, selectedId: null, hoveredClaim: null,
-    follow: true, focusId: null, fitRequest: 0, abstractOpen: false, explainBusy: false, explained: {},
+    follow: true, focusId: null, fitAll: false, abstractOpen: false, explainBusy: false, explained: {},
     set: (p) => set(p),
-    select: (id) => set(id ? { selectedId: id, focusId: id, abstractOpen: false } : { selectedId: null }),
+    select: (id) => set(id ? { selectedId: id, focusId: id, abstractOpen: false, fitAll: false } : { selectedId: null }),
     leave() {
       unsub?.(); unsub = null
-      set({ app: initialState, sid: null, conn: 'closed', selectedId: null, focusId: null, abstractOpen: false, explained: {}, error: null })
+      set({ app: initialState, sid: null, conn: 'closed', selectedId: null, focusId: null, fitAll: false, abstractOpen: false, explained: {}, error: null })
     },
     async begin(replay, goal) {
       unsub?.()
-      set({ app: initialState, selectedId: null, focusId: null, follow: true, error: null, abstractOpen: false, explained: {} })
+      set({ app: initialState, selectedId: null, focusId: null, fitAll: false, follow: true, error: null, abstractOpen: false, explained: {} })
       try {
         const sid = replay ? await api.replayDemo() : await api.createSession({ goal })
         set({ sid })

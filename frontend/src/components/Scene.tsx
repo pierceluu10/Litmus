@@ -22,11 +22,18 @@ const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').match
 
 // Camera framing: a fixed offset from the focused star, slightly from the right so sibling depth reads,
 // aimed left of and below the star so the statue stays in frame and the star clears the proposal dock.
-// a fixed three-quarter view of the accuracy plane; the user can zoom within limits but never rotate or pan
-const VIEW = new Vector3(150, 36, 310)
+// A locked view of the accuracy plane: the user can zoom within limits but never rotate or pan. The default is swung a little
+// toward the nodes' side, so the tree is met more head-on.
+const VIEW = new Vector3(-48, 30, 345)
 const MIN_DISTANCE = 170
 const MAX_DISTANCE = 480
 const AIM = new Vector3(-14, -18, 0)
+// Opening shot: from just behind the statue's head and ear, looking over its shoulder toward the arm.
+// The head is near (-69, 16, -5) in scene units. The camera then glides to the default view, once per session.
+const EAR_CAM = new Vector3(-70, 24, -70)
+const EAR_AIM = new Vector3(-50, 12, 40)
+const INTRO_HOLD_MS = 900
+const INTRO_SMOOTH = 1.5
 const PORTRAIT_ASPECT = 0.9
 const PORTRAIT_PULLBACK = 1.7
 
@@ -157,27 +164,54 @@ function Fingertip() {
 }
 
 function CameraRig({ positions, parents }: { positions: Map<string, Pos>; parents: Map<string, string | null> }) {
-  const controls = useRef<CameraControls>(null)
-  const { focusId, fitRequest } = useStore()
+  // held in state (not a plain ref) so the effects below run again once the controls exist
+  const [ctl, setCtl] = useState<CameraControls | null>(null)
+  const { focusId, fitAll } = useStore()
   // frame the branch, not just the star: halfway between the focused star and the one it grew from
   const star = focusId ? positions.get(focusId) : undefined
   const from = focusId ? positions.get(parents.get(focusId) ?? '') ?? star : undefined
   const focus = star && from ? { x: (star.x + from.x) / 2, y: (star.y + from.y) / 2, z: (star.z + from.z) / 2 } : { x: FIRST_STEP, y: 0, z: 0 }
   const portrait = useThree((s) => s.size.width / s.size.height) < PORTRAIT_ASPECT // narrow screens see less width: pull back
-  useEffect(() => {
-    const c = controls.current
+  const introDone = useRef(false)
+  const wasFit = useRef(false)
+  // the default view; later moves keep whatever zoom the user chose, only the target moves
+  const toDefault = (animated: boolean, keepZoom: boolean) => {
+    const c = ctl
     if (!c) return
-    // keep whatever zoom the user chose; only the target moves
-    const t = new Vector3(focus.x, focus.y, focus.z).add(AIM), view = VIEW.clone().setLength(Math.min(MAX_DISTANCE, (c.distance || VIEW.length()) * (portrait ? PORTRAIT_PULLBACK : 1)))
-    c.setLookAt(t.x + view.x, t.y + view.y, t.z + view.z, t.x, t.y, t.z, !reducedMotion())
-  }, [focus.x, focus.y, focus.z, portrait])
+    const t = new Vector3(focus.x, focus.y, focus.z).add(AIM)
+    const dist = keepZoom && c.distance ? c.distance : VIEW.length() * (portrait ? PORTRAIT_PULLBACK : 1)
+    const view = VIEW.clone().setLength(Math.min(MAX_DISTANCE, Math.max(MIN_DISTANCE, dist)))
+    c.setLookAt(t.x + view.x, t.y + view.y, t.z + view.z, t.x, t.y, t.z, animated)
+  }
   useEffect(() => {
-    if (!fitRequest || !controls.current) return
-    const box = new Box3().setFromPoints([new Vector3(-40, -30, 0), ...[...positions.values()].map((p) => new Vector3(p.x, p.y, p.z))])
-    box.expandByScalar(16)
-    controls.current.fitToBox(box, !reducedMotion(), { paddingLeft: 10, paddingRight: 40, paddingTop: 30, paddingBottom: 30 })
-  }, [fitRequest]) // eslint-disable-line react-hooks/exhaustive-deps
-  return <CameraControls ref={controls} makeDefault minDistance={MIN_DISTANCE} maxDistance={MAX_DISTANCE} smoothTime={0.6} azimuthRotateSpeed={0} polarRotateSpeed={0} truckSpeed={0} />
+    const c = ctl
+    if (!c || fitAll) return
+    if (!introDone.current && !reducedMotion()) {
+      c.minDistance = 40 // the opening shot is closer than the zoom limit allows
+      c.setLookAt(EAR_CAM.x, EAR_CAM.y, EAR_CAM.z, EAR_AIM.x, EAR_AIM.y, EAR_AIM.z, false)
+      c.smoothTime = INTRO_SMOOTH
+      const go = window.setTimeout(() => {
+        introDone.current = true
+        c.minDistance = MIN_DISTANCE
+        toDefault(true, false)
+        window.setTimeout(() => { c.smoothTime = 0.6 }, 2800)
+      }, INTRO_HOLD_MS)
+      return () => window.clearTimeout(go)
+    }
+    toDefault(!reducedMotion(), true)
+  }, [ctl, focus.x, focus.y, focus.z, portrait]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const c = ctl
+    if (!c) return
+    if (fitAll) {
+      const box = new Box3().setFromPoints([new Vector3(-40, -30, 0), ...[...positions.values()].map((p) => new Vector3(p.x, p.y, p.z))])
+      box.expandByScalar(16)
+      c.minDistance = 40
+      c.fitToBox(box, !reducedMotion(), { paddingLeft: 10, paddingRight: 40, paddingTop: 30, paddingBottom: 30 })
+    } else if (wasFit.current) { c.minDistance = MIN_DISTANCE; toDefault(!reducedMotion(), false) }
+    wasFit.current = fitAll
+  }, [ctl, fitAll, positions.size]) // eslint-disable-line react-hooks/exhaustive-deps
+  return <CameraControls ref={setCtl} makeDefault minDistance={MIN_DISTANCE} maxDistance={MAX_DISTANCE} smoothTime={0.6} azimuthRotateSpeed={0} polarRotateSpeed={0} truckSpeed={0} />
 }
 
 function Stars({ stars }: { stars: Star[] }) {

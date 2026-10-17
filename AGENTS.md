@@ -235,14 +235,14 @@ npm test             # reducer, layout, simulator + grader-port tests
 | `transport/` | `api.ts` interface, `real.ts` (REST + WebSocket, reconnect from last `seq`), `mock.ts` |
 | `lib/` | `format.ts` (agent names, numbers, colours), `layout.ts` (3D positions) |
 | `App.tsx` | Hash router: home `Landing`, `#/login` and `#/signup` (`Auth`, demo account in `auth.ts`), then the workspace once a session exists |
-| `components/Landing.tsx`, `LowPolyScene.tsx`, `thinker*.ts` | The home page: intro animation, Read/Test/Steer/Trace sections, SVG low-poly temple with the Thinker |
+| `components/Landing.tsx`, `LowPolyScene.tsx`, `thinker*.ts` | The home page: intro animation; the statue and headline fade out on scroll; then a pinned horizontal walkthrough (vertical scroll drives `x`; slides dwell in the middle of their range, `dwell()`) of plain-language cards that copy the real workspace (claims, proposal dock, tree, leaderboard, question card, write-up). Below 860px or with reduced motion the slides stack vertically. SVG low-poly temple with the Thinker |
 | `components/Scene.tsx` | The 3D canvas: statue, blobs, edges, accuracy scale, follow camera |
 | `components/` | `TopBar` (status, GPU budget, Generate abstract), `Claims` (left rail), `Inspector` (right rail: results overview, one agent's detail, abstract), `PathChart`, `Dock` (proposals + questions), `Prov` |
 | `public/litmus-statue.glb` | The agent: SMK's public-domain scan of the Artemision Bronze (KAS2100, api.smk.dk), decimated to 1,200 faces, fingertip at the origin |
 
 **The scene is a chart**: x = generations from the statue's fingertip (siblings take their own column), y = measured accuracy (22 units per point, baseline at the fingertip's height), z = a little depth per sibling. An ungraded star rides at its parent's height and glides to its accuracy when graded. Blob = experiment (graphite, distorts faster while training); ring = verdict colour (partial arc = training progress, amber = needs you); dashed edge = shadow branch or training. Scale labels are pinned to the canvas's right edge.
 
-**Camera**: a fixed three-quarter view of the accuracy plane, aimed at the midpoint of the focused star and its parent. No rotate or pan; zoom is capped (170–480 units). Focus = the newest star while following, and dispatching, answering or branching turns following back on; clicking any star or claim re-centres on it. "Fit all" frames the tree.
+**Camera**: locked: no rotate or pan, zoom capped (170-480 units). At the start of a session it opens just behind the statue's head, looking over its shoulder along the arm, and glides once to the default view (`EAR_CAM`/`EAR_AIM`, `INTRO_SMOOTH` in `Scene.tsx`). The default view (`VIEW`) is swung a little toward the nodes' side so the tree is met head-on, aimed at the midpoint of the focused star and its parent. Focus = the newest star while following; dispatching, answering or branching turns following back on; clicking any star or claim re-centres on it and keeps your zoom. "Fit all" is a toggle (`fitAll` in the store): on frames every star, off returns to the default view. There is no pause button.
 
 **Branch from anywhere**: "Branch from here" sends `feedback(kind: "suggest")` for that star, so it works against the real backend too (the agent replans from it); the demo backend answers with proposals from that star.
 

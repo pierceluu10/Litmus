@@ -1,7 +1,7 @@
 import { useStore } from '../store'
 
 export function TopBar() {
-  const { app, conn, togglePause, generateAbstract, error, set, leave } = useStore()
+  const { app, conn, generateAbstract, error, set, leave } = useStore()
   const s = app.session!
   const graded = s.stars.filter((x) => x.grade && x.grade.verdict !== 'baseline').length
   const share = s.budget_total ? Math.min(1, s.budget_used / s.budget_total) : 0
@@ -20,7 +20,6 @@ export function TopBar() {
             <span className="num text-[12px]">{Math.round(s.budget_used)}/{s.budget_total}s</span>
           </div>
         )}
-        {s.status !== 'done' && <button className="btn btn-quiet" onClick={togglePause}>{s.status === 'paused' ? 'Resume' : 'Pause'}</button>}
         {s.abstract && <button className="btn" onClick={() => set({ abstractOpen: true, selectedId: null })}>Read abstract</button>}
         <button className="btn btn-primary" disabled={!graded} onClick={generateAbstract}>
           {s.abstract ? 'Regenerate abstract' : 'Generate abstract'}
