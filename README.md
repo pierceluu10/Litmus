@@ -43,7 +43,7 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
-The frontend runs an in-browser demo backend by default: a simulated airbench calibrated from a recorded real session, graded by a port of the same locked grader. For real experiments set `VITE_MOCK=0` in `frontend/.env` and run `./dev.sh` (backend on :8000 with a Modal warmup, frontend on :5173).
+Run `./dev.sh` (backend on :8000 with a Modal warmup, frontend on :5173): by default every experiment trains live on Modal A100s. The **Demo mode** switch on the front page swaps in an in-browser backend instead: a simulated airbench calibrated from a recorded real session, graded by a port of the same locked grader, no keys or GPU needed.
 
 The statue is the Artemision Bronze, from the public-domain 3D scan by SMK, the National Gallery of Denmark.
 

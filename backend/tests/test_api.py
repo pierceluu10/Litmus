@@ -63,12 +63,12 @@ def test_api_flow_and_every_event_matches_the_contract(engine):  # noqa: F811
             {"proposal_id": proposals[1]["id"], "knob_overrides": {"tta_level": 7}}]}).status_code == 409
         assert client.post(f"/api/sessions/{sid}/dispatch", json={"star_id": "S99", "selections": [
             {"proposal_id": proposals[1]["id"]}]}).status_code == 404
-        # Human skips the agent's pick → a shadow branch must appear.
+        # Human skips the agent's pick: only what the human chose runs (no shadow branch).
         ok = client.post(f"/api/sessions/{sid}/dispatch", json={"star_id": "S0", "selections": [
             {"proposal_id": proposals[1]["id"]}], "instruction": "TTA first"})
         assert ok.json() == {"ok": True}
-        snap = wait(client, sid, lambda s: any(x["chosen_by"] == "shadow" and x["status"] == "done" for x in s["stars"])
-                    and all(x["status"] in ("done", "waiting") for x in s["stars"]))
+        snap = wait(client, sid, lambda s: len(s["stars"]) > 1 and all(x["status"] in ("done", "waiting") for x in s["stars"]))
+        assert not any(x["chosen_by"] == "shadow" for x in snap["stars"])
         assert client.post(f"/api/sessions/{sid}/feedback", json={"star_id": "S1", "kind": "challenge",
                                                                    "text": "I think this is noise"}).status_code == 200
         assert client.get("/api/sessions/nope").status_code == 404
@@ -85,7 +85,7 @@ def test_api_flow_and_every_event_matches_the_contract(engine):  # noqa: F811
         assert [e.seq for e in events] == list(range(1, len(events) + 1))
         for event in events:
             validate(event)
-        assert "shadow.created" in {e.type for e in events}
+        assert "shadow.created" not in {e.type for e in events}
 
 
 @pytest.mark.parametrize("path", ["/api/sessions/x/pause", "/api/sessions/x/resume"])

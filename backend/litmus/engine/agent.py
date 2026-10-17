@@ -240,7 +240,7 @@ async def propose(state: SessionState, claims: list[Claim], instruction: str | N
         proposals, problems = _validate_proposals(drafts, state, by_id, slots)
     if len(proposals) < 1:
         raise ProposalError("; ".join(problems) or "no valid proposals")
-    return proposals, f"{drafts.thinking} I'd pick \"{next(p.title for p in proposals if p.agent_recommended)}\": {drafts.recommendation_reason}"
+    return proposals, drafts.thinking
 
 
 # ---------------------------------------------------------------- reflect / conflicts

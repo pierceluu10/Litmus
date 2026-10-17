@@ -2,11 +2,16 @@ import { create } from 'zustand'
 import { applyEvent, initialState, type AppState } from './reducer'
 import { mockApi } from './transport/mock'
 import { realApi } from './transport/real'
-import type { ConnState, Health, LibraryStage } from './transport/api'
+import type { Api, ConnState, Health, LibraryStage } from './transport/api'
 import type { Provenance, Selection } from './types'
 
-// The in-browser demo backend is the default; VITE_MOCK=0 talks to the real one.
-export const api = import.meta.env.VITE_MOCK === '0' ? realApi : mockApi
+// Live (the FastAPI backend, Modal A100s) unless the front page's Demo mode switch picks the in-browser backend.
+const DEMO_KEY = 'litmus.demo'
+const savedDemo = () => { try { return localStorage.getItem(DEMO_KEY) === '1' } catch { return false } }
+export const apiFor = (demo: boolean): Api => (demo ? mockApi : realApi)
+// A session keeps the backend it started on, even if the switch is flipped later.
+let current: Api = apiFor(savedDemo())
+export const sessionApi = () => current
 
 type Store = {
   app: AppState
@@ -14,6 +19,8 @@ type Store = {
   conn: ConnState
   libraryStage: LibraryStage | 'ready'
   health: Health | null
+  demo: boolean
+  setDemo: (demo: boolean) => void
   error: string | null
   selectedId: string | null
   hoveredClaim: string | null
@@ -48,9 +55,13 @@ export const useStore = create<Store>((set, get) => {
     try { await f(sid); set({ error: null }) } catch (e) { set({ error: (e as Error).message }) }
   }
   return {
-    app: initialState, sid: null, conn: 'closed', libraryStage: 'papers', health: null, error: null, selectedId: null, hoveredClaim: null,
+    app: initialState, sid: null, conn: 'closed', libraryStage: 'papers', health: null, demo: savedDemo(), error: null, selectedId: null, hoveredClaim: null,
     follow: true, focusId: null, fitAll: false, abstractOpen: false, explainBusy: false, explained: {},
     set: (p) => set(p),
+    setDemo(demo) {
+      try { localStorage.setItem(DEMO_KEY, demo ? '1' : '0') } catch { /* private window: the switch still works for this visit */ }
+      set({ demo, health: null, error: null })
+    },
     select: (id) => set(id ? { selectedId: id, focusId: id, abstractOpen: false, fitAll: false } : { selectedId: null }),
     leave() {
       unsub?.(); unsub = null
@@ -61,12 +72,13 @@ export const useStore = create<Store>((set, get) => {
       unsub?.()
       set({ app: initialState, libraryStage: 'papers', selectedId: null, focusId: null, fitAll: false, follow: true, error: null, abstractOpen: false, explained: {} })
       libraryLoad?.abort()
+      const api = current = apiFor(get().demo)
       const load = libraryLoad = new AbortController()
       api.library((libraryStage) => set({ libraryStage }), load.signal)
         .then(({ documents, claims }) => { if (!load.signal.aborted) set((st) => ({ app: { ...st.app, documents, claims }, libraryStage: 'ready' })) })
         .catch((e: Error) => set({ error: e.message }))
       try {
-        const sid = replay ? await api.replayDemo() : await api.createSession({ goal })
+        const sid = replay ? await api.replayDemo() : await api.createSession({ goal, fresh: true })
         set({ sid })
         unsub = api.subscribe(sid, 0, (e) => {
           set((st) => {
@@ -77,21 +89,21 @@ export const useStore = create<Store>((set, get) => {
         }, (conn) => set({ conn }))
       } catch (e) { set({ error: (e as Error).message }) }
     },
-    dispatch: (star_id, selections, instruction) => { set({ follow: true }); return act((sid) => api.dispatch(sid, { star_id, selections, instruction })) },
-    answer: (question_id, option_id, comment) => { set({ follow: true }); return act((sid) => api.answer(sid, { question_id, option_id, comment })) },
-    feedback: (star_id, kind, text) => act((sid) => api.feedback(sid, { star_id, kind, text })),
+    dispatch: (star_id, selections, instruction) => { set({ follow: true }); return act((sid) => current.dispatch(sid, { star_id, selections, instruction })) },
+    answer: (question_id, option_id, comment) => { set({ follow: true }); return act((sid) => current.answer(sid, { question_id, option_id, comment })) },
+    feedback: (star_id, kind, text) => act((sid) => current.feedback(sid, { star_id, kind, text })),
     async explain(star_id, question) {
       set({ explainBusy: true })
       await act(async (sid) => {
-        const r = await api.explain(sid, { star_id, question })
+        const r = await current.explain(sid, { star_id, question })
         set((st) => ({ explained: { ...st.explained, [star_id]: r } }))
       })
       set({ explainBusy: false })
     },
-    togglePause: () => act((sid) => (get().app.session?.status === 'paused' ? api.resume(sid) : api.pause(sid))),
-    stopBranch: (star_id) => act((sid) => api.stopBranch(sid, star_id)),
+    togglePause: () => act((sid) => (get().app.session?.status === 'paused' ? current.resume(sid) : current.pause(sid))),
+    stopBranch: (star_id) => act((sid) => current.stopBranch(sid, star_id)),
     // Branching from any star, refuted ones included, goes through feedback "suggest": the agent replans from it.
-    branch: (star_id, text) => { set({ follow: true }); return act((sid) => api.feedback(sid, { star_id, kind: 'suggest', text: text?.trim() || 'Branch from here.' })) },
-    generateAbstract: async () => { await act((sid) => api.abstract(sid)); if (get().app.session?.abstract) set({ abstractOpen: true, selectedId: null }) },
+    branch: (star_id, text) => { set({ follow: true }); return act((sid) => current.feedback(sid, { star_id, kind: 'suggest', text: text?.trim() || 'Branch from here.' })) },
+    generateAbstract: async () => { await act((sid) => current.abstract(sid)); if (get().app.session?.abstract) set({ abstractOpen: true, selectedId: null }) },
   }
 })

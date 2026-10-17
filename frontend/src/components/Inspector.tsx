@@ -1,5 +1,5 @@
 import { Fragment, useState } from 'react'
-import { api, useStore } from '../store'
+import { sessionApi, useStore } from '../store'
 import { agentDetail, agentName, pct, progressFraction, pts, starTone, toneVar } from '../lib/format'
 import type { Star } from '../types'
 import { PathChart } from './PathChart'
@@ -21,7 +21,7 @@ function Overview() {
   const graded = s.stars.filter((x) => x.grade && x.grade.verdict !== 'baseline' && x.status !== 'failed')
   const ranked = s.stars.filter((x) => x.grade && x.status !== 'failed').sort((a, b) => b.grade!.mean_child - a.grade!.mean_child)
   const count = (v: string) => graded.filter((x) => x.grade!.verdict === v).length
-  const steered = s.decisions.filter((d) => d.changed_trajectory)
+  const steered = s.decisions.filter((d) => d.kind === 'answer' && d.changed_trajectory)
   return (
     <div className="space-y-6 p-4">
       <section>
@@ -202,7 +202,7 @@ function AbstractView() {
   }
   const render = (text: string) => text.split(/\[((?:S\d+)|(?:hl_[\w-]+))\]/g).map((part, i) => (i % 2 ? cite(part, i) : <Fragment key={i}>{part}</Fragment>))
   const download = async () => {
-    const md = sid ? await api.exportMarkdown(sid) : ''
+    const md = sid ? await sessionApi().exportMarkdown(sid) : ''
     const url = URL.createObjectURL(new Blob([md], { type: 'text/markdown' }))
     const el = document.createElement('a'); el.href = url; el.download = 'litmus-findings.md'; el.click(); URL.revokeObjectURL(url)
   }

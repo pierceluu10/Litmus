@@ -15,7 +15,7 @@ export interface Api {
   health(): Promise<Health>
   warmup(): Promise<void>
   library(onStage: (stage: LibraryStage) => void, signal: AbortSignal): Promise<Library>
-  createSession(body: { goal?: string; budget_gpu_seconds?: number; auto_mode?: boolean }): Promise<string>
+  createSession(body: { goal?: string; budget_gpu_seconds?: number; auto_mode?: boolean; fresh?: boolean }): Promise<string>
   replayDemo(): Promise<string>
   subscribe(sessionId: string, fromSeq: number, onEvent: (e: LitmusEvent) => void, onConn: (c: ConnState) => void): () => void
   dispatch(sid: string, body: { star_id: string; selections: Selection[]; instruction?: string }): Promise<void>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { animate, motion, useInView, useMotionValueEvent, useReducedMotion, useScroll, useSpring, useTransform, type MotionValue } from 'motion/react'
-import { api, useStore } from '../store'
+import { apiFor, useStore } from '../store'
 import { LowPolyScene } from './LowPolyScene'
 import { nav, useAuth } from '../auth'
 
@@ -356,8 +356,18 @@ function StackedStory({ cta }: { cta: ReactNode }) {
   )
 }
 
+// Off: the real backend trains on Modal. On: the in-browser simulation, no backend or keys needed.
+function DemoSwitch() {
+  const { demo, setDemo } = useStore()
+  return (
+    <button role="switch" aria-checked={demo} className="switch" onClick={() => setDemo(!demo)}>
+      <span className="switch-track" aria-hidden="true"><span className="switch-thumb" /></span>Demo mode
+    </button>
+  )
+}
+
 export function Landing() {
-  const { begin, health, set, error } = useStore()
+  const { begin, health, set, error, demo } = useStore()
   const main = useRef<HTMLElement>(null)
   const [scrolled, setScrolled] = useState(false)
   const { user, logout } = useAuth()
@@ -368,8 +378,11 @@ export function Landing() {
   // stacked layout only: the statue and headline fade as the page scrolls
   const sceneOpacity = useTransform(scrollY, [0, vh * 0.65], [1, 0])
   const textOpacity = useTransform(scrollY, [0, vh * 0.32], [1, 0])
-  useEffect(() => { api.health().then((h) => set({ health: h })).catch((e) => set({ error: api.mock ? null : `Could not read backend health (${e.message}). Is the backend running, and is OPENAI_API_KEY set in backend/.env? Replay demo works without keys.` })) }, [set])
-  const status = api.mock ? '' : health ? `GPU ${health.modal_warm ? 'warm' : 'cold'} · Papiers ${health.papiers_ok ? 'ok' : 'unavailable'} · OpenAI ${health.openai_ok ? 'ok' : 'unavailable'}` : 'Checking the backend…'
+  useEffect(() => {
+    if (demo) return
+    apiFor(false).health().then((h) => set({ health: h })).catch((e: Error) => set({ error: `Could not reach the backend (${e.message}). Start it with ./dev.sh, or turn on Demo mode.` }))
+  }, [demo, set])
+  const status = demo ? '' : health ? `Modal GPU ${health.modal_warm ? 'warm' : 'cold'} · Papiers ${health.papiers_ok ? 'ok' : 'unavailable'} · OpenAI ${health.openai_ok ? 'ok' : 'unavailable'}` : error ? '' : 'Checking the backend…'
   const start = () => begin(false, GOAL), replay = () => begin(true)
   const cta = <Cta onStart={start} onReplay={replay} />
   const hero = (
@@ -389,6 +402,7 @@ export function Landing() {
       <nav className={`sticky top-0 z-30 flex items-center justify-between px-[clamp(20px,4vw,56px)] py-3.5 transition-colors ${scrolled ? 'border-b border-rule bg-surface/95' : 'border-b border-transparent'}`}>
         <button className="border-0 bg-transparent p-0 text-[20px] font-bold tracking-tight" onClick={() => main.current?.scrollTo({ top: 0, behavior: 'smooth' })}>Litmus</button>
         <div className="flex items-center gap-2">
+          <DemoSwitch />
           {user ? (
             <>
               <button className="btn" onClick={logout}>Log out</button>

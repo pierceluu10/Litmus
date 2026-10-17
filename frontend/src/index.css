@@ -63,6 +63,14 @@ body {
 .btn-quiet { border-color: transparent; background: transparent; color: var(--color-muted); }
 @media (hover: hover) and (pointer: fine) { .btn-quiet:hover:not(:disabled) { color: var(--color-ink); border-color: transparent; background: color-mix(in srgb, var(--color-ink) 5%, transparent); } }
 
+.switch { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px; margin-right: 4px; border-radius: 7px; font-weight: 500; color: var(--color-muted); }
+.switch-track { position: relative; width: 28px; height: 16px; border-radius: 999px; background: var(--color-rule); transition: background-color 180ms var(--ease-out); }
+.switch-thumb { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 999px; background: var(--color-surface); box-shadow: 0 1px 2px rgb(21 24 28 / 0.2); transition: transform 180ms var(--ease-out); }
+.switch[aria-checked="true"] { color: var(--color-ink); }
+.switch[aria-checked="true"] .switch-track { background: var(--color-ink); }
+.switch[aria-checked="true"] .switch-thumb { transform: translateX(12px); }
+@media (hover: hover) and (pointer: fine) { .switch:hover { color: var(--color-ink); } }
+
 .field { width: 100%; height: 32px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--color-rule); background: var(--color-surface); }
 .field:focus { outline: none; border-color: var(--color-ink); }
 
@@ -112,6 +120,6 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .intro-in { animation: none; opacity: 1; }
   .live-dot, .skeleton { animation: none; }
-  .claim, .tabs > button { transition: none; }
+  .claim, .tabs > button, .switch-track, .switch-thumb { transition: none; }
   .btn, .star-label { transition: none; }
 }

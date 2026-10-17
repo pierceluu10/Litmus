@@ -139,7 +139,7 @@ branch subgraph: run → reflect → (run +5 seeds) | (ask ⟂) | END          �
 - Adaptive seeds: inconclusive + |delta| ≥ 0.05 pts + n < 10 → 5 more paired seeds automatically, explained.
 - Refuted → always searches the library; conflicts → one question per wave; answers/feedback land on the
   session `agenda`, and the next `propose` must implement every human agenda item (validated, repaired once).
-- Shadow branch: when the human skips the agent's pick, the pick runs as `chosen_by:"shadow"` if budget allows.
+- No shadow branches (user decision, 2026-10-17): skipping the agent's pick runs only what the human chose. `chosen_by:"shadow"` and `shadow.created` stay in the contract (additive only) but are no longer emitted.
 - Auto mode dispatches all proposals (≤4) and answers questions with the agent's leaning.
 - Limits: 4 branches per wave, 12 research stars, 3 waves (configurable), per-session GPU budget.
 - Deviation from the original plan: events are emitted straight to the store (persist + broadcast) instead of
@@ -230,7 +230,7 @@ cd frontend && npm install
 npm run dev          # http://localhost:5173
 npm test             # reducer, layout, simulator + grader-port tests
 ```
-**Demo backend is the default** (user decision, 2026-10-17): with no `frontend/.env`, the app runs the in-browser backend in `src/mock/` and shows no demo badge. `VITE_MOCK=0` switches to the real backend at `VITE_API_URL` (default `http://localhost:8000`).
+**Live by default, Demo mode on a switch** (user decision, 2026-10-17): the front page's nav has a **Demo mode** switch (remembered in `localStorage` as `litmus.demo`). Off = the real backend at `VITE_API_URL` (default `http://localhost:8000`), sessions created with `fresh: true` so every star trains live on Modal; the front page shows Modal/Papiers/OpenAI health. On = the in-browser backend in `src/mock/`. A session keeps the backend it started on (`sessionApi()` in `store.ts`); the workspace shows no badge either way.
 
 **The library is always real**: on launch the claims rail streams `GET /api/library/stream` from the backend (Getting papers… highlights… notes… Summarizing…), in the demo too, so run `uv run litmus serve`. If the backend is unreachable the demo falls back to `src/mock/library.json`, a snapshot of `backend/data/library_cache.json` with the same ids (refresh it by copying the cache).
 

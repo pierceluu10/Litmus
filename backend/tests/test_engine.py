@@ -158,21 +158,19 @@ async def test_full_session_with_question_mid_branch(engine):
         longer = next(p for p in wave2 if p.title == "Mixup + longer")
         assert any(p.kind == "human" for p in longer.provenance)
 
-        # Human skips the agent's pick (Mixup + longer is recommended) → shadow branch runs the agent's choice.
+        # Human skips the agent's pick (Mixup + longer is recommended): only Cutout runs, no shadow branch.
         cutout = next(p for p in wave2 if p.title == "Cutout")
         driver.dispatch(sid, "S0", [{"proposal_id": cutout.id}], None)
         state = await wait_for(sid, lambda s: s.status == "done")
-        shadow = next(s for s in state.stars if s.chosen_by == "shadow")
-        assert shadow.title == "Mixup + longer"
-        dispatch2 = [d for d in state.decisions if d.kind == "dispatch"][-1]
-        assert dispatch2.changed_trajectory and shadow.shadow_of == dispatch2.id
+        assert not any(s.chosen_by == "shadow" for s in state.stars)
+        assert not any(s.title == "Mixup + longer" for s in state.stars)
         assert "[bogus_id]" not in state.abstract.text and "[S1]" in state.abstract.text
         assert {c.id for c in state.abstract.citations} == {"hl_mixup"}
 
         # Snapshot and event log agree; seqs are gapless.
         events = store.events_after(sid, 0)
         assert [e.seq for e in events] == list(range(1, len(events) + 1))
-        assert {"question.asked", "question.answered", "library.search", "shadow.created", "abstract.ready",
+        assert {"question.asked", "question.answered", "library.search", "abstract.ready",
                 "papiers.export_ready", "agent.replanned"} <= {e.type for e in events}
     finally:
         await driver.shutdown()

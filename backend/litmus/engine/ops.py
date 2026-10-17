@@ -8,7 +8,7 @@ import statistics
 
 from litmus import grader, store
 from litmus.experiments.knobs import BASELINE_KNOBS, DEFAULT_SEEDS, config_hash
-from litmus.experiments.service import ExperimentError, estimate_gpu_seconds, run_config
+from litmus.experiments.service import ExperimentError, run_config
 from litmus.models import AgendaItem, Answer, Decision, Grade, Progress, apply_changes, Proposal, Provenance, Question, RunResult, SessionState, Star, now_iso
 
 log = logging.getLogger(__name__)
@@ -345,24 +345,7 @@ def dispatch(state: SessionState, selections: list[dict], chosen_by: str, instru
     emit(state, "human.dispatched", {"star_id": decision.star_id, "selections": selections,
                                      "decision": decision.model_dump()})
     refresh_status(state)
-    if changed and chosen_by == "human":
-        start_shadow(state, recommended, decision.id)
     return stars
-
-
-def start_shadow(state: SessionState, p: Proposal, decision_id: str) -> None:
-    """Run the agent's own pick as a low-priority ghost branch so the UI can compare agent-alone vs human-guided."""
-    parent = star(state, p.parent_star_id or p.star_id)
-    knobs = apply_changes(parent.knobs.model_dump(), p.knob_changes)
-    if budget_left(state) < 2 * estimate_gpu_seconds(knobs, len(DEFAULT_SEEDS)):
-        think(state, f"Not enough GPU budget left to also run my own pick ({p.title}) as a shadow branch.")
-        return
-    shadow = new_star(state, parent=parent, title=p.title, hypothesis=p.hypothesis, knobs=knobs,
-                      knob_changes=p.knob_changes, provenance=p.provenance, chosen_by="shadow",
-                      predicted=p.predicted, proposal_id=p.id, shadow_of=decision_id)
-    think(state, f"You skipped my pick, \"{p.title}\". I'll run it quietly as a shadow branch ({shadow.id}) "
-                 f"so we can compare what I would have found alone.", shadow.id)
-    spawn(run_star(state.id, shadow.id))
 
 
 def baseline_knobs() -> dict:
