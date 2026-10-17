@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Billboard, CameraControls, Html, Line, MeshDistortMaterial, useGLTF } from '@react-three/drei'
-import { Box3, MathUtils, Vector3, type Camera, type Mesh, type Object3D } from 'three'
+import { Box3, MathUtils, Vector3, type Mesh } from 'three'
 import type { Line2 } from 'three-stdlib'
 import { useStore } from '../store'
 import { FIRST_STEP, layoutStars, STEP, yFor, type Pos } from '../lib/layout'
@@ -129,13 +129,6 @@ function Edge({ star, live, dim, onPath }: { star: Star; live: Live; dim: boolea
   return <Line ref={line} points={points} color={color} lineWidth={onPath ? 2.6 : 1.5} dashed={running || shadow} dashSize={running ? 2.2 : 3} gapSize={running ? 1.6 : 2.4} transparent opacity={dim ? 0.15 : 1} />
 }
 
-const SCALE_INSET = 14
-// Scale labels stick to the canvas's right edge at their line's projected height, so they stay readable wherever the camera is.
-const pinRight = (el: Object3D, camera: Camera, size: { width: number; height: number }) => {
-  const v = new Vector3().setFromMatrixPosition(el.matrixWorld).project(camera)
-  return [size.width - SCALE_INSET, ((1 - v.y) / 2) * size.height]
-}
-
 // Faint reference lines for accuracy, so height reads as a number.
 function AccuracyScale({ baseline, low, high, length }: { baseline: number; low: number; high: number; length: number }) {
   const ticks: number[] = []
@@ -147,12 +140,10 @@ function AccuracyScale({ baseline, low, high, length }: { baseline: number; low:
         return (
           <group key={v}>
             <Line points={[[-20, y, -40], [length, y, -40]]} color="#aab2bc" lineWidth={1} dashed dashSize={1.2} gapSize={2.4} transparent opacity={0.6} />
-            <Html position={[0, y, -40]} zIndexRange={[10, 0]} calculatePosition={pinRight}><span className="scale-label">{(v * 100).toFixed(1)}%</span></Html>
           </group>
         )
       })}
       <Line points={[[-20, 0, -40], [length, 0, -40]]} color="#16191d" lineWidth={1} transparent opacity={0.35} />
-      <Html position={[0, 0, -40]} zIndexRange={[10, 0]} calculatePosition={pinRight}><span className="scale-label scale-label-base">baseline {(baseline * 100).toFixed(2)}%</span></Html>
     </group>
   )
 }

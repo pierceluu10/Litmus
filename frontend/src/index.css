@@ -80,9 +80,6 @@ body {
 .star-label[data-selected] { background: var(--color-surface); box-shadow: 0 1px 2px rgb(21 24 28 / 0.08), 0 4px 12px rgb(21 24 28 / 0.08); }
 .star-label[data-selected] .star-label-name, .star-label[data-selected] .star-label-value { text-shadow: none; }
 @media (hover: hover) and (pointer: fine) { .star-label:hover { background: color-mix(in srgb, var(--color-surface) 80%, transparent); } }
-/* pinned to the canvas edge: right-aligned, vertically centred on the line */
-.scale-label { display: block; transform: translate(-100%, -50%); font-family: var(--font-mono); font-size: 10px; color: var(--color-faint); white-space: nowrap; user-select: none; }
-.scale-label-base { color: var(--color-muted); }
 
 .marble-ground { background: radial-gradient(120% 90% at 30% 35%, var(--color-marble) 0%, var(--color-paper) 70%); }
 
