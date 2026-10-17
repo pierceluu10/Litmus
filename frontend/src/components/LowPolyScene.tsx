@@ -1,3 +1,4 @@
+import { motion, useMotionValue, useTransform, type MotionValue } from 'motion/react'
 import { thinkerPolys } from './thinkerRender'
 // A low-poly temple: pediment, columns and a marble bust, all flat-shaded triangles.
 // Generated from seeded jitter so it renders identically every time.
@@ -75,7 +76,17 @@ export function Facets({ seed, width = 400, height = 1400 }: { seed: number; wid
     </svg>
   )
 }
-export function LowPolyScene({ className, intro = false }: { className?: string; intro?: boolean }) {
+// As `exit` goes 0 → 1 the intro plays backwards and stops short: the roof lifts off, the columns sink, and the
+// statue and sky settle into a faint backdrop instead of vanishing.
+const RECEDED = 0.14, SKY_RECEDED = 0.55
+
+export function LowPolyScene({ className, intro = false, exit }: { className?: string; intro?: boolean; exit?: MotionValue<number> }) {
+  const still = useMotionValue(0)
+  const e = exit ?? still
+  const roof = { opacity: useTransform(e, [0, 0.45], [1, 0]), y: useTransform(e, [0, 0.45], [0, -44]) }
+  const columns = { opacity: useTransform(e, [0.15, 0.65], [1, 0]), y: useTransform(e, [0.15, 0.65], [0, 34]) }
+  const statueStyle = { opacity: useTransform(e, [0.3, 1], [1, RECEDED]) }
+  const skyStyle = { opacity: useTransform(e, [0.4, 1], [1, SKY_RECEDED]) }
   const sky = gridMesh([-700, 1600, -500], [-700, 1600, 504], 16, 6, 91, [214, 226, 240])
   const floor = gridMesh([-700, 1600, 504], [-700, 1600, 1000], 16, 3, 92, [196, 208, 224])
   const behind = [...column(262, 150, 462, 40, 11, AEGEAN), ...column(638, 150, 462, 40, 12, AEGEAN)]
@@ -105,29 +116,25 @@ export function LowPolyScene({ className, intro = false }: { className?: string;
   const rise = (c: number[]): Anim => [0.45 + ((462 - c[1]) / 372) * 0.6, 34]
   return (
     <svg viewBox="-240 -60 1380 700" className={className} preserveAspectRatio="xMidYMid meet" role="img" aria-label="A low-poly Greek temple with a metal statue of a seated thinker between two columns">
-      {layer(sky, 'sky', (c) => [Math.abs(c[0] - 450) / 1500 * 0.8, 0])}
-      {layer(floor, 'fl', (c) => [Math.abs(c[0] - 450) / 1500 * 0.8, 0])}
-      {layer(halo, 'ha', (_, i) => [0.5 + i * 0.03, 0])}
-      {layer(behind, 'bc', rise)}
-      {layer(front, 'fc', rise)}
-      {layer(steps, 'st', (_, i) => [0.35 + i * 0.1, 18])}
-      {layer(pediment, 'pe', (c) => [1.15 + (c[0] / 900) * 0.3, -44])}
-      {statue.map((p, i) => {
-        const pts = p.points.split(' ').map((q) => q.split(',').map(Number))
-        const a = intro ? [1.3 + ((466 - cen(pts)[1]) / 340) * 1.0 + (i % 7) * 0.012, 10] : null
-        return <polygon key={`s${i}`} points={p.points} fill={p.fill} stroke={p.fill} strokeWidth={0.6} strokeLinejoin="round"
-          className={a ? 'intro-in' : undefined} style={a ? ({ animationDelay: `${a[0].toFixed(2)}s`, '--dy': `${a[1]}px` } as React.CSSProperties) : undefined} />
-      })}
-    </svg>
-  )
-}
-
-// The same faceted sky as the opening page, for use as a quiet backdrop behind the star map.
-export function LowPolySky({ className }: { className?: string }) {
-  const sky = gridMesh([0, 1600, 0], [0, 1600, 900], 14, 8, 91, [214, 226, 240])
-  return (
-    <svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" className={className} aria-hidden>
-      {sky.map((t, i) => <polygon key={i} points={t.pts.map((p) => p.join(',')).join(' ')} fill={t.fill} stroke={t.fill} strokeWidth={0.6} />)}
+      <motion.g style={skyStyle}>
+        {layer(sky, 'sky', (c) => [Math.abs(c[0] - 450) / 1500 * 0.8, 0])}
+        {layer(floor, 'fl', (c) => [Math.abs(c[0] - 450) / 1500 * 0.8, 0])}
+      </motion.g>
+      <motion.g style={statueStyle}>{layer(halo, 'ha', (_, i) => [0.5 + i * 0.03, 0])}</motion.g>
+      <motion.g style={columns}>
+        {layer(behind, 'bc', rise)}
+        {layer(front, 'fc', rise)}
+        {layer(steps, 'st', (_, i) => [0.35 + i * 0.1, 18])}
+      </motion.g>
+      <motion.g style={roof}>{layer(pediment, 'pe', (c) => [1.15 + (c[0] / 900) * 0.3, -44])}</motion.g>
+      <motion.g style={statueStyle}>
+        {statue.map((p, i) => {
+          const pts = p.points.split(' ').map((q) => q.split(',').map(Number))
+          const a = intro ? [1.3 + ((466 - cen(pts)[1]) / 340) * 1.0 + (i % 7) * 0.012, 10] : null
+          return <polygon key={`s${i}`} points={p.points} fill={p.fill} stroke={p.fill} strokeWidth={0.6} strokeLinejoin="round"
+            className={a ? 'intro-in' : undefined} style={a ? ({ animationDelay: `${a[0].toFixed(2)}s`, '--dy': `${a[1]}px` } as React.CSSProperties) : undefined} />
+        })}
+      </motion.g>
     </svg>
   )
 }

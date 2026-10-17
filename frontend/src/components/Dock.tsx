@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useStore } from '../store'
 import { agentName, knobText } from '../lib/format'
@@ -10,20 +10,19 @@ const spring = { type: 'spring' as const, duration: 0.45, bounce: 0.1 }
 const EXPECTS = { improves: 'expects a gain', hurts: 'expects a loss', no_effect: 'expects no change' }
 const panel = 'mx-auto w-full max-w-[920px] rounded-xl border border-rule bg-surface p-3 shadow-[0_1px_2px_rgb(21_24_28/0.06),0_12px_32px_rgb(21_24_28/0.10)]'
 
-function Proposals({ starId, items, background }: { starId: string; items: Proposal[]; background: boolean }) {
+function Proposals({ starId, items }: { starId: string; items: Proposal[] }) {
   const { dispatch, app, select } = useStore()
   const from = app.session!.stars.find((s) => s.id === starId)
   const [sel, setSel] = useState<string[]>([])
   const [instr, setInstr] = useState('')
   const [busy, setBusy] = useState(false)
-  const [folded, setFolded] = useState<boolean | null>(null) // null: fold while something newer needs attention, until the human chooses
-  const collapsed = folded ?? background
+  const [collapsed, setCollapsed] = useState(false)
   const toggle = (id: string) => setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : s.length < MAX_AGENTS ? [...s, id] : s))
   return (
     <section aria-label="Proposed experiments" className={panel}>
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="m-0 text-[13.5px] font-semibold">{items.length} experiments ready from <button className="underline decoration-rule underline-offset-4 hover:decoration-ink" onClick={() => from && select(from.id)}>{from ? agentName(from) : starId}</button></h2>
-        <button className="label hover:text-ink" aria-expanded={!collapsed} onClick={() => setFolded(!collapsed)}>{collapsed ? 'review' : 'hide'}</button>
+        <button className="label hover:text-ink" aria-expanded={!collapsed} onClick={() => setCollapsed(!collapsed)}>{collapsed ? 'review' : 'hide'}</button>
       </div>
       {!collapsed && <>
       <ul className="m-0 mt-2.5 grid list-none gap-2 p-0" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(150px, 1fr))` }}>
@@ -91,17 +90,41 @@ function QuestionCard({ q }: { q: Question }) {
   )
 }
 
+type Pending = { key: string; label: string; waiting: boolean; node: ReactNode }
+
+// Everything waiting on the human, one panel at a time: a tab per question and per star with open proposals,
+// so branching from several agents never buries a panel. The newest arrival opens unless you picked another.
 export function Dock() {
   const s = useStore((st) => st.app.session)
+  const [choice, setChoice] = useState<{ key: string; newest: string } | null>(null)
   const questions = (s?.questions ?? []).filter((q) => q.status === 'open')
   const open = (s?.proposals ?? []).filter((p) => p.status === 'open')
   const starIds = [...new Set(open.map((p) => p.star_id))]
+  const name = (id: string) => { const star = s?.stars.find((x) => x.id === id); return star ? agentName(star) : id }
+  const pending: Pending[] = [
+    ...questions.map((q) => ({ key: q.id, label: `Your call on ${name(q.star_id)}`, waiting: true, node: <QuestionCard q={q} /> })),
+    ...starIds.map((id) => {
+      const items = open.filter((p) => p.star_id === id)
+      return { key: id, label: `${name(id)} · ${items.length} ready`, waiting: false, node: <Proposals starId={id} items={items} /> }
+    }),
+  ]
+  const newest = pending[pending.length - 1]?.key
+  const active = choice && choice.newest === newest && pending.some((p) => p.key === choice.key) ? choice.key : newest
   const enter = { initial: { opacity: 0, y: 24 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: 12, transition: { duration: 0.15 } }, transition: spring }
   return (
-    <div className="pointer-events-none absolute inset-x-4 bottom-4 z-30 flex max-h-[50%] flex-col gap-2 overflow-y-auto">
+    <div className="pointer-events-none absolute inset-x-4 bottom-4 z-30 flex max-h-[60%] flex-col gap-2">
+      {pending.length > 1 && (
+        <div role="tablist" aria-label="Waiting on you" className="tabs on-scene pointer-events-auto mx-auto w-full max-w-[920px] overflow-x-auto">
+          {pending.map((p) => (
+            <button key={p.key} role="tab" aria-selected={p.key === active} className="inline-flex shrink-0 items-center gap-1.5" onClick={() => setChoice({ key: p.key, newest: newest! })}>
+              {p.waiting && <span className="dot live-dot" style={{ background: 'var(--color-waiting)' }} />}{p.label}
+            </button>
+          ))}
+        </div>
+      )}
       <AnimatePresence initial={false}>
-        {questions.map((q) => <motion.div key={q.id} className="pointer-events-auto" {...enter}><QuestionCard q={q} /></motion.div>)}
-        {starIds.map((id, i) => <motion.div key={id} className="pointer-events-auto" {...enter}><Proposals starId={id} items={open.filter((p) => p.star_id === id)} background={questions.length > 0 || i < starIds.length - 1} /></motion.div>)}
+        {/* inactive panels stay mounted so a half-made selection survives switching tabs */}
+        {pending.map((p) => <motion.div key={p.key} role="tabpanel" hidden={p.key !== active} className="pointer-events-auto min-h-0 overflow-y-auto" {...enter}>{p.node}</motion.div>)}
       </AnimatePresence>
     </div>
   )

@@ -26,9 +26,11 @@ function Overview() {
     <div className="space-y-6 p-4">
       <section>
         <h2 className="m-0 text-[15px] font-semibold tracking-[-0.01em]">Results</h2>
-        <p className="m-0 mt-0.5 text-muted">
-          {graded.length ? <>{graded.length} graded · <span style={{ color: toneVar('confirmed') }}>{count('confirmed')} confirmed</span> · <span style={{ color: toneVar('refuted') }}>{count('refuted')} refuted</span> · {count('inconclusive')} inconclusive</> : 'Waiting for the first verdict.'}
-        </p>
+        {graded.length > 0 && (
+          <p className="m-0 mt-0.5 text-muted">
+            {graded.length} graded · <span style={{ color: toneVar('confirmed') }}>{count('confirmed')} confirmed</span> · <span style={{ color: toneVar('refuted') }}>{count('refuted')} refuted</span> · {count('inconclusive')} inconclusive
+          </p>
+        )}
       </section>
       <section><H>Accuracy by path</H><div className="plate px-3 pb-1.5 pt-2.5"><PathChart stars={s.stars} highlight={null} /></div></section>
       {ranked.length > 0 && (
@@ -117,13 +119,11 @@ function Verdict({ s }: { s: Star }) {
       <p className="num m-0 mt-2 text-[11.5px] text-muted">95% CI {pct(g.ci_low)} – {pct(g.ci_high)} · {g.n} seeds</p>
     </div>
   )
-  const crosses = g.ci_low <= 0 && g.ci_high >= 0
   return (
     <div className="rounded-lg border p-3" style={{ borderColor: `color-mix(in srgb, ${color} 45%, var(--color-rule))` }}>
       <div className="flex items-baseline justify-between"><span className="text-[12px] font-medium" style={{ color }}>{VERDICT_TEXT[g.verdict]}</span><span className="num text-[11.5px] text-muted">{g.n} paired seeds · p {g.p_value < 0.001 ? '< 0.001' : g.p_value.toFixed(3)}</span></div>
       <div className="num mt-1 text-[28px] font-medium leading-none tracking-[-0.03em]" style={{ color }}>{pts(g.delta)} <span className="text-[14px]">pts</span></div>
       <p className="num m-0 mt-2 text-[11.5px] text-muted">95% CI [{pts(g.ci_low)}, {pts(g.ci_high)}] · {pct(g.mean_parent)} → {pct(g.mean_child)}</p>
-      <p className="m-0 mt-1.5 text-[12.5px] text-muted">{crosses ? 'Interval crosses zero: could be noise.' : g.practical ? 'Interval clears zero, and the effect is large enough to matter.' : 'Real but below 0.05 pts.'}</p>
     </div>
   )
 }

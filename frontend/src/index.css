@@ -94,6 +94,8 @@ body {
 .tabs { display: flex; gap: 6px; }
 .tabs > button { height: 26px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--color-rule); font-size: 12px; font-weight: 500; color: var(--color-muted); transition: background-color 160ms, color 160ms, border-color 160ms; }
 .tabs > button[aria-selected="true"] { background: var(--color-ink); border-color: var(--color-ink); color: var(--color-surface); }
+/* over the 3D scene the idle tabs need their own ground */
+.tabs.on-scene > button:not([aria-selected="true"]) { background: var(--color-surface); box-shadow: 0 1px 2px rgb(21 24 28 / 0.06); }
 @media (hover: hover) and (pointer: fine) { .tabs > button:hover:not([aria-selected="true"]) { color: var(--color-ink); border-color: var(--color-faint); } }
 
 @keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }

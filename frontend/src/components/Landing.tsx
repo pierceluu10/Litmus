@@ -288,39 +288,57 @@ function SlideBody({ s, cta }: { s: Slide; cta: ReactNode }) {
   )
 }
 
-function PinnedSlide({ s, index, pos, cta }: { s: Slide; index: number; pos: MotionValue<number>; cta: ReactNode }) {
+const SCENE_DRIFT = 10 // vw the temple drifts left across the whole story, slower than the slides
+
+function PinnedSlide({ index, pos, children }: { index: number; pos: MotionValue<number>; children: ReactNode }) {
   const d = useTransform(pos, (v) => v - index)
   const opacity = useTransform(d, [-1, -0.5, 0, 0.5, 1], [0, 0.4, 1, 0.4, 0])
   const scale = useTransform(d, [-1, 0, 1], [0.95, 1, 0.95])
   return (
     <div className="flex h-full w-screen shrink-0 items-center px-[clamp(24px,6vw,96px)] pb-14 pt-16">
-      <motion.div className="w-full" style={{ opacity, scale }}><SlideBody s={s} cta={cta} /></motion.div>
+      <motion.div className="w-full" style={{ opacity, scale }}>{children}</motion.div>
     </div>
   )
 }
 
-function PinnedStory({ main, cta }: { main: RefObject<HTMLElement | null>; cta: ReactNode }) {
+// One page: the hero is the first panel, and scrolling slides the story in from the right while the temple
+// plays its intro backwards and settles into the background.
+function PinnedStory({ main, hero, cta }: { main: RefObject<HTMLElement | null>; hero: ReactNode; cta: ReactNode }) {
   const ref = useRef<HTMLElement>(null)
+  const panels = SLIDES.length + 1
   const { scrollYProgress } = useScroll({ container: main as RefObject<HTMLElement>, target: ref, offset: ['start start', 'end end'] })
   const p = useSpring(scrollYProgress, { stiffness: 130, damping: 30, mass: 0.35 })
-  const pos = useTransform(p, (v) => dwell(v, SLIDES.length))
+  const pos = useTransform(p, (v) => dwell(v, panels))
   const x = useTransform(pos, (v) => `${-v * 100}vw`)
+  const exit = useTransform(pos, (v) => clamp(v))
+  const sceneX = useTransform(pos, (v) => `${(-v / (panels - 1)) * SCENE_DRIFT}vw`)
+  const chrome = useTransform(pos, [0, 0.5], [0, 1])
+  const prompt = useTransform(pos, [0, 0.15], [1, 0])
   const fill = useTransform(p, (v) => clamp(v))
   const [active, setActive] = useState(0)
   useMotionValueEvent(pos, 'change', (v) => setActive(Math.round(v)))
+  const next = () => main.current?.scrollBy({ top: innerHeight, behavior: 'smooth' })
   return (
-    <section id="story" ref={ref} aria-label="How Litmus works" style={{ height: `${SLIDES.length * 100}vh` }} className="relative bg-paper">
-      <div className="sticky top-0 h-screen overflow-hidden">
-        <motion.div className="flex h-full will-change-transform" style={{ x, width: `${SLIDES.length * 100}vw` }}>
-          {SLIDES.map((s, i) => <PinnedSlide key={s.key} s={s} index={i} pos={pos} cta={cta} />)}
+    <section ref={ref} aria-label="How Litmus works" style={{ height: `${panels * 100}vh` }} className="relative -mt-[57px]">
+      <div className="sticky top-0 h-screen overflow-hidden bg-[#eef2f7]">
+        <motion.div className="absolute inset-0" style={{ x: sceneX }}>
+          <LowPolyScene intro exit={exit} className="absolute inset-0 h-full w-full" />
         </motion.div>
-        <div className="pointer-events-none absolute inset-x-0 bottom-6 flex flex-col items-center gap-2">
+        <motion.div className="relative flex h-full will-change-transform" style={{ x, width: `${panels * 100}vw` }}>
+          <div className="flex h-full w-screen shrink-0 flex-col justify-end p-[clamp(20px,4vw,56px)] pb-20">{hero}</div>
+          {SLIDES.map((s, i) => <PinnedSlide key={s.key} index={i + 1} pos={pos}><SlideBody s={s} cta={cta} /></PinnedSlide>)}
+        </motion.div>
+        <motion.button aria-label="Scroll to see how it works" className="absolute bottom-5 left-1/2 flex -translate-x-1/2 flex-col items-center gap-1.5 border-0 bg-transparent text-[12px] text-muted" onClick={next} style={{ opacity: prompt }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.6 }}>
+          Scroll
+          <motion.span className="block h-6 w-px origin-top bg-muted" animate={{ scaleY: [0.2, 1, 0.2], opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1.8, ease: 'easeInOut' }} />
+        </motion.button>
+        <motion.div className="pointer-events-none absolute inset-x-0 bottom-6 flex flex-col items-center gap-2" style={{ opacity: chrome }}>
           <div className="flex items-center gap-1.5" aria-hidden>
-            {SLIDES.map((s, i) => <span key={s.key} className="h-1 rounded-full transition-all duration-300" style={{ width: i === active ? 28 : 8, background: i === active ? 'var(--color-ink)' : 'var(--color-rule)' }} />)}
+            {SLIDES.map((s, i) => <span key={s.key} className="h-1 rounded-full transition-all duration-300" style={{ width: i + 1 === active ? 28 : 8, background: i + 1 === active ? 'var(--color-ink)' : 'var(--color-rule)' }} />)}
           </div>
           <div className="h-px w-40 overflow-hidden bg-rule"><motion.div className="h-full origin-left bg-faint" style={{ scaleX: fill }} /></div>
-          <span className="font-mono text-[11px] text-faint">{active + 1} / {SLIDES.length}</span>
-        </div>
+          <span className="font-mono text-[11px] text-faint">{Math.max(1, active)} / {SLIDES.length}</span>
+        </motion.div>
       </div>
     </section>
   )
@@ -328,7 +346,7 @@ function PinnedStory({ main, cta }: { main: RefObject<HTMLElement | null>; cta: 
 
 function StackedStory({ cta }: { cta: ReactNode }) {
   return (
-    <section id="story" aria-label="How Litmus works" className="bg-paper">
+    <section aria-label="How Litmus works" className="bg-paper">
       {SLIDES.map((s) => (
         <motion.div key={s.key} className="px-6 py-16" initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: '-60px' }} transition={{ duration: 0.6, ease }}>
           <SlideBody s={s} cta={cta} />
@@ -347,17 +365,25 @@ export function Landing() {
   const wide = useMediaQuery('(min-width: 860px)')
   const vh = useViewportHeight()
   const { scrollY } = useScroll({ container: main as RefObject<HTMLElement> })
-  // the statue and headline fade as the page scrolls; the statue also drifts slightly slower than the page
+  // stacked layout only: the statue and headline fade as the page scrolls
   const sceneOpacity = useTransform(scrollY, [0, vh * 0.65], [1, 0])
-  const sceneY = useTransform(scrollY, [0, vh], [0, vh * 0.22])
-  const sceneScale = useTransform(scrollY, [0, vh], [1, 1.05])
   const textOpacity = useTransform(scrollY, [0, vh * 0.32], [1, 0])
-  const promptOpacity = useTransform(scrollY, [0, vh * 0.08], [1, 0])
   useEffect(() => { api.health().then((h) => set({ health: h })).catch((e) => set({ error: api.mock ? null : `Could not read backend health (${e.message}). Is the backend running, and is OPENAI_API_KEY set in backend/.env? Replay demo works without keys.` })) }, [set])
   const status = api.mock ? '' : health ? `GPU ${health.modal_warm ? 'warm' : 'cold'} · Papiers ${health.papiers_ok ? 'ok' : 'unavailable'} · OpenAI ${health.openai_ok ? 'ok' : 'unavailable'}` : 'Checking the backend…'
   const start = () => begin(false, GOAL), replay = () => begin(true)
   const cta = <Cta onStart={start} onReplay={replay} />
-  const toStory = () => document.getElementById('story')?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' })
+  const hero = (
+    <motion.div className="max-w-[440px]" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.2, duration: 0.8, ease }}>
+      <h1 className="m-0 text-[clamp(30px,4vw,52px)] font-bold leading-[1.05] tracking-[-0.03em]">Turn what you highlighted into experiments.</h1>
+      <p className="mt-3 max-w-[40ch] text-[16px] leading-snug text-muted">AI agents test the claims you read, and you decide where to dig deeper.</p>
+      <div className="mt-5 flex gap-2">
+        <button className="btn btn-primary" onClick={start}>Start research</button>
+        <button className="btn" onClick={replay}>Replay demo</button>
+      </div>
+      {status && <p className="mb-0 mt-3 text-[12.5px] text-muted">{status}</p>}
+      {error && <p role="alert" className="mb-0 mt-2 text-[13px] text-refuted">{error}</p>}
+    </motion.div>
+  )
   return (
     <main ref={main} className="h-full overflow-y-auto bg-surface" onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 40)}>
       <nav className={`sticky top-0 z-30 flex items-center justify-between px-[clamp(20px,4vw,56px)] py-3.5 transition-colors ${scrolled ? 'border-b border-rule bg-surface/95' : 'border-b border-transparent'}`}>
@@ -377,32 +403,17 @@ export function Landing() {
         </div>
       </nav>
 
-      <section className="relative -mt-[57px] h-screen min-h-[640px] overflow-hidden bg-[#eef2f7]">
-        <motion.div className="absolute inset-0" style={reduce ? undefined : { opacity: sceneOpacity, y: sceneY, scale: sceneScale }}>
-          <LowPolyScene intro className="absolute inset-0 h-full w-full" />
-        </motion.div>
-        <div className="relative flex h-full flex-col justify-end p-[clamp(20px,4vw,56px)] pb-20">
-          <motion.div className="max-w-[440px]" style={reduce ? undefined : { opacity: textOpacity }}>
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.2, duration: 0.8, ease }}>
-              <h1 className="m-0 text-[clamp(30px,4vw,52px)] font-bold leading-[1.05] tracking-[-0.03em]">Turn what you highlighted into experiments.</h1>
-              <p className="mt-3 max-w-[40ch] text-[16px] leading-snug text-muted">AI agents test the claims you read, and you decide where to dig deeper.</p>
-              <div className="mt-5 flex gap-2">
-                <button className="btn btn-primary" onClick={start}>Start research</button>
-                <button className="btn" onClick={replay}>Replay demo</button>
-              </div>
-              {status && <p className="mb-0 mt-3 text-[12.5px] text-muted">{status}</p>}
-              {error && <p role="alert" className="mb-0 mt-2 text-[13px] text-refuted">{error}</p>}
+      {wide && !reduce ? <PinnedStory main={main} hero={hero} cta={cta} /> : (
+        <>
+          <section className="relative -mt-[57px] h-screen min-h-[640px] overflow-hidden bg-[#eef2f7]">
+            <motion.div className="absolute inset-0" style={reduce ? undefined : { opacity: sceneOpacity }}>
+              <LowPolyScene intro className="absolute inset-0 h-full w-full" />
             </motion.div>
-          </motion.div>
-        </div>
-        <motion.button aria-label="Scroll to see how it works" className="absolute bottom-5 left-1/2 flex -translate-x-1/2 flex-col items-center gap-1.5 border-0 bg-transparent text-[12px] text-muted" onClick={toStory} style={reduce ? undefined : { opacity: promptOpacity }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 2.6 }}>
-          Scroll
-          <motion.span className="block h-6 w-px origin-top bg-muted" animate={reduce ? undefined : { scaleY: [0.2, 1, 0.2], opacity: [0.3, 1, 0.3] }} transition={{ repeat: Infinity, duration: 1.8, ease: 'easeInOut' }} />
-        </motion.button>
-      </section>
-
-      {wide && !reduce ? <PinnedStory main={main} cta={cta} /> : <StackedStory cta={cta} />}
-
+            <motion.div className="relative flex h-full flex-col justify-end p-[clamp(20px,4vw,56px)] pb-20" style={reduce ? undefined : { opacity: textOpacity }}>{hero}</motion.div>
+          </section>
+          <StackedStory cta={cta} />
+        </>
+      )}
     </main>
   )
 }
