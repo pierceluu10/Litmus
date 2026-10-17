@@ -5,6 +5,13 @@ or remove fields, every change gets a Changelog line (newest first) and lands on
 `docs(contract): ...`.
 
 ## Changelog
+- 2026-10-17 — Additive: `POST /api/sessions/{id}/start {claim_ids}` answers "Where should we start?" (the session
+  waits at `waiting_human` with `wave: 0` until it arrives; auto mode picks the top claims) and event
+  `start.chosen {claim_ids}`; `SessionState.start_claim_ids`; `Star.suggestion?` (the star's agent, in its own words:
+  where it would go next). Semantics: `proposals.ready.star_id` is the agent whose card it is and `proposals` are
+  that card's open options (each agent suggests after its verdict); choosing from a card skips that card's other
+  options only; a dispatch made while a wave is running queues its stars for the next wave (`Star.wave`, status
+  `queued`). `Proposal.agent_recommended` is always false (no agent's pick).
 - 2026-10-17 — Additive: `POST /explain` body `history?: ChatTurn[]` (`{role: "human"|"litmus", text}`, oldest
   first) so explain is a per-star chat; omitted = a fresh conversation.
 - 2026-10-17 — Additive: `Claim.summary?` (a 3–7 word AI title for the claim, cached per highlight + note);
@@ -36,6 +43,7 @@ All JSON is snake_case. Timestamps are ISO 8601 UTC strings. IDs are stable stri
 | GET | `/api/sessions` | | `{sessions: {id, goal, status, created_at, replay}[]}` newest first |
 | GET | `/api/sessions/{id}` | | full `SessionState` snapshot |
 | POST | `/api/sessions/{id}/dispatch` | `{star_id, selections:[{proposal_id, knob_overrides?}], instruction?}` | `{ok}` |
+| POST | `/api/sessions/{id}/start` | `{claim_ids: string[]}` (1–4 library claim ids) | `{ok}` (409 unknown id or already started) |
 | POST | `/api/sessions/{id}/answer` | `{question_id, option_id, comment?}` | `{ok}` |
 | POST | `/api/sessions/{id}/feedback` | `{star_id, kind:"challenge"\|"suggest"\|"prioritize", text}` | `{ok}` |
 | POST | `/api/sessions/{id}/explain` | `{star_id, question?, history?: ChatTurn[]}` | `{answer, provenance: Provenance[]}` |
@@ -103,7 +111,7 @@ Star = { id,                                // "S0" is the baseline, then S1, S2
          progress?: { seed:number, epoch:number, val_acc:number }[],
          runs: RunResult[], parent_runs: RunResult[],
          grade?: Grade,
-         reflection?: string, error?: string, created_at, finished_at? }
+         reflection?: string, suggestion?: string, error?: string, created_at, finished_at? }
 
 Question = { id, star_id, text, evidence: Provenance[],
              options:[{id, label, consequence, directive?, parent_star_id?, knob_changes?}],
@@ -124,7 +132,7 @@ SessionState = { id, goal, status:"running"|"paused"|"waiting_human"|"done", sta
                  replay?: boolean, created_at,
                  wave: number,                     // current wave
                  agenda: AgendaItem[],             // what the agent committed to consider next wave, and why
-                 finish_requested: boolean,
+                 finish_requested: boolean, start_claim_ids: string[],
                  last_seq: number }                // open the WS with from_seq = last_seq
 
 AgendaItem = { id, source: "reflection"|"answer"|"feedback", star_id?, text, knob_changes,
@@ -140,7 +148,8 @@ Event = { seq:number, ts:string, session_id, type: EventType, payload: object }
 | `session.started` | `{goal, replay: boolean}` |
 | `library.loaded` | `{documents: Document[], claims: Claim[]}` |
 | `agent.thinking` | `{star_id?, text}` — short, human-readable step |
-| `proposals.ready` | `{star_id, proposals: Proposal[]}` |
+| `proposals.ready` | `{star_id, proposals: Proposal[]}` — one agent's card: its open options |
+| `start.chosen` | `{claim_ids: string[]}` — the claims the session starts from |
 | `human.dispatched` | `{star_id, selections, decision: Decision}` |
 | `star.created` | `{star: Star}` |
 | `experiment.started` | `{star_id, seeds: number[]}` |
