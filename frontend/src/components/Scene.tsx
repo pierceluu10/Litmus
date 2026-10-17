@@ -3,7 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Billboard, CameraControls, Html, Line, useGLTF } from '@react-three/drei'
 import { Box3, MathUtils, Vector3, type Group, type Mesh } from 'three'
 import type { Line2 } from 'three-stdlib'
-import { usePanelOpen, useStore } from '../store'
+import { useStore } from '../store'
 import { FIRST_STEP, layoutStars, UNITS_PER_POINT, type Pos } from '../lib/layout'
 import { agentName, progressFraction, provMatches, starTone, type Tone } from '../lib/format'
 import type { Star } from '../types'
@@ -264,7 +264,7 @@ function CameraRig({ positions }: { positions: Map<string, Pos> }) {
   const focus = star ?? { x: FIRST_STEP, y: 0, z: 0 }
   const size = useThree((s) => s.size)
   const portrait = size.width / size.height < PORTRAIT_ASPECT // narrow screens see less width: pull back
-  const panel = usePanelOpen() && innerWidth >= WIDE_PX ? PANEL_PX : 0
+  const panel = innerWidth >= WIDE_PX ? PANEL_PX : 0 // the results card is always open on wide screens
   const introDone = useRef(false)
   const wasFit = useRef(false)
   // the default view; later moves keep whatever zoom the user chose, only the target moves

@@ -289,12 +289,12 @@ npm test             # reducer, layout, simulator + grader-port tests
 ranking row) opens its card above it (`NodeCard` in `NodeBubble.tsx`): **About** (the claim it tests, verdict, what it
 found and suggests, Stop / Branch from here) and **Where should I proceed?** (its options). The right panel is for the
 whole research only: researching now, results, accuracy by path, rankings, where you steered, research log, and the
-**Litmus card** (one conversation; Litmus answers about the open agent, shown as a removable chip, or the research as a
+**Litmus card** (opened by Litmus's face, which sits under the always-open results card and narrates what the agents do in speech bubbles above it; one conversation; Litmus answers about the open agent, shown as a removable chip, or the research as a
 whole). **Test another claim** (`ClaimPicker.tsx`) lists every highlight with its status; tested ones keep a greyed-out
 Test button; open one for its card (paper, your note, Basis, Findings, source). Following new branches is always on;
 **Fit all** zooms out (padded clear of the results card) and closes node cards, **Default view** goes back to following.
 The camera puts the focused agent in the middle of the space the results card leaves (`PANEL_PX`, `BELOW_MIDDLE`), zoom is
-capped at `MAX_DISTANCE` (520), and five dashed accuracy levels (baseline ±1, ±2 points, `AccuracyLines`) run behind the
+capped at `MAX_DISTANCE` (520, the user's furthest zoom; the default ≈350 is their ideal), and five dashed accuracy levels (baseline ±1, ±2 points, `AccuracyLines`) run behind the
 graph, the baseline through the fingertip. The floating cards carry the landing's faceted sky (`.card-facets`).
 
 **Branch from anywhere**: "Branch from here" sends `feedback(kind: "suggest")` for that star, so it works against the real backend too (the agent replans from it); the demo backend answers with proposals from that star.

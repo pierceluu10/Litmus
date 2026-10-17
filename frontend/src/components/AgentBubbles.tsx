@@ -1,21 +1,28 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { useStore, usePanelOpen, useStarting } from '../store'
+import { useStore, useStarting } from '../store'
 import { StartBubble } from './StartBubble'
 
 const SHOW_MS = 9000
 const MAX_QUEUED = 5
 type Bubble = { seq: number; text: string }
 
-// Litmus's face sits in the top right of the scene; whenever the agent does something it says so in a speech bubble
-// that pops out beside it and fades away. Your own actions (answers, notes) are not narrated back to you.
+// "Where should we start?" pops out over the scene, beside the results card, until the session has its first claim.
+export function StartPrompt() {
+  const starting = useStarting()
+  if (!starting) return null
+  return <div className="pointer-events-none absolute right-3 top-3 z-30 lg:right-[calc(var(--panel)+0.75rem)]"><StartBubble /></div>
+}
+
+// Litmus's face sits under the results card and opens the chat with it. Whenever the agents do something, Litmus says
+// so in a speech bubble that rises above its face and fades away (not while the chat is open, where the
+// conversation already is). Your own actions (answers, notes) are not narrated back to you.
 export function AgentBubbles() {
   const feed = useStore((s) => s.app.feed)
   const [queue, setQueue] = useState<Bubble[]>([])
   const [shown, setShown] = useState<Bubble | null>(null)
-  const open = usePanelOpen()
+  const { chatOpen, set } = useStore()
   const starting = useStarting()
-  const set = useStore((s) => s.set)
   const seen = useRef(feed.length)
   useEffect(() => {
     const fresh = feed.slice(seen.current).filter((f) => f.kind !== 'decision' && f.kind !== 'feedback')
@@ -34,23 +41,23 @@ export function AgentBubbles() {
     return () => clearTimeout(timer)
   }, [shown])
   return (
-    <div className="pointer-events-none absolute right-3 top-3 z-30 flex items-start justify-end gap-2.5 lg:right-3">
-      {starting && <StartBubble />}
-      <ul aria-live="polite" className="m-0 flex max-w-[min(360px,50vw)] list-none flex-col items-end gap-1.5 p-0 pt-1">
+    <div className="relative flex shrink-0 justify-end">
+      <ul aria-live="polite" className="pointer-events-none absolute bottom-[calc(100%+8px)] right-1 z-10 m-0 flex w-max max-w-[320px] list-none flex-col items-end gap-1.5 p-0">
         <AnimatePresence initial={false}>
-          {!open && !starting && shown && [shown].map((b) => (
+          {!chatOpen && !starting && shown && [shown].map((b) => (
             <motion.li key={b.seq} initial={{ opacity: 0, scale: 0.9, x: 10 }} animate={{ opacity: 1, scale: 1, x: 0 }} exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.2 } }}
-              transition={{ type: 'spring', duration: 0.4, bounce: 0.18 }} style={{ transformOrigin: 'right center' }}
-              className="relative rounded-2xl rounded-tr-md border border-rule bg-surface px-3 py-2 text-[12.5px] leading-snug shadow-[0_8px_24px_-10px_rgba(43,58,82,0.3)]">
+              transition={{ type: 'spring', duration: 0.4, bounce: 0.18 }} style={{ transformOrigin: 'right bottom' }}
+              className="relative rounded-2xl rounded-br-md border border-rule bg-surface px-3 py-2 text-[12.5px] leading-snug shadow-[0_8px_24px_-10px_rgba(43,58,82,0.3)]">
               <span className="line-clamp-4">{b.text}</span>
             </motion.li>
           ))}
         </AnimatePresence>
       </ul>
-      <button aria-pressed={open} aria-label={open ? 'Close results' : 'Open results'} title={open ? 'Close results' : 'Results'} className="pointer-events-auto shrink-0 rounded-full border bg-surface p-1 shadow-[0_8px_24px_-10px_rgba(43,58,82,0.3)] transition-transform active:scale-95"
-        style={{ borderColor: open ? 'var(--color-ink)' : 'var(--color-rule)' }}
-        onClick={() => set(open ? { panelOpen: false, selectedId: null, abstractOpen: false, hoveredClaim: null } : { panelOpen: true })}>
-        <img src="/litmus-face.svg" alt="" width={44} height={44} />
+      <button aria-pressed={chatOpen} aria-label={chatOpen ? 'Close the chat with Litmus' : 'Chat with Litmus'} title={chatOpen ? 'Close chat' : 'Chat with Litmus'}
+        className="flex items-center gap-2 rounded-full border bg-surface py-1 pl-1 pr-3.5 shadow-[0_8px_24px_-10px_rgba(43,58,82,0.3)] transition-transform active:scale-95"
+        style={{ borderColor: chatOpen ? 'var(--color-ink)' : 'var(--color-rule)' }} onClick={() => set({ chatOpen: !chatOpen })}>
+        <img src="/litmus-face.svg" alt="" width={36} height={36} />
+        <span className="text-[13px] font-semibold">{chatOpen ? 'Close chat' : 'Ask Litmus'}</span>
       </button>
     </div>
   )

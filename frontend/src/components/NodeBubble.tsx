@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useStore } from '../store'
-import { agentDetail, agentName, knobText, pct, progressFraction, provMatches, pts, starTone, toneVar } from '../lib/format'
+import { agentDetail, agentName, knobText, pct, progressFraction, provMatches, pts, toneVar } from '../lib/format'
 import type { Proposal, Star } from '../types'
 import { SceneBackdrop } from './LowPolyScene'
 
@@ -23,7 +23,8 @@ function Verdict({ s }: { s: Star }) {
     )
   }
   if (!g) return <p className="m-0 text-muted">{s.status === 'waiting' ? 'Waiting for your answer.' : s.status === 'failed' ? s.error ?? 'Stopped.' : 'Not graded yet.'}</p>
-  const color = toneVar(starTone(s))
+  // the verdict's own colour (refuted red, confirmed green), even while the node's ring shows it is waiting on you
+  const color = toneVar(g.verdict)
   return (
     <div title={`${g.n} paired seeds · p ${g.p_value < 0.001 ? '< 0.001' : g.p_value.toFixed(3)}`}>
       <div className="flex items-baseline justify-between"><span className="font-medium" style={{ color }}>{VERDICT_TEXT[g.verdict]}</span><span className="text-[11px] text-muted">{g.n} runs</span></div>
@@ -37,6 +38,16 @@ function Verdict({ s }: { s: Star }) {
   )
 }
 
+// A titled part of the card: a small caps subtitle over its text.
+function Part({ title, clamp = '', children }: { title: string; clamp?: string; children: React.ReactNode }) {
+  return (
+    <section>
+      <h3 className="card-subtitle">{title}</h3>
+      <p className={`m-0 leading-snug text-ink ${clamp}`}>{children}</p>
+    </section>
+  )
+}
+
 // About the agent: the claim it tests, its result, what it found and where it would go, and the actions on it.
 function About({ star }: { star: Star }) {
   const { app: { claims }, stopBranch, branch } = useStore()
@@ -45,11 +56,11 @@ function About({ star }: { star: Star }) {
   const live = star.status === 'running' || star.status === 'queued'
   return (
     <div className="flex flex-col gap-2.5">
-      {claim && <p className="m-0 leading-snug"><span className="label mr-1">Tests</span>{claim.summary ?? claim.text}</p>}
+      {claim && <Part title="Tests">{claim.summary ?? claim.text}</Part>}
       {!star.parent_id && <p className="m-0 leading-snug text-muted">The published configuration, run as is. Every agent is measured against it.</p>}
       <Verdict s={star} />
-      {star.parent_id && star.reflection && <p className="m-0 line-clamp-4 leading-snug"><span className="label mr-1">Found</span>{star.reflection}</p>}
-      {star.suggestion && <p className="m-0 line-clamp-3 leading-snug"><span className="label mr-1">Suggests</span>{star.suggestion}</p>}
+      {star.parent_id && star.reflection && <Part title="Found" clamp="line-clamp-4">{star.reflection}</Part>}
+      {star.suggestion && <Part title="Suggests" clamp="line-clamp-3">{star.suggestion}</Part>}
       {live && <button className="btn h-7 self-start px-2.5 text-[12px]" onClick={() => stopBranch(star.id)}>Stop</button>}
       {!live && star.status === 'done' && (steer === null
         ? <button className="btn h-7 self-start px-2.5 text-[12px]" onClick={() => setSteer('')}>Branch from here</button>

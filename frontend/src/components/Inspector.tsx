@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
-import { motion } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
 import { sessionApi, useStore } from '../store'
 import { agentDetail, agentName, pct, pts, starTone, toneVar } from '../lib/format'
 import type { Provenance } from '../types'
@@ -7,6 +7,7 @@ import { PathChart } from './PathChart'
 import { ProvChip } from './Prov'
 import { Steering } from './Steering'
 import { SceneBackdrop } from './LowPolyScene'
+import { AgentBubbles } from './AgentBubbles'
 
 const H = ({ children, aside }: { children: React.ReactNode; aside?: React.ReactNode }) => (
   <div className="mb-2 flex items-baseline justify-between"><h3 className="m-0 text-[12px] font-semibold text-muted">{children}</h3>{aside}</div>
@@ -222,10 +223,10 @@ function AbstractView() {
 
 // On wide screens the panel floats over the scene as a card with space around it; on narrow ones it sits below the scene.
 export function Inspector({ floating }: { floating: boolean }) {
-  const { app, abstractOpen } = useStore()
+  const { app, abstractOpen, chatOpen } = useStore()
   const showAbstract = abstractOpen && !!app.session?.abstract
   // The results card and the Litmus chat are two cards stacked in one column: what you're looking at, and who you ask.
-  const column = floating ? 'absolute bottom-3 right-3 top-[76px] z-20 flex w-[348px] flex-col gap-2.5' : 'flex flex-col gap-2.5 border-t border-rule bg-paper p-3'
+  const column = floating ? 'absolute bottom-3 right-3 top-3 z-20 flex w-[348px] flex-col gap-2.5' : 'flex flex-col gap-2.5 border-t border-rule bg-paper p-3'
   return (
     <div className={column}>
       <motion.aside className={`${CARD} flex min-h-0 flex-1 flex-col overflow-hidden`} aria-label="Results" style={{ transformOrigin: 'top right' }}
@@ -235,7 +236,8 @@ export function Inspector({ floating }: { floating: boolean }) {
           {showAbstract ? <AbstractView /> : <Overview />}
         </div>
       </motion.aside>
-      {!showAbstract && <AskBar />}
+      <AnimatePresence initial={false}>{chatOpen && !showAbstract && <AskBar key="chat" />}</AnimatePresence>
+      <AgentBubbles />
     </div>
   )
 }

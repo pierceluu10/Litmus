@@ -39,8 +39,10 @@ export function labelAgents(stars: Star[]): Star[] {
 }
 export function agentDetail(s: Star): string {
   const k = s.knob_changes
-  const parts = Object.entries(k).map(([key, v]) => key === 'epochs' ? `${v} ep` : key === 'mixup_alpha' ? `α ${v}` : key === 'tta_level' ? (v === 0 ? 'off' : `level ${v}`)
-    : key === 'flip' ? String(v) : typeof v === 'boolean' ? (v ? 'on' : 'off') : key === 'label_smoothing' ? `ε ${v}` : String(v))
+  // the setting this agent changed, written as a setting: "α = 1", "ε = 0", "20 epochs", "TTA off", "random flip"
+  const parts = Object.entries(k).map(([key, v]) => key === 'epochs' ? `${v} epochs` : key === 'mixup_alpha' ? `α = ${v}` : key === 'label_smoothing' ? `ε = ${v}`
+    : key === 'tta_level' ? (v === 0 ? 'TTA off' : `TTA level ${v}`) : key === 'flip' ? `${v} flip` : typeof v === 'boolean' ? `${KNOB_NAMES[key as keyof Knobs]} ${v ? 'on' : 'off'}`
+    : `${KNOB_NAMES[key as keyof Knobs] ?? key} = ${v}`)
   return parts.join(' · ')
 }
 

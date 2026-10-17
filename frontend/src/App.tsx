@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react'
-import { AnimatePresence } from 'motion/react'
-import { useStore, usePanelOpen } from './store'
+import { useStore } from './store'
 import { Login, Signup } from './components/Auth'
 import { Upload } from './components/Upload'
 import { Landing } from './components/Landing'
 import { toneVar } from './lib/format'
 import { TopBar } from './components/TopBar'
 import { ClaimPicker } from './components/ClaimPicker'
-import { AgentBubbles } from './components/AgentBubbles'
+import { StartPrompt } from './components/AgentBubbles'
 import { Scene } from './components/Scene'
 import { SceneBackdrop } from './components/LowPolyScene'
 import { Dock } from './components/Dock'
@@ -54,22 +53,21 @@ function Screens() {
   const session = useStore((s) => s.app.session)
   const hash = useHash()
   const wide = useWide()
-  const open = usePanelOpen()
   if (!session) return hash === '#/login' ? <Login /> : hash === '#/signup' ? <Signup /> : hash === '#/upload' ? <Upload /> : <Landing />
   return (
     <div className="flex h-full flex-col">
       <TopBar />
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:overflow-hidden">
         {/* --panel / --rail: the room the floating cards take on the right and left; the scene's controls and the dock keep clear */}
-        <main className="marble-ground relative min-h-0 flex-1 overflow-hidden max-lg:h-[72vh] max-lg:flex-none lg:[--rail:0px]" style={{ '--panel': open ? '372px' : '0px' } as React.CSSProperties}>
+        <main className="marble-ground relative min-h-0 flex-1 overflow-hidden max-lg:h-[72vh] max-lg:flex-none lg:[--rail:0px] lg:[--panel:372px]">
           <SceneBackdrop seed={SCENE_FACETS} />
           <Scene />
           <SceneChrome />
-          <AgentBubbles />
+          <StartPrompt />
           <Dock />
-          {wide && <AnimatePresence>{open && <Inspector floating key="panel" />}</AnimatePresence>}
+          {wide && <Inspector floating />}
         </main>
-        {!wide && open && <Inspector floating={false} />}
+        {!wide && <Inspector floating={false} />}
       </div>
       <ThoughtFlight />
     </div>

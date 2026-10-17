@@ -130,6 +130,9 @@ body {
   -webkit-mask-image: radial-gradient(120% 75% at 100% 100%, #000 0%, rgb(0 0 0 / 0.35) 45%, transparent 75%);
   mask-image: radial-gradient(120% 75% at 100% 100%, #000 0%, rgb(0 0 0 / 0.35) 45%, transparent 75%); }
 
+/* a subtitle inside the floating cards: small caps over the body text */
+.card-subtitle { margin: 0 0 3px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-faint); }
+
 /* the accuracy levels behind the graph */
 .level-label { display: block; transform: translate(6px, -50%); white-space: nowrap; font-family: var(--font-mono); font-size: 10.5px; color: var(--color-faint); pointer-events: none; }
 
