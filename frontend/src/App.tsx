@@ -10,6 +10,7 @@ import { SceneBackdrop } from './components/LowPolyScene'
 import { Dock } from './components/Dock'
 import { Inspector } from './components/Inspector'
 import { ThoughtFlight } from './components/ThoughtFlight'
+import { Tutorial } from './components/Tutorial'
 
 // tiny hash router: '' is the home page, #/login and #/signup are the account pages
 function useWide() {
@@ -46,7 +47,7 @@ function SceneChrome() {
   )
 }
 
-export default function App() {
+function Screens() {
   const session = useStore((s) => s.app.session)
   const hash = useHash()
   const wide = useWide()
@@ -56,7 +57,7 @@ export default function App() {
       <TopBar />
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:overflow-hidden">
         {/* --panel is the room the floating results card takes on the right; the scene's own controls keep clear of it */}
-        <main className="marble-ground relative min-h-0 flex-1 overflow-hidden max-lg:h-[72vh] max-lg:flex-none lg:[--panel:372px]">
+        <main data-tour="scene" className="marble-ground relative min-h-0 flex-1 overflow-hidden max-lg:h-[72vh] max-lg:flex-none lg:[--panel:372px]">
           <SceneBackdrop seed={SCENE_FACETS} />
           <Scene />
           <SceneChrome />
@@ -69,4 +70,9 @@ export default function App() {
       <ThoughtFlight />
     </div>
   )
+}
+
+// The tour is mounted above every screen, so leaving the workspace always ends it (it cannot linger and reappear later).
+export default function App() {
+  return <><Screens /><Tutorial /></>
 }

@@ -20,7 +20,7 @@ export function Researching() {
   const loading = libraryStage !== 'ready'
   if (!loading && !rows.length) return null
   return (
-    <section aria-label="Claims being researched now" className="absolute left-4 top-16 z-30 w-[min(300px,calc(100%-2rem))] rounded-xl border border-rule bg-surface/95 p-3 shadow-[0_10px_30px_-8px_rgba(43,58,82,0.22)]">
+    <section data-tour="researching" aria-label="Claims being researched now" className="absolute left-4 top-16 z-30 w-[min(300px,calc(100%-2rem))] rounded-xl border border-rule bg-surface/95 p-3 shadow-[0_10px_30px_-8px_rgba(43,58,82,0.22)]">
       <h2 className="m-0 text-[12px] font-semibold text-muted">{loading ? 'Reading your library' : active.length === 1 ? 'Researching now' : `Researching now · ${active.length} agents`}</h2>
       {loading ? (
         <p className="m-0 mt-2 flex items-center gap-2 text-[12.5px]" aria-live="polite"><span className="dot live-dot" style={{ background: toneVar('running') }} />{STAGE_TEXT[libraryStage as LibraryStage]}…</p>

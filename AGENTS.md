@@ -49,7 +49,7 @@ uv run litmus --help
 3. Live session: `POST /api/sessions {"fresh": true}` so every star trains live with epoch progress. Expect
    ~35s to the first proposals (library + baseline), ~1–2 min per wave, ~6 min for 3 waves, ≈300–500 GPU-s
    (≈$0.30 on an A100).
-4. If Wi-Fi, Modal, or OpenAI fails: `GET /api/replay/demo` (the UI's "Replay demo") re-streams the recorded
+4. If Wi-Fi, Modal, or OpenAI fails: `GET /api/replay/demo` (no longer a button in the UI; the Tutorial replaced it, and the endpoint stays for the judging fallback) re-streams the recorded
    real session offline, flagged `replay: true`.
 5. A crashed or restarted server resumes every unfinished session on startup (verified with `kill -9`).
 
@@ -236,7 +236,7 @@ cd frontend && npm install
 npm run dev          # http://localhost:5173
 npm test             # reducer, layout, simulator + grader-port tests
 ```
-**Live by default, Demo mode on a switch** (user decision, 2026-10-17): the front page's nav has a **Demo mode** switch (remembered in `localStorage` as `litmus.demo`). Off = the real backend at `VITE_API_URL` (default `http://localhost:8000`), sessions created with `fresh: true` so every star trains live on Modal; the front page shows Modal/Papiers/OpenAI health. On = the in-browser backend in `src/mock/`. A session keeps the backend it started on (`sessionApi()` in `store.ts`); the workspace shows no badge either way.
+**Live by default; the Tutorial uses the practice backend** (user decision, 2026-10-17): the front page has a **Tutorial** button in place of the old Demo mode switch. It starts a session on the in-browser backend for that visit only (nothing is saved) and walks through the workspace with pop-ups (`tutorial.ts` holds the 12 steps; `components/Tutorial.tsx` draws them against `data-tour` anchors on the real UI). Each step waits until what it describes is on screen, and a few steps do the action when you press Next (run the suggestions, answer the question). Developers can keep the practice backend on with `?demo=1` or `localStorage litmus.demo=1`. Otherwise it is the real backend at `VITE_API_URL` (default `http://localhost:8000`), sessions created with `fresh: true` so every star trains live on Modal; the front page shows Modal/Papiers/OpenAI health. The practice backend is `src/mock/`. A session keeps the backend it started on (`sessionApi()` in `store.ts`); the workspace shows no badge either way.
 
 **The library is always real**: on launch the claims rail streams `GET /api/library/stream` from the backend (Getting papers… highlights… notes… Summarizing…), in the demo too, so run `uv run litmus serve`. If the backend is unreachable the demo falls back to `src/mock/library.json`, a snapshot of `backend/data/library_cache.json` with the same ids (refresh it by copying the cache).
 

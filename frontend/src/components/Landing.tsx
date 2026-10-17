@@ -3,6 +3,7 @@ import { animate, motion, useInView, useMotionValueEvent, useReducedMotion, useS
 import { apiFor, useStore } from '../store'
 import { LowPolyScene } from './LowPolyScene'
 import { nav, useAuth } from '../auth'
+import { useTutorial } from '../tutorial'
 
 const ease = [0.23, 1, 0.32, 1] as const
 const GOAL = 'Which training tricks actually help a tiny CIFAR-10 classifier?'
@@ -260,13 +261,13 @@ const dwell = (p: number, n: number) => {
   return i + (f < 0.28 ? 0 : f > 0.72 ? 1 : smooth((f - 0.28) / 0.44))
 }
 
-function Cta({ onStart, onReplay }: { onStart: () => void; onReplay: () => void }) {
+function Cta({ onStart, onTutorial }: { onStart: () => void; onTutorial: () => void }) {
   const user = useAuth((s) => s.user)
   return (
     <div className="flex flex-wrap items-center justify-center gap-3">
       {!user && <button className="btn btn-primary px-5 py-2.5" onClick={() => nav('#/signup')}>Get started</button>}
       <button className={`btn px-5 py-2.5 ${user ? 'btn-primary' : ''}`} onClick={onStart}>Start research</button>
-      <button className="btn px-5 py-2.5" onClick={onReplay}>Replay demo</button>
+      <button className="btn px-5 py-2.5" onClick={onTutorial}>Tutorial</button>
     </div>
   )
 }
@@ -356,16 +357,6 @@ function StackedStory({ cta }: { cta: ReactNode }) {
   )
 }
 
-// Off: the real backend trains on Modal. On: the in-browser simulation, no backend or keys needed.
-function DemoSwitch() {
-  const { demo, setDemo } = useStore()
-  return (
-    <button role="switch" aria-checked={demo} className="switch" onClick={() => setDemo(!demo)}>
-      <span className="switch-track" aria-hidden="true"><span className="switch-thumb" /></span>Demo mode
-    </button>
-  )
-}
-
 export function Landing() {
   const { begin, set, error, demo } = useStore()
   const main = useRef<HTMLElement>(null)
@@ -380,17 +371,17 @@ export function Landing() {
   const textOpacity = useTransform(scrollY, [0, vh * 0.32], [1, 0])
   useEffect(() => {
     if (demo) return
-    apiFor(false).health().catch((e: Error) => set({ error: `Could not reach the backend (${e.message}). Start it with ./dev.sh, or turn on Demo mode.` }))
+    apiFor(false).health().catch((e: Error) => set({ error: `Could not reach the backend (${e.message}). Start it with ./dev.sh, or take the tutorial, which needs no backend.` }))
   }, [demo, set])
-  const start = () => begin(false, GOAL), replay = () => begin(true)
-  const cta = <Cta onStart={start} onReplay={replay} />
+  const start = () => { useTutorial.getState().stop(); void begin(false, GOAL) }, tutorial = () => void useTutorial.getState().start()
+  const cta = <Cta onStart={start} onTutorial={tutorial} />
   const hero = (
     <motion.div className="max-w-[440px]" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.2, duration: 0.8, ease }}>
       <h1 className="m-0 text-[clamp(30px,4vw,52px)] font-bold leading-[1.05] tracking-[-0.03em]">Turn what you highlighted into experiments.</h1>
       <p className="mt-3 max-w-[40ch] text-[16px] leading-snug text-muted">AI agents test the claims you read, and you decide where to dig deeper.</p>
       <div className="mt-5 flex gap-2">
         <button className="btn btn-primary" onClick={start}>Start research</button>
-        <button className="btn" onClick={replay}>Replay demo</button>
+        <button className="btn" onClick={tutorial}>Tutorial</button>
       </div>
       {error && <p role="alert" className="mb-0 mt-2 text-[13px] text-refuted">{error}</p>}
     </motion.div>
@@ -400,7 +391,6 @@ export function Landing() {
       <nav className={`sticky top-0 z-30 flex items-center justify-between px-[clamp(20px,4vw,56px)] py-3.5 transition-colors ${scrolled ? 'border-b border-rule bg-surface/95' : 'border-b border-transparent'}`}>
         <button className="border-0 bg-transparent p-0 text-[20px] font-bold tracking-tight" onClick={() => main.current?.scrollTo({ top: 0, behavior: 'smooth' })}>Litmus</button>
         <div className="flex items-center gap-2">
-          <DemoSwitch />
           {user ? (
             <>
               <button className="btn" onClick={logout}>Log out</button>

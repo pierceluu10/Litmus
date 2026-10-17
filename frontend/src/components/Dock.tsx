@@ -112,7 +112,7 @@ export function Dock() {
   const active = choice && choice.newest === newest && pending.some((p) => p.key === choice.key) ? choice.key : newest
   const enter = { initial: { opacity: 0, y: 24 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: 12, transition: { duration: 0.15 } }, transition: spring }
   return (
-    <div className="pointer-events-none absolute inset-x-4 bottom-4 z-30 flex max-h-[60%] flex-col gap-2 lg:right-[calc(var(--panel)+0.25rem)]">
+    <div data-tour="dock" className="pointer-events-none absolute inset-x-4 bottom-4 z-30 flex max-h-[60%] flex-col gap-2 lg:right-[calc(var(--panel)+0.25rem)]">
       {pending.length > 1 && (
         <div role="tablist" aria-label="Waiting on you" className="tabs on-scene pointer-events-auto mx-auto w-full max-w-[920px] overflow-x-auto">
           {pending.map((p) => (

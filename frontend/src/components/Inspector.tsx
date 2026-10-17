@@ -331,7 +331,7 @@ export function Inspector({ floating }: { floating: boolean }) {
     ? 'absolute bottom-3 right-3 top-3 z-20 flex w-[348px] flex-col overflow-hidden rounded-2xl border border-rule bg-surface shadow-[0_20px_50px_-14px_rgba(43,58,82,0.30)]'
     : 'flex flex-col border-t border-rule bg-surface'
   return (
-    <aside className={shell} aria-label="Results">
+    <aside data-tour="results" className={shell} aria-label="Results">
       <div className="min-h-0 flex-1 overflow-y-auto">
         {showAbstract ? <AbstractView /> : s ? <Detail s={s} key={s.id} /> : <Overview />}
       </div>

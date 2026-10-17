@@ -21,7 +21,7 @@ export function TopBar() {
           </div>
         )}
         {s.abstract && <button className="btn" onClick={() => set({ abstractOpen: true, selectedId: null })}>Read abstract</button>}
-        <button className="btn btn-primary" disabled={!graded} onClick={generateAbstract}>
+        <button data-tour="generate" className="btn btn-primary" disabled={!graded} onClick={generateAbstract}>
           {s.abstract ? 'Regenerate abstract' : 'Generate abstract'}
         </button>
       </div>

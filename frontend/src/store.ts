@@ -5,9 +5,10 @@ import { realApi } from './transport/real'
 import type { Api, ConnState, LibraryStage } from './transport/api'
 import type { ChatTurn, Provenance, Selection } from './types'
 
-// Live (the FastAPI backend, Modal A100s) unless the front page's Demo mode switch picks the in-browser backend.
+// Live (the FastAPI backend, Modal A100s) unless the in-browser practice backend is chosen: the Tutorial does, for one visit;
+// developers can keep it on with ?demo=1.
 const DEMO_KEY = 'litmus.demo'
-const savedDemo = () => { try { return localStorage.getItem(DEMO_KEY) === '1' } catch { return false } }
+const savedDemo = () => { try { return localStorage.getItem(DEMO_KEY) === '1' || /[?&]demo=1\b/.test(location.search) } catch { return false } }
 export const apiFor = (demo: boolean): Api => (demo ? mockApi : realApi)
 // A session keeps the backend it started on, even if the switch is flipped later.
 let current: Api = apiFor(savedDemo())
@@ -72,7 +73,7 @@ export const useStore = create<Store>((set, get) => {
     leave() {
       unsub?.(); unsub = null
       libraryLoad?.abort(); libraryLoad = null
-      set({ app: initialState, sid: null, conn: 'closed', selectedId: null, focusId: null, fitAll: false, abstractOpen: false, chats: {}, thought: null, error: null })
+      set({ app: initialState, sid: null, conn: 'closed', selectedId: null, focusId: null, fitAll: false, abstractOpen: false, chats: {}, thought: null, error: null, demo: savedDemo() })
     },
     async begin(replay, goal) {
       unsub?.()
