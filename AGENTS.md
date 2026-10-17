@@ -37,14 +37,14 @@ Grader (pure stats) ◀── seeds ── results (cached by config hash in SQL
 ```bash
 cd backend
 uv sync
-cp ../.env.example .env   # fill OPENAI_API_KEY, OPENAI_MODEL
+cp ../.env.example ../.env   # repo-root .env (backend/.env also read); fill OPENAI_API_KEY, OPENAI_MODEL
 uv run litmus --help
 ```
 
-## Env vars (`backend/.env`, gitignored)
+## Env vars (repo-root `.env` or `backend/.env`, gitignored)
 | Var | Purpose |
 |---|---|
-| `OPENAI_API_KEY`, `OPENAI_MODEL` | LLM calls (structured outputs) |
+| `OPENAI_API_KEY`, `OPENAI_MODEL` | LLM calls (structured outputs). `OPENAI_MODEL_NAME` also accepted. |
 | `PAPIERS_TOKEN` | Papiers CLI auth (optional if `papiers auth login` was run) |
 | `LITMUS_BUDGET_GPU_SECONDS` | default per-session GPU budget |
 
@@ -89,11 +89,25 @@ uv run litmus --help
 - Baseline star: `baseline_grade` — `ci_low/ci_high` are the CI of its own mean accuracy, not of a delta.
 - Never edited by the agent path; bump `GRADER_VERSION` on any change.
 
+### Papiers (`backend/litmus/papiers_client.py`, `backend/litmus/library.py`)
+- Real shapes (see `backend/tests/fixtures/papiers/`): `list` → `{items:[{id, kind, title, preview, metadata}]}`;
+  `read hl_…` → `items[].content` (highlighted text) and `items[].metadata.annotationText` (the human's note on
+  it). The list `preview` is `"<annotation> — <text>"`, so never parse that; read the highlight.
+  `search` → `results[]` per document with `evidence[]` (`{kind, id, snippet}`).
+- Weights: annotated highlight 3.0 > standalone note / Ask Papiers conversation 2.5 > highlight 2.0
+  (+0.25 if a note discusses its doc) > saved-but-unhighlighted doc 0.5. The demo library has 5 documents,
+  12 highlights, 6 annotated, 0 standalone notes, 0 conversations (the code handles both).
+- Conditions behind each highlight: `papiers read doc --pages N` + LLM (`prompts/extract_conditions.txt`),
+  extracted once and cached in `backend/data/library_cache.json`. If Papiers is down, the cache is served.
+- **No write-back via CLI**: v0.1.5 has no write command (`supports_write()` checks `papiers help --all`).
+  Papiers is a desktop app with no web deep links, so `papiers_url` = the paper's source URL (arXiv).
+
 ### Commands
 | Command | What |
 |---|---|
 | `uv run litmus smoke [--seeds 0 1]` | baseline on Modal, streams epochs |
 | `uv run litmus warmup` | start a warm container |
+| `uv run litmus library [--refresh]` | ranked claims with notes and conditions |
 | `uv run pytest` | tests (CPU only) |
 
 ## Gotchas
@@ -105,6 +119,8 @@ uv run litmus --help
   **4.2 GPU-s per seed**, cold start ≈17s (container boot + data load + cudnn warmup), warm ≈4.5s/seed wall.
   All 11 knob variants ran in parallel on 8 containers: e.g. mixup α=0.2 @9.9ep 0.9369, mixup @20ep 0.9457,
   no whitening 0.9284, flip none 0.9338 (single seed each).
+- 2026-10-16 papiers-client: `uv run litmus library --refresh` → 5 documents, 12 claims, the 6 annotated
+  highlights ranked 1–6, conditions extracted for all 12 in ~10s (e.g. mixup: "200 epochs, PreAct ResNet-18…").
 
 ## Frontend
 (owned by frontend agent)

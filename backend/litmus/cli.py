@@ -4,7 +4,7 @@ import argparse
 import asyncio
 import time
 
-from dotenv import load_dotenv
+import litmus.config  # noqa: F401  (loads .env)
 
 
 async def _smoke(seeds: list[int]) -> None:
@@ -30,16 +30,34 @@ async def _warmup() -> None:
     print(f"warm: {result} in {time.perf_counter() - started:.1f}s")
 
 
+async def _library(refresh: bool) -> None:
+    from litmus.library import get_library
+
+    documents, claims = await get_library(refresh=refresh)
+    print(f"{len(documents)} documents, {len(claims)} claims (judgment-weighted)\n")
+    for claim in claims:
+        print(f"#{claim.rank:<2} w={claim.weight:<4} [{claim.id}] {claim.doc_title[:50]}")
+        print(f"     claim: {claim.text[:160]}")
+        if claim.annotation:
+            print(f"     NOTE:  {claim.annotation}")
+        if claim.conditions:
+            print(f"     cond:  {claim.conditions[:300]}")
+        print()
+
+
 def main() -> None:
-    load_dotenv()
     parser = argparse.ArgumentParser(prog="litmus")
     commands = parser.add_subparsers(dest="command", required=True)
     smoke = commands.add_parser("smoke", help="train the baseline on Modal and stream epochs")
     smoke.add_argument("--seeds", type=int, nargs="+", default=[0])
     commands.add_parser("warmup", help="start a warm Modal container (run ~2 min before judging)")
+    library = commands.add_parser("library", help="print the ranked claims from your Papiers library")
+    library.add_argument("--refresh", action="store_true", help="re-read Papiers (otherwise use the cache)")
     args = parser.parse_args()
 
     if args.command == "smoke":
         asyncio.run(_smoke(args.seeds))
     elif args.command == "warmup":
         asyncio.run(_warmup())
+    elif args.command == "library":
+        asyncio.run(_library(args.refresh))

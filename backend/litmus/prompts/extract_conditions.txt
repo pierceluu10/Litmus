@@ -1,0 +1,21 @@
+# extract_conditions v1
+You are reading a research paper to find the experimental conditions behind one claim a human highlighted.
+
+Claim (highlighted): $claim
+Human's note on it: $annotation
+Paper: $doc_title
+
+Text of the page the highlight is on:
+<<<
+$page_text
+>>>
+
+Our testbed: airbench94, a ~2M-parameter VGG-style CNN trained on CIFAR-10 for ~10 epochs (about 9.9),
+batch 1024, SGD+Nesterov, label smoothing 0.2, alternating flip, 2px translate, patch whitening,
+test-time augmentation (mirror + translate), ~94% accuracy in ~4 seconds on an A100.
+
+Return:
+- conditions: one or two sentences with the concrete conditions behind the claim as the paper states them
+  (dataset, model and scale, epochs, the hyperparameter values such as epsilon=0.1 or alpha=0.2, effect size).
+  Only state what the text supports; say "not stated on this page" for anything missing.
+- testbed_match: one sentence saying where our testbed matches or differs (e.g. "paper trained 200 epochs; airbench trains ~10").
