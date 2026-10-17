@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react'
 import { useStore } from './store'
+import { Login, Signup } from './components/Auth'
 import { TopBar } from './components/TopBar'
 import { Library } from './components/Library'
 import { Feed } from './components/Feed'
@@ -10,9 +12,17 @@ import { Sidebar } from './components/Sidebar'
 import { AbstractPanel } from './components/AbstractPanel'
 import { Landing } from './components/Landing'
 
+// tiny hash router: '' is the home page, #/login and #/signup are the account pages
+function useHash() {
+  const [h, setH] = useState(location.hash)
+  useEffect(() => { const f = () => setH(location.hash); addEventListener('hashchange', f); return () => removeEventListener('hashchange', f) }, [])
+  return h
+}
+
 export default function App() {
   const { app, abstractOpen } = useStore()
-  if (!app.session) return <Landing />
+  const hash = useHash()
+  if (!app.session) return hash === '#/login' ? <Login /> : hash === '#/signup' ? <Signup /> : <Landing />
   return (
     <div className="flex h-full flex-col">
       <TopBar />

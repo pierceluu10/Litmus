@@ -3,6 +3,7 @@ import { animate, motion, useInView, useReducedMotion } from 'motion/react'
 import { api, useStore } from '../store'
 import { claims } from '../mock/library'
 import { LowPolyScene, LowPolySky } from './LowPolyScene'
+import { nav, useAuth } from '../auth'
 
 const ease = [0.23, 1, 0.32, 1] as const
 const HELV = 'font-[Helvetica_Neue,Helvetica,Arial,sans-serif]'
@@ -201,6 +202,7 @@ export function Landing() {
   const { begin, health, set, error } = useStore()
   const [goal, setGoal] = useState('Which training tricks actually help a tiny CIFAR-10 classifier?')
   const [scrolled, setScrolled] = useState(false)
+  const { user, logout } = useAuth()
   useEffect(() => { api.health().then((h) => set({ health: h })).catch((e) => set({ error: api.mock ? null : `Could not read backend health (${e.message}). Is the backend running, and is OPENAI_API_KEY set in backend/.env? Replay demo works without keys.` })) }, [set])
   const status = api.mock ? 'Mock mode: the backend is simulated in your browser.' : health ? `GPU ${health.modal_warm ? 'warm' : 'cold'} · Papiers ${health.papiers_ok ? 'ok' : 'unavailable'} · OpenAI ${health.openai_ok ? 'ok' : 'unavailable'}` : 'Checking the backend…'
   return (
@@ -210,7 +212,20 @@ export function Landing() {
         <div className="flex gap-7 text-[14px] max-md:hidden">
           {[['read', 'Read'], ['test', 'Test'], ['steer', 'Steer'], ['trace', 'Trace']].map(([id, l]) => <button key={id} className="border-0 bg-transparent p-0 text-muted transition-colors hover:text-ink" onClick={() => go(id)}>{l}</button>)}
         </div>
-        <button className="btn btn-primary" onClick={() => begin(false, goal)}>Start research</button>
+        <div className="flex items-center gap-2">
+          {user ? (
+            <>
+              <span className="mr-1 text-[14px] text-muted max-sm:hidden">{user.name}</span>
+              <button className="btn" onClick={logout}>Log out</button>
+              <button className="btn btn-primary" onClick={() => begin(false, goal)}>Start research</button>
+            </>
+          ) : (
+            <>
+              <button className="btn" onClick={() => nav('#/login')}>Log in</button>
+              <button className="btn btn-primary" onClick={() => nav('#/signup')}>Get started</button>
+            </>
+          )}
+        </div>
       </nav>
 
       <section className="relative -mt-[57px] h-screen min-h-[640px] overflow-hidden bg-[#eef2f7]">
