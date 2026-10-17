@@ -160,6 +160,9 @@ function StarBlob({ star, target, live, dim, selected }: { star: Star; target: P
   const proposals = useStore((s) => s.app.session?.proposals) // the store's own array: filtering inside the selector would return a new one every render
   const options = useMemo(() => (proposals ?? []).filter((p) => p.star_id === star.id && p.status === 'open'), [proposals, star.id])
   const hasOptions = options.length > 0 && star.status === 'done'
+  // graded, but its agent has not written its take and options yet (an LLM call on the real backend)
+  const generating = useStore((st) => !!star.parent_id && star.status === 'done' && !!star.grade && !star.suggestion
+    && st.app.session?.status !== 'done' && !(proposals ?? []).some((p) => p.star_id === star.id))
   const group = useRef<import('three').Group>(null)
   const body = useRef<Mesh>(null)
   const [hover, setHover] = useState(false)
@@ -207,7 +210,7 @@ function StarBlob({ star, target, live, dim, selected }: { star: Star; target: P
       {cardFor === star.id && !fitAll && (
         // the wrapper keeps the card's untransformed box at the node: it must not take clicks, only the card itself
         <Html position={[0, 0, 0]} zIndexRange={[60, 40]} style={{ pointerEvents: 'none' }}>
-          <PlacedCard ringPx={ringPx}>{(side) => <NodeCard star={star} items={hasOptions ? options : []} side={side} />}</PlacedCard>
+          <PlacedCard ringPx={ringPx}>{(side) => <NodeCard star={star} items={hasOptions ? options : []} generating={generating} side={side} />}</PlacedCard>
         </Html>
       )}
       <Billboard>

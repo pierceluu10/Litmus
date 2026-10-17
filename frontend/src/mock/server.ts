@@ -13,6 +13,7 @@ const SEEDS = [0, 1, 2, 3, 4]
 const EXTRA_SEEDS = [5, 6, 7, 8, 9]
 const MAX_STARS = 16
 const MAX_PROPOSALS = 3
+const SUGGEST_MS = 2400 // how long an agent takes to write its card, like the real backend's LLM call
 const EPOCH_TICKS = 6
 const TICK_MS = 380
 const MAX_TICK_STRETCH = 2.5 // long-epoch runs take visibly longer, up to this factor
@@ -55,6 +56,7 @@ export class MockServer {
   nextStar = 0
   asked = false
   asking = false // between deciding to ask and the question arriving, no new wave may be proposed
+  writing = 0 // agents still writing their cards: Litmus waits for them before planning on its own
   goal: string
   replay: boolean
 
@@ -271,8 +273,9 @@ export class MockServer {
       return
     }
     if (g.verdict === 'refuted' && s.knob_changes.mixup_alpha && !this.asked) { this.askAboutMixup(s); return }
-    this.suggest(id)
-    this.settle()
+    // the agent writes its take and options with an LLM call on the real backend: the card shows "Generating next steps" meanwhile
+    this.writing++
+    this.later(() => { this.writing--; this.suggest(id); this.settle() }, SUGGEST_MS)
   }
 
   private askAboutMixup(s: Star) {
@@ -302,7 +305,7 @@ export class MockServer {
   // When every branch has settled and nothing waits on the human, Litmus plans from the best star.
   private settle() {
     const s = this.session
-    if (this.asking || s.stars.some((x) => x.status === 'running' || x.status === 'queued')) return
+    if (this.asking || this.writing || s.stars.some((x) => x.status === 'running' || x.status === 'queued')) return
     if (s.proposals.some((p) => p.status === 'open') || s.questions.some((q) => q.status === 'open')) {
       if (s.status !== 'waiting_human') this.emit('session.status', { status: 'waiting_human' })
       return

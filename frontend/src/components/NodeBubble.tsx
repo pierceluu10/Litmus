@@ -8,6 +8,7 @@ const MAX_AGENTS = 4
 const EXPECTS = { improves: 'expects a gain', hurts: 'expects a loss', no_effect: 'expects no change' }
 const VERDICT_TEXT = { confirmed: 'Confirmed', refuted: 'Refuted', inconclusive: 'Inconclusive', baseline: 'Baseline' }
 type Tab = 'about' | 'proceed'
+const PLACEHOLDER_WIDTHS = ['72%', '58%', '66%'] // the option rows while they are written
 const CARD_FACETS = 37
 
 // The result in one glance: training progress, or the verdict with its effect and likely range.
@@ -61,6 +62,28 @@ function About({ star }: { star: Star }) {
       {star.parent_id && star.reflection && <Part title="Found" clamp="line-clamp-4">{star.reflection}</Part>}
       {star.suggestion && <Part title="Suggests" clamp="line-clamp-3">{star.suggestion}</Part>}
       {live && <button className="btn h-7 self-start px-2.5 text-[12px]" onClick={() => stopBranch(star.id)}>Stop</button>}
+    </div>
+  )
+}
+
+// While the agent writes its take and options: their shapes, waiting to be filled in.
+function Generating() {
+  return (
+    <div aria-busy="true">
+      <p className="m-0 flex items-center gap-2 text-muted" aria-live="polite"><span className="dot live-dot" style={{ background: toneVar('running') }} />Generating next steps…</p>
+      <div className="mt-2 flex flex-col gap-1.5" aria-hidden>
+        <span className="h-2.5 w-full animate-pulse rounded-full bg-rule" />
+        <span className="h-2.5 w-3/5 animate-pulse rounded-full bg-rule" />
+      </div>
+      <ul className="m-0 mt-3 flex list-none flex-col gap-1.5 p-0" aria-hidden>
+        {PLACEHOLDER_WIDTHS.map((w) => (
+          <li key={w} className="flex items-start gap-2 rounded-lg border border-rule p-2">
+            <span className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded-[4px] border border-rule" />
+            <span className="flex flex-1 flex-col gap-1.5 py-0.5"><span className="h-2.5 animate-pulse rounded-full bg-rule" style={{ width: w }} /><span className="h-2 w-1/4 animate-pulse rounded-full bg-rule/70" /></span>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-2.5 flex justify-end"><button className="btn btn-primary" disabled>Run experiments</button></div>
     </div>
   )
 }
@@ -187,9 +210,10 @@ const POINTER: Record<Side, string> = {
   left: '-right-[7px] -translate-y-1/2 border-r border-t',
 }
 
-export function NodeCard({ star, items, side = 'above' }: { star: Star; items: Proposal[]; side?: Side }) {
-  const [tab, setTab] = useState<Tab>(items.length ? 'proceed' : 'about')
-  const shown = tab === 'proceed' && !items.length ? 'about' : tab
+export function NodeCard({ star, items, generating, side = 'above' }: { star: Star; items: Proposal[]; generating: boolean; side?: Side }) {
+  const [tab, setTab] = useState<Tab>(items.length || generating ? 'proceed' : 'about')
+  const proceeds = items.length > 0 || generating
+  const shown = tab === 'proceed' && !proceeds ? 'about' : tab
   return (
     <div className="pointer-events-auto relative w-[300px] rounded-2xl marble-edge border border-rule bg-surface text-[12.5px]" role="dialog" aria-label={agentName(star)}
       // the card lives inside the canvas's container: without this, pressing on it starts a camera drag that captures the
@@ -202,13 +226,13 @@ export function NodeCard({ star, items, side = 'above' }: { star: Star; items: P
       <div data-card-body className="relative isolate overflow-y-auto overflow-x-hidden rounded-2xl p-3" style={{ maxHeight: 'var(--card-max)' }}>
       <SceneBackdrop seed={CARD_FACETS} className="card-facets" />
       <h2 className="m-0 text-[13.5px] font-semibold">{agentName(star)}{star.parent_id && <span className="num ml-1.5 text-[11.5px] font-normal text-faint">{agentDetail(star)}</span>}</h2>
-      {items.length > 0 && (
+      {proceeds && (
         <div role="tablist" aria-label={`${agentName(star)} details`} className="tabs mt-2">
           <button role="tab" aria-selected={shown === 'about'} onClick={() => setTab('about')}>About</button>
           <button role="tab" aria-selected={shown === 'proceed'} onClick={() => setTab('proceed')}>Where should I proceed?</button>
         </div>
       )}
-      <div role="tabpanel" className="mt-2.5">{shown === 'about' ? <About star={star} /> : <Proceed star={star} items={items} />}</div>
+      <div role="tabpanel" className="mt-2.5">{shown === 'about' ? <About star={star} /> : (generating ? <Generating /> : <Proceed star={star} items={items} />)}</div>
       </div>
     </div>
   )
