@@ -4,9 +4,6 @@ import { agentDetail, agentName, pct, progressFraction, pts, starTone, toneVar }
 import type { Star } from '../types'
 import { PathChart } from './PathChart'
 import { ProvChip } from './Prov'
-import { Facets } from './LowPolyScene'
-
-const FACET_SEED = 73
 
 const H = ({ children, aside }: { children: React.ReactNode; aside?: React.ReactNode }) => (
   <div className="mb-2 flex items-baseline justify-between"><h3 className="m-0 text-[12px] font-semibold text-muted">{children}</h3>{aside}</div>
@@ -103,58 +100,45 @@ function Verdict({ s }: { s: Star }) {
     const latest = (s.progress ?? []).reduce<{ epoch: number; val_acc: number } | null>((m, p) => (!m || p.epoch > m.epoch ? p : m), null)
     const f = progressFraction(s)
     return (
-      <div className="rounded-lg border border-rule p-3">
+      <div className="rounded-xl border border-rule p-3.5">
         <div className="flex items-baseline justify-between"><span className="text-[12px] font-medium" style={{ color: toneVar('running') }}>Training</span><span className="num text-[11.5px] text-muted">{latest ? `epoch ${latest.epoch}/${s.knobs.epochs} · ${pct(latest.val_acc)}` : 'starting'}</span></div>
-        <div className="mt-2 h-1 overflow-hidden rounded-full bg-rule"><div className="h-full rounded-full transition-[width] duration-300" style={{ width: `${f * 100}%`, background: toneVar('running') }} /></div>
-        <p className="m-0 mt-2 text-[12px] text-muted">{s.runs.length}/{Math.max(5, s.runs.length)} seeds done. The verdict lands when all seeds finish.</p>
+        <div className="mt-2.5 h-1 overflow-hidden rounded-full bg-rule"><div className="h-full rounded-full transition-[width] duration-300" style={{ width: `${f * 100}%`, background: toneVar('running') }} /></div>
+        <p className="m-0 mt-2 text-[12px] text-muted">{s.runs.length}/{Math.max(5, s.runs.length)} runs done. The verdict lands when they all finish.</p>
       </div>
     )
   }
   if (!g) return <p className="m-0 text-muted">{s.status === 'waiting' ? 'Waiting for your answer below.' : s.status === 'failed' ? s.error ?? 'Stopped.' : 'Not graded yet.'}</p>
   const color = toneVar(starTone(s))
   if (g.verdict === 'baseline') return (
-    <div className="rounded-lg border border-rule p-3">
-      <span className="text-[12px] font-medium">Baseline</span>
-      <div className="num mt-1 text-[28px] font-medium leading-none tracking-[-0.03em]">{pct(g.mean_child)}</div>
-      <p className="num m-0 mt-2 text-[11.5px] text-muted">95% CI {pct(g.ci_low)} – {pct(g.ci_high)} · {g.n} seeds</p>
+    <div className="rounded-xl border border-rule p-3.5">
+      <div className="flex items-baseline justify-between"><span className="text-[12px] font-medium">Baseline</span><span className="text-[11.5px] text-muted">{g.n} runs</span></div>
+      <div className="num mt-1 text-[30px] font-medium leading-none tracking-[-0.03em]">{pct(g.mean_child)}</div>
+      <p className="num m-0 mt-2 text-[12px] text-faint">Likely range {pct(g.ci_low)} to {pct(g.ci_high)}</p>
     </div>
   )
   return (
-    <div className="rounded-lg border p-3" style={{ borderColor: `color-mix(in srgb, ${color} 45%, var(--color-rule))` }}>
-      <div className="flex items-baseline justify-between"><span className="text-[12px] font-medium" style={{ color }}>{VERDICT_TEXT[g.verdict]}</span><span className="num text-[11.5px] text-muted">{g.n} paired seeds · p {g.p_value < 0.001 ? '< 0.001' : g.p_value.toFixed(3)}</span></div>
-      <div className="num mt-1 text-[28px] font-medium leading-none tracking-[-0.03em]" style={{ color }}>{pts(g.delta)} <span className="text-[14px]">pts</span></div>
-      <p className="num m-0 mt-2 text-[11.5px] text-muted">95% CI [{pts(g.ci_low)}, {pts(g.ci_high)}] · {pct(g.mean_parent)} → {pct(g.mean_child)}</p>
+    <div className="rounded-xl border p-3.5" style={{ borderColor: `color-mix(in srgb, ${color} 45%, var(--color-rule))` }} title={`${g.n} paired seeds · p ${g.p_value < 0.001 ? '< 0.001' : g.p_value.toFixed(3)}`}>
+      <div className="flex items-baseline justify-between"><span className="text-[12px] font-medium" style={{ color }}>{VERDICT_TEXT[g.verdict]}</span><span className="text-[11.5px] text-muted">{g.n} runs</span></div>
+      <div className="num mt-1 text-[30px] font-medium leading-none tracking-[-0.03em]" style={{ color }}>{pts(g.delta)} <span className="text-[14px]">pts</span></div>
+      <p className="num m-0 mt-2 text-[12px] text-muted">{pct(g.mean_parent)} → {pct(g.mean_child)}</p>
+      <p className="num m-0 mt-0.5 text-[12px] text-faint">Likely range {pts(g.ci_low)} to {pts(g.ci_high)}</p>
     </div>
   )
 }
 
-function Actions({ s }: { s: Star }) {
-  const { branch, stopBranch, app } = useStore()
-  const [mode, setMode] = useState(false)
+// "Branch from here" lives in the header; this is the little form it opens.
+function BranchForm({ s, done }: { s: Star; done: () => void }) {
+  const branch = useStore((st) => st.branch)
   const [text, setText] = useState('')
-  const live = s.status === 'running' || s.status === 'queued'
-  const pending = app.session?.proposals.some((p) => p.star_id === s.id && p.status === 'open')
-  const submit = async () => {
-    await branch(s.id, text)
-    setText(''); setMode(false)
-  }
+  const submit = async () => { await branch(s.id, text); setText(''); done() }
   return (
-    <section className="flex flex-col gap-2.5">
-      <div className="flex flex-wrap gap-2">
-        <button className="btn btn-primary" disabled={live || pending} onClick={() => setMode(!mode)}>{pending ? 'Proposals ready below' : 'Branch from here'}</button>
-        {live && <button className="btn" onClick={() => stopBranch(s.id)}>Stop</button>}
-      </div>
-      {mode && (
-        <div className="flex flex-col gap-2">
-          <label htmlFor="steer" className="label block">Agents will propose experiments that start from this result. Steer them (optional):</label>
-          <textarea id="steer" autoFocus value={text} onChange={(e) => setText(e.target.value)} rows={2}
-            placeholder="e.g. try it with longer training"
-            className="w-full resize-none rounded-md border border-rule bg-surface p-2 focus:border-ink focus:outline-none"
-            onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit() }} />
-          <button className="btn btn-primary self-start" onClick={submit}>Ask for proposals</button>
-        </div>
-      )}
-    </section>
+    <div className="flex flex-col gap-2">
+      <label htmlFor="steer" className="label block">Agents will propose experiments that start from this result. Steer them (optional):</label>
+      <textarea id="steer" autoFocus value={text} onChange={(e) => setText(e.target.value)} rows={2} placeholder="e.g. try it with longer training"
+        className="w-full resize-none rounded-md border border-rule bg-surface p-2 focus:border-ink focus:outline-none"
+        onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit() }} />
+      <button className="btn btn-primary self-start" onClick={submit}>Ask for proposals</button>
+    </div>
   )
 }
 
@@ -164,30 +148,27 @@ function TestedClaims({ s }: { s: Star }) {
   const tested = s.provenance.filter((p, i, all) => p.kind !== 'note' && p.kind !== 'human' && all.findIndex((q) => q.id === p.id) === i)
   if (!tested.length) return null
   return (
-    <section>
-      <H>Tested claim{tested.length > 1 ? 's' : ''}</H>
-      <div className="flex flex-wrap items-start gap-1.5">{tested.map((p) => <ProvChip key={p.id} p={p} label={claims.find((c) => c.id === p.id)?.summary} />)}</div>
-    </section>
+    <div className="flex flex-wrap items-center gap-1.5">
+      <span className="label mr-0.5">Tests</span>
+      {tested.map((p) => <ProvChip key={p.id} p={p} label={claims.find((c) => c.id === p.id)?.summary} />)}
+    </div>
   )
 }
 
 const OPENERS = ['What did you run?', 'Is this result real?', 'What should I try next?']
 const firstSentence = (t: string) => t.match(/^.*?[.!?](\s|$)/)?.[0].trim() ?? t
 
-// A chat about this star: the agent's conclusion opens it, replans appear as notes, then the human's questions.
-function Chat({ s }: { s: Star }) {
-  const { chats, thinking, ask, app } = useStore()
-  const [draft, setDraft] = useState('')
+// What the agent concluded, anything that changed because of you, and the conversation so far.
+function Story({ s }: { s: Star }) {
+  const { chats, thinking, app } = useStore()
   const [full, setFull] = useState(false)
   const turns = chats[s.id] ?? []
   const replans = app.replans.filter((r) => r.star_id === s.id)
-  const busy = thinking === s.id
-  const send = (q: string) => { if (!q.trim() || busy) return; setDraft(''); ask(s.id, q.trim()) }
+  if (!s.reflection && !replans.length && !turns.length && thinking !== s.id) return null
   return (
     <section className="flex flex-col gap-3">
-      <H>Ask Litmus</H>
       {s.reflection && (
-        <button className={`text-left text-[13px] leading-relaxed text-ink ${full ? '' : 'line-clamp-4'}`} aria-expanded={full} onClick={() => setFull(!full)} title={full ? undefined : 'Show all'}>{s.reflection}</button>
+        <button className={`text-left text-[13px] leading-relaxed text-ink ${full ? '' : 'line-clamp-3'}`} aria-expanded={full} onClick={() => setFull(!full)} title={full ? undefined : 'Show all'}>{s.reflection}</button>
       )}
       {replans.map((r) => (
         <p key={r.seq} className="m-0 flex gap-2 text-[12px] leading-snug text-muted" title={r.because}>
@@ -197,41 +178,69 @@ function Chat({ s }: { s: Star }) {
       {turns.map((t, i) => t.role === 'human'
         ? <p key={i} className="m-0 max-w-[85%] self-end rounded-xl rounded-br-sm bg-paper px-3 py-2 text-[13px] leading-snug">{t.text}</p>
         : <p key={i} className="m-0 text-[13px] leading-relaxed">{t.text}</p>)}
-      {busy && <p className="m-0 flex items-center gap-2 text-[12.5px] text-muted" aria-live="polite"><span className="dot live-dot" style={{ background: 'var(--color-agent)' }} />Thinking…</p>}
-      {!turns.length && !busy && (
-        <div className="flex flex-wrap gap-1.5">{OPENERS.map((q) => <button key={q} className="chip hover:border-faint hover:text-ink" onClick={() => send(q)}>{q}</button>)}</div>
-      )}
+      {thinking === s.id && <p className="m-0 flex items-center gap-2 text-[12.5px] text-muted" aria-live="polite"><span className="dot live-dot" style={{ background: 'var(--color-agent)' }} />Thinking…</p>}
+    </section>
+  )
+}
+
+// The question bar is pinned to the bottom of the panel, so the details above can scroll without losing it.
+function AskBar({ s }: { s: Star }) {
+  const { chats, thinking, ask } = useStore()
+  const [draft, setDraft] = useState('')
+  const turns = chats[s.id] ?? []
+  const busy = thinking === s.id
+  const send = (q: string) => { if (!q.trim() || busy) return; setDraft(''); ask(s.id, q.trim()) }
+  return (
+    <div className="flex flex-col gap-2 border-t border-rule bg-surface p-3">
+      {!turns.length && !busy && <div className="flex flex-wrap gap-1.5">{OPENERS.map((q) => <button key={q} className="chip hover:border-faint hover:text-ink" onClick={() => send(q)}>{q}</button>)}</div>}
       <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); send(draft) }}>
         <label className="sr-only" htmlFor={`ask-${s.id}`}>Ask Litmus about this experiment</label>
-        <input id={`ask-${s.id}`} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Ask about this experiment" className="field min-w-0 flex-1" />
+        <input id={`ask-${s.id}`} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Ask Litmus about this experiment" className="field min-w-0 flex-1" />
         <button className="btn btn-primary" disabled={!draft.trim() || busy}>Ask</button>
       </form>
-    </section>
+    </div>
   )
 }
 
 function Detail({ s }: { s: Star }) {
   const { app, select } = useStore()
   const stars = app.session!.stars
+  const [branching, setBranching] = useState(false)
+  const parent = stars.find((x) => x.id === s.parent_id)
+  const live = s.status === 'running' || s.status === 'queued'
+  const pending = app.session?.proposals.some((p) => p.star_id === s.id && p.status === 'open')
   return (
-    <div className="flex flex-col gap-5 p-4">
-      <button className="btn btn-quiet -ml-2 h-7 self-start px-2" onClick={() => select(null)}>← All results</button>
-      <section>
+    <div className="flex flex-col gap-4 p-4">
+      <div className="flex items-center justify-between gap-2">
+        <button className="btn btn-quiet -ml-2 h-7 px-2" onClick={() => select(null)}>← All results</button>
+        <div className="flex gap-1.5">
+          {live && <StopButton id={s.id} />}
+          <button className="btn h-7 px-2.5 text-[12.5px]" disabled={live || pending} aria-expanded={branching} onClick={() => setBranching(!branching)}>{pending ? 'Proposals ready' : 'Branch from here'}</button>
+        </div>
+      </div>
+      {branching && <BranchForm s={s} done={() => setBranching(false)} />}
+      <header>
         <div className="flex items-center gap-2">
           <span className="h-3 w-3 rounded-full ring-2 ring-offset-2 ring-offset-surface" style={{ background: 'var(--color-graphite)', ['--tw-ring-color' as string]: toneVar(starTone(s)) }} />
           <h2 className="m-0 text-[17px] font-semibold tracking-[-0.02em]">{agentName(s)}</h2>
           {s.parent_id && <span className="num text-[12px] text-faint">{agentDetail(s)}</span>}
         </div>
-        <p className="m-0 mt-1.5 leading-snug">{s.title}</p>
-        <p className="m-0 mt-0.5 text-[12px] text-muted">{s.parent_id && `From ${agentName(stars.find((x) => x.id === s.parent_id)!)}`}</p>
-      </section>
+        <p className="m-0 mt-1.5 text-[13px] leading-snug text-muted">{s.title}{parent && ` · from ${agentName(parent)}`}</p>
+      </header>
       <Verdict s={s} />
-      <section><H>Accuracy along this path</H><div className="plate px-3 pb-1.5 pt-2.5"><PathChart stars={stars} highlight={s} /></div></section>
+      <div className="plate px-3 pb-1.5 pt-2.5">
+        <p className="label m-0 mb-1">Accuracy along this path</p>
+        <PathChart stars={stars} highlight={s} />
+      </div>
       <TestedClaims s={s} />
-      <Actions s={s} key={s.id} />
-      <Chat s={s} key={`chat-${s.id}`} />
+      <Story s={s} />
     </div>
   )
+}
+
+function StopButton({ id }: { id: string }) {
+  const stop = useStore((st) => st.stopBranch)
+  return <button className="btn h-7 px-2.5 text-[12.5px]" onClick={() => stop(id)}>Stop</button>
 }
 
 // ---------------------------------------------------------------- abstract
@@ -268,15 +277,20 @@ function AbstractView() {
   )
 }
 
-export function Inspector() {
+// On wide screens the panel floats over the scene as a card with space around it; on narrow ones it sits below the scene.
+export function Inspector({ floating }: { floating: boolean }) {
   const { app, selectedId, abstractOpen } = useStore()
   const s = app.session?.stars.find((x) => x.id === selectedId)
+  const showAbstract = abstractOpen && !!app.session?.abstract
+  const shell = floating
+    ? 'absolute bottom-3 right-3 top-3 z-20 flex w-[348px] flex-col overflow-hidden rounded-2xl border border-rule bg-surface shadow-[0_20px_50px_-14px_rgba(43,58,82,0.30)]'
+    : 'flex flex-col border-t border-rule bg-surface'
   return (
-    <aside className="rail relative min-h-0 overflow-hidden border-l border-rule" aria-label="Results">
-      <Facets seed={FACET_SEED} />
-      <div className="relative h-full overflow-y-auto">
-        {abstractOpen && app.session?.abstract ? <AbstractView /> : s ? <Detail s={s} key={s.id} /> : <Overview />}
+    <aside className={shell} aria-label="Results">
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {showAbstract ? <AbstractView /> : s ? <Detail s={s} key={s.id} /> : <Overview />}
       </div>
+      {s && !showAbstract && <AskBar s={s} key={`ask-${s.id}`} />}
     </aside>
   )
 }

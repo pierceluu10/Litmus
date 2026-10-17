@@ -32,7 +32,7 @@ const MIN_DISTANCE = 170
 const MAX_DISTANCE = 760
 const FOV_HALF_TAN = Math.tan(MathUtils.degToRad(15)) // the canvas's fov is 30
 const USABLE_HEIGHT = 0.62 // share of the canvas free of the top buttons and the bottom dock
-const AIM = new Vector3(-14, -18, 0)
+const AIM = new Vector3(26, -18, 0) // aimed right of the star, so the graph sits in the open part of the scene beside the results card
 // Opening shot: from just behind the statue's head and ear, looking over its shoulder toward the arm.
 // The head is near (-69, 16, -5) in scene units. The camera then glides to the default view, once per session.
 const EAR_CAM = new Vector3(-70, 24, -70)
