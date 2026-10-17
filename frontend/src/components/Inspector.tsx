@@ -158,7 +158,7 @@ function Actions({ s }: { s: Star }) {
   )
 }
 
-// Each claim the star tested once, named by its title in the Claims rail rather than "Highlight from …".
+// Each claim the star tested once, named by its short title rather than "Highlight from …".
 function TestedClaims({ s }: { s: Star }) {
   const claims = useStore((st) => st.app.claims)
   const tested = s.provenance.filter((p, i, all) => p.kind !== 'note' && p.kind !== 'human' && all.findIndex((q) => q.id === p.id) === i)

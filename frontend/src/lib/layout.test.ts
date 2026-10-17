@@ -1,25 +1,26 @@
 import { describe, expect, it } from 'vitest'
-import { COLUMN, FIRST_STEP, layoutStars, STEP, UNITS_PER_POINT } from './layout'
-import type { Grade, Star } from '../types'
+import { FIRST_STEP, LAYER_GAP, layoutStars, SLOT_GAP } from './layout'
+import type { Star } from '../types'
 
-const g = (mean_child: number): Grade => ({ metric: 'tta_val_acc', mean_parent: 0.94, mean_child, delta: 0, sd_parent: 0, sd_child: 0, n: 5, ci_low: 0, ci_high: 0, p_value: 1, verdict: 'confirmed', practical: true, grader_version: '1' })
 const star = (id: string, parent_id: string | null, extra: Partial<Star> = {}) => ({ id, parent_id, status: 'done', knob_changes: {}, ...extra }) as Star
 
-describe('layoutStars', () => {
-  const stars = [star('S0', null, { grade: g(0.94) }), star('S1', 'S0', { grade: g(0.93) }), star('S2', 'S0', { status: 'running' }), star('S3', 'S2')]
+describe('layoutStars (neural-network layers)', () => {
+  const stars = [star('S0', null), star('S1', 'S0'), star('S2', 'S0'), star('S3', 'S0'), star('S4', 'S0'), star('S5', 'S2')]
   const pos = layoutStars(stars)
-  it('height is accuracy relative to the baseline', () => {
+  it('puts the baseline at the first step, level with the fingertip', () => {
     expect(pos.get('S0')).toEqual({ x: FIRST_STEP, y: 0, z: 0 })
-    expect(pos.get('S1')!.y).toBeCloseTo(-UNITS_PER_POINT, 6)
   })
-  it('ungraded stars ride at their parent height', () => {
-    expect(pos.get('S2')!.y).toBe(0)
-    expect(pos.get('S3')!.y).toBe(pos.get('S2')!.y)
+  it('stacks siblings in one column, evenly spaced and centred on the baseline', () => {
+    const ys = ['S1', 'S2', 'S3', 'S4'].map((id) => pos.get(id)!.y)
+    expect(new Set(['S1', 'S2', 'S3', 'S4'].map((id) => pos.get(id)!.x))).toEqual(new Set([FIRST_STEP + LAYER_GAP]))
+    expect(ys).toEqual([1.5 * SLOT_GAP, 0.5 * SLOT_GAP, -0.5 * SLOT_GAP, -1.5 * SLOT_GAP])
   })
-  it('generations step right and siblings take their own columns', () => {
-    expect(pos.get('S1')!.x).toBe(FIRST_STEP + STEP)
-    expect(pos.get('S2')!.x).toBe(FIRST_STEP + STEP + COLUMN)
-    expect(pos.get('S3')!.x).toBe(pos.get('S2')!.x + STEP)
-    expect(pos.get('S1')!.z).toBe(-pos.get('S2')!.z)
+  it('steps each generation one layer to the right', () => {
+    expect(pos.get('S5')!.x).toBe(FIRST_STEP + 2 * LAYER_GAP)
+    expect(pos.get('S5')!.y).toBe(0)
+  })
+  it('does not depend on accuracy or status', () => {
+    const again = layoutStars(stars.map((s) => ({ ...s, status: 'running' }) as Star))
+    expect(again.get('S3')).toEqual(pos.get('S3'))
   })
 })

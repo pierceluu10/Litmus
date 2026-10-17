@@ -4,7 +4,7 @@ import { Login, Signup } from './components/Auth'
 import { Landing } from './components/Landing'
 import { toneVar } from './lib/format'
 import { TopBar } from './components/TopBar'
-import { Claims } from './components/Claims'
+import { Researching } from './components/Researching'
 import { Scene } from './components/Scene'
 import { Dock } from './components/Dock'
 import { Inspector } from './components/Inspector'
@@ -44,11 +44,11 @@ export default function App() {
   return (
     <div className="flex h-full flex-col">
       <TopBar />
-      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[minmax(220px,264px)_minmax(0,1fr)_minmax(300px,360px)] lg:overflow-hidden">
-        <Claims />
+      <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_minmax(300px,360px)] lg:overflow-hidden">
         <main className="marble-ground relative min-h-0 overflow-hidden max-lg:order-first max-lg:h-[72vh]">
           <Scene />
           <SceneChrome />
+          <Researching />
           <Dock />
         </main>
         <Inspector />
