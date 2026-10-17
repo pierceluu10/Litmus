@@ -46,7 +46,7 @@ const ABOVE_MIDDLE = 0.1 // share of the canvas height the focused group sits ab
 // The head is near (-69, 16, -5) in scene units. The camera then glides to the default view, once per session.
 const EAR_CAM = new Vector3(-70, 24, -70)
 const EAR_AIM = new Vector3(-50, 12, 40)
-const INTRO_HOLD_MS = 900
+const INTRO_HOLD_MS = 250
 const INTRO_SMOOTH = 1.5
 const PORTRAIT_ASPECT = 0.9
 const PORTRAIT_PULLBACK = 1.7

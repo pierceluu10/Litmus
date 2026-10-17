@@ -33,7 +33,8 @@ type Store = {
   chat: (ChatTurn & { provenance?: Provenance[] })[] // the conversation with Litmus, oldest first
   thinking: string | null // the star Litmus is answering about while the chat waits
   thought: Thought | null // the question's trip to the statue and back; the answer stays hidden until it lands
-  begin: (replay: boolean, goal?: string) => Promise<void>
+  begin: (replay: boolean, goal?: string, claimId?: string) => Promise<void> // claimId: start there at once (chosen on the Connect page)
+  startClaim: string | null // the claim chosen before the session existed: no "Where should we start?" for it
   leave: () => void
   select: (id: string | null) => void
   set: (p: Partial<Store>) => void
@@ -73,7 +74,7 @@ export const useStore = create<Store>((set, get) => {
   }
   return {
     app: initialState, sid: null, conn: 'closed', libraryStage: 'papers', demo: savedDemo(), error: null, selectedId: null, hoveredClaim: null, imported: null,
-    follow: true, focusId: null, fitAll: false, abstractOpen: false, chatOpen: false, cardFor: null, chat: [], thinking: null, thought: null,
+    follow: true, focusId: null, fitAll: false, abstractOpen: false, chatOpen: false, cardFor: null, chat: [], thinking: null, thought: null, startClaim: null,
     set: (p) => set(p),
     setDemo(demo) {
       try { localStorage.setItem(DEMO_KEY, demo ? '1' : '0') } catch { /* private window: the switch still works for this visit */ }
@@ -86,11 +87,11 @@ export const useStore = create<Store>((set, get) => {
     leave() {
       unsub?.(); unsub = null
       libraryLoad?.abort(); libraryLoad = null
-      set({ app: initialState, sid: null, conn: 'closed', selectedId: null, focusId: null, fitAll: false, abstractOpen: false, chatOpen: false, cardFor: null, chat: [], thought: null, error: null, demo: savedDemo(), imported: null })
+      set({ app: initialState, sid: null, conn: 'closed', selectedId: null, focusId: null, fitAll: false, abstractOpen: false, chatOpen: false, cardFor: null, chat: [], thought: null, error: null, demo: savedDemo(), imported: null, startClaim: null })
     },
-    async begin(replay, goal) {
+    async begin(replay, goal, claimId) {
       unsub?.()
-      set({ app: initialState, libraryStage: 'papers', selectedId: null, focusId: null, fitAll: false, follow: true, error: null, abstractOpen: false, chatOpen: false, cardFor: null, chat: [], thought: null })
+      set({ app: initialState, libraryStage: 'papers', selectedId: null, focusId: null, fitAll: false, follow: true, error: null, abstractOpen: false, chatOpen: false, cardFor: null, chat: [], thought: null, startClaim: claimId ?? null })
       libraryLoad?.abort()
       const api = current = apiFor(get().demo)
       const load = libraryLoad = new AbortController()
@@ -116,6 +117,7 @@ export const useStore = create<Store>((set, get) => {
             return { app, focusId: born ?? st.focusId, ...(born ? { fitAll: false } : {}), ...finished }
           })
         }, (conn) => set({ conn }))
+        if (claimId) await api.start(sid, [claimId])
       } catch (e) { set({ error: (e as Error).message }) }
     },
     start: (claim_ids) => { set({ follow: true }); return act((sid) => current.start(sid, claim_ids)) },
@@ -145,4 +147,4 @@ export const useStore = create<Store>((set, get) => {
 
 
 // Before the first claim is chosen, Litmus asks where to start (a bubble from its face).
-export const useStarting = () => useStore((s) => { const ss = s.app.session; return !!ss && !ss.start_claim_ids?.length && ss.stars.every((x) => !x.parent_id) })
+export const useStarting = () => useStore((s) => { const ss = s.app.session; return !!ss && !s.startClaim && !ss.start_claim_ids?.length && ss.stars.every((x) => !x.parent_id) })

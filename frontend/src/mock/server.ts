@@ -56,6 +56,8 @@ export class MockServer {
   nextStar = 0
   asked = false
   asking = false // between deciding to ask and the question arriving, no new wave may be proposed
+  early: string[] | null = null // chosen before session.started
+  opening: string | null = null // chosen before the baseline was graded
   writing = 0 // agents still writing their cards: Litmus waits for them before planning on its own
   goal: string
   replay: boolean
@@ -93,18 +95,25 @@ export class MockServer {
     this.emit('budget.updated', { used: 0, total: BUDGET_GPU_SECONDS })
     this.later(() => {
       const base = this.newStar(null, 'Baseline', 'The reference configuration, about 94% accuracy.', {}, [], 'agent')
-      this.run(base.id, SEEDS, () => { if (!this.session.start_claim_ids) this.emit('session.status', { status: 'waiting_human' }) })
+      this.run(base.id, SEEDS, () => {
+        if (this.opening) { this.openClaim(this.opening); this.opening = null }
+        else if (!this.session.start_claim_ids) this.emit('session.status', { status: 'waiting_human' })
+      })
     }, 700)
+    if (this.early) this.begin(this.early)
   }
 
   // "Where should we start?": one agent per chosen claim, each running the move tied to that highlight.
+  // A claim chosen on the Connect page arrives before the session has started or its baseline is graded: it waits for both.
   begin(claim_ids: string[]) {
+    if (!this.state.session) { this.early = claim_ids; return }
     if (this.session.start_claim_ids) return
     this.emit('start.chosen', { claim_ids })
     // one agent per claim: the first move whose leading provenance is that claim
     this.think('Starting where you chose: drafting its first test.')
     this.emit('session.status', { status: 'running' })
-    this.openClaim(claim_ids[0])
+    if (this.stars[0]?.grade) this.openClaim(claim_ids[0])
+    else this.opening = claim_ids[0]
   }
 
   // A claim no agent has tested yet becomes a new agent from the baseline.
