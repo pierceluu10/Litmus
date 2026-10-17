@@ -79,7 +79,18 @@ function column(cx: number, top: number, bottom: number, w: number, seed: number
 }
 
 const AEGEAN = [112, 146, 188]
+const CYAN = '#2fb4e0'
+
+// Circuit traces down the neck and chest, each with a data packet travelling along it.
+const TRACES = ['M450 332 L450 362 L418 362 L418 424', 'M450 332 L450 384 L484 384 L484 428', 'M468 330 L504 346 L504 410', 'M432 330 L396 348 L396 412']
+// Neural graph on the crown of the head: nodes and the links between them.
+const NODES: P[] = [[420, 150], [441, 138], [466, 146], [488, 162], [428, 170], [452, 164], [476, 176], [412, 186], [444, 184]]
+const LINKS: [number, number][] = [[0, 1], [1, 2], [2, 3], [0, 4], [1, 5], [2, 5], [3, 6], [4, 5], [5, 6], [4, 7], [4, 8], [5, 8], [6, 8]]
+const FLOATERS: P[] = [[352, 150], [548, 118], [578, 230], [334, 262], [520, 300]]
+
 export function LowPolyScene({ className }: { className?: string }) {
+  const sky = gridMesh([-700, 900, -500], [-700, 900, 504], 12, 6, 91, [214, 226, 240])
+  const floor = gridMesh([-700, 900, 504], [-700, 900, 1000], 12, 3, 92, [196, 208, 224])
   const behind = [...column(262, 150, 462, 40, 11, AEGEAN), ...column(638, 150, 462, 40, 12, AEGEAN)]
   const front = [...column(120, 92, 462, 62, 21), ...column(780, 92, 462, 62, 22)]
   const pediment: Tri[] = [
@@ -97,16 +108,36 @@ export function LowPolyScene({ className }: { className?: string }) {
   const chest = gridMesh([376, 524, 318], [326, 574, 430], 5, 3, 51)
   const neck = gridMesh([428, 472, 262], [424, 476, 326], 2, 2, 61)
   const head = ellipseMesh(450, 214, 49, 64, 71, undefined, 12, 3)
-  const face: Tri[] = [
-    tri([450, 196], [441, 238], [459, 238], 0.5), tri([450, 196], [459, 238], [452, 200], 0.9),
-    tri([424, 196], [440, 192], [436, 204], 0.4), tri([476, 196], [460, 192], [464, 204], 0.55),
-  ]
-  const all = [...halo, ...behind, ...pediment, ...front, ...steps, ...pedestal, ...chest, ...neck, ...hair, ...head, ...face]
+  const face: Tri[] = [tri([450, 196], [441, 238], [459, 238], 0.5), tri([450, 196], [459, 238], [452, 200], 0.9)]
+  const marble = [...sky, ...floor, ...halo, ...behind, ...pediment, ...front, ...steps, ...pedestal, ...chest, ...neck, ...hair, ...head, ...face]
+  const poly = (t: Tri, i: number) => <polygon key={i} points={t.pts.map((p) => p.join(',')).join(' ')} fill={t.fill} stroke={t.fill} strokeWidth={0.6} strokeLinejoin="round" />
   return (
-    <svg viewBox="0 0 900 512" className={className} role="img" aria-label="A low-poly Greek temple with a marble bust between two columns" shapeRendering="geometricPrecision">
-      {all.map((t, i) => (
-        <polygon key={i} points={t.pts.map((p) => p.join(',')).join(' ')} fill={t.fill} stroke={t.fill} strokeWidth={0.6} strokeLinejoin="round" />
-      ))}
+    <svg viewBox="-480 -60 1380 700" className={className} preserveAspectRatio="xMaxYMid meet" role="img" aria-label="A low-poly Greek temple with a marble bust whose head is wired with a neural network">
+      {marble.map(poly)}
+      <g fill="none" stroke={CYAN} strokeLinecap="round" strokeLinejoin="round">
+        {/* the crown of the head opens onto a neural graph */}
+        <polygon points="404,182 420,140 450,128 482,140 496,170 470,184 440,190" fill="#26323f" stroke="none" opacity={0.92} />
+        {LINKS.map(([i, j]) => <line key={`${i}-${j}`} x1={NODES[i][0]} y1={NODES[i][1]} x2={NODES[j][0]} y2={NODES[j][1]} strokeWidth={1} opacity={0.75} />)}
+        {NODES.map(([x, y], i) => <circle key={i} cx={x} cy={y} r={2.6} fill={CYAN} stroke="none" className="ai-blink" style={{ animationDelay: `${(i % 5) * 0.35}s` }} />)}
+        {/* circuit traces and travelling data */}
+        {TRACES.map((d, i) => (
+          <g key={d}>
+            <path d={d} strokeWidth={1.6} opacity={0.85} />
+            <circle r={3} fill="#fff" stroke={CYAN} strokeWidth={1.4} className="ai-packet"><animateMotion dur={`${2.6 + i * 0.5}s`} repeatCount="indefinite" path={d} begin={`${i * 0.4}s`} /></circle>
+          </g>
+        ))}
+        {/* chest core */}
+        <polygon points="450,360 462,374 450,388 438,374" fill={CYAN} stroke="#fff" strokeWidth={1.5} className="ai-core" />
+        {/* eyes */}
+        {[438, 462].map((x) => <polygon key={x} points={`${x - 7},200 ${x},195 ${x + 7},200 ${x},205`} fill={CYAN} stroke="#fff" strokeWidth={1} className="ai-core" />)}
+        {/* floating nodes, tethered to the crown */}
+        {FLOATERS.map(([x, y], i) => (
+          <g key={i} className="ai-float" style={{ animationDelay: `${i * 0.6}s` }}>
+            <line x1={x} y1={y} x2={NODES[(i * 2) % NODES.length][0]} y2={NODES[(i * 2) % NODES.length][1]} strokeWidth={0.8} opacity={0.4} strokeDasharray="3 4" />
+            <polygon points={`${x},${y - 7} ${x + 6},${y + 4} ${x - 6},${y + 4}`} fill="#fff" stroke={CYAN} strokeWidth={1.4} />
+          </g>
+        ))}
+      </g>
     </svg>
   )
 }

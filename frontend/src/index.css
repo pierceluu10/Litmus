@@ -66,7 +66,16 @@ svg text { font-family: var(--font-sans); }
 .line-draw { stroke-dasharray: 1; stroke-dashoffset: 0; animation: drawin 700ms var(--ease-out) 1; }
 .agent-dot { animation: fadeout 1.4s linear 1 forwards; }
 
+@keyframes ai-blink { 0%,100% { opacity: .45; } 50% { opacity: 1; } }
+@keyframes ai-core { 0%,100% { opacity: .75; } 50% { opacity: 1; } }
+@keyframes ai-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+.ai-blink { animation: ai-blink 2.4s ease-in-out infinite; }
+.ai-core { animation: ai-core 2s ease-in-out infinite; }
+.ai-float { animation: ai-float 5s ease-in-out infinite; }
+
 @media (prefers-reduced-motion: reduce) {
+  .ai-blink, .ai-core, .ai-float { animation: none; }
+  .ai-packet { display: none; }
   .star-pulse, .star-breathe, .star-bloom, .line-draw, .agent-dot { animation: none; }
   .agent-dot { display: none; }
 }

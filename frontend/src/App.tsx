@@ -16,12 +16,13 @@ function Start() {
   const [goal, setGoal] = useState('Which training tricks actually help a tiny CIFAR-10 classifier?')
   useEffect(() => { api.health().then((h) => set({ health: h })).catch((e) => set({ error: `Backend unreachable: ${e.message}` })) }, [set])
   return (
-    <main className="h-full overflow-y-auto bg-surface"><div className="grid min-h-full lg:grid-cols-[minmax(380px,0.8fr)_1.2fr]">
-      <div className="flex items-center justify-center p-8">
-        <div className="w-full max-w-[460px]">
-          <h1 className="m-0 font-serif text-[56px] font-semibold leading-none">Litmus</h1>
-          <p className="mt-4 font-serif text-[19px] leading-snug">Turns the claims you highlighted into experiments, runs them with parallel agents, and lets you steer at every branch.</p>
-          <label htmlFor="goal" className="mt-8 block font-medium">Research goal</label>
+    <main className="relative h-full overflow-hidden bg-[#eef2f7]">
+      <LowPolyScene className="absolute inset-0 h-full w-full" />
+      <div className="relative flex h-full items-center p-6 max-lg:items-end lg:pl-[7vw]">
+        <div className="w-full max-w-[460px] rounded-lg border border-rule bg-surface p-7 shadow-[0_12px_40px_rgba(30,34,39,0.12)]">
+          <h1 className="m-0 font-serif text-[52px] font-semibold leading-none">Litmus</h1>
+          <p className="mt-4 font-serif text-[18px] leading-snug">Turns the claims you highlighted into experiments, runs them with parallel agents, and lets you steer at every branch.</p>
+          <label htmlFor="goal" className="mt-6 block font-medium">Research goal</label>
           <input id="goal" value={goal} onChange={(e) => setGoal(e.target.value)} className="mt-1 w-full rounded-md border border-rule bg-surface px-3 py-2" />
           <div className="mt-3 flex gap-2">
             <button className="btn btn-primary" onClick={() => begin(false, goal)}>Start research</button>
@@ -33,8 +34,7 @@ function Start() {
           {error && <p role="alert" className="text-refuted">{error}</p>}
         </div>
       </div>
-      <div className="grid place-items-center bg-[#eef2f7] p-6 max-lg:order-first"><LowPolyScene className="w-full max-w-[860px]" /></div>
-    </div></main>
+    </main>
   )
 }
 
