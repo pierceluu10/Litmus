@@ -48,10 +48,9 @@ function Part({ title, clamp = '', children }: { title: string; clamp?: string; 
   )
 }
 
-// About the agent: the claim it tests, its result, what it found and where it would go, and the actions on it.
+// About the agent: the claim it tests, its result, what it found and where it would go, and Stop while it trains.
 function About({ star }: { star: Star }) {
-  const { app: { claims }, stopBranch, branch } = useStore()
-  const [steer, setSteer] = useState<string | null>(null)
+  const { app: { claims }, stopBranch } = useStore()
   const claim = star.parent_id ? claims.find((c) => star.provenance.some((p) => provMatches(p, c.id))) : undefined
   const live = star.status === 'running' || star.status === 'queued'
   return (
@@ -62,14 +61,6 @@ function About({ star }: { star: Star }) {
       {star.parent_id && star.reflection && <Part title="Found" clamp="line-clamp-4">{star.reflection}</Part>}
       {star.suggestion && <Part title="Suggests" clamp="line-clamp-3">{star.suggestion}</Part>}
       {live && <button className="btn h-7 self-start px-2.5 text-[12px]" onClick={() => stopBranch(star.id)}>Stop</button>}
-      {!live && star.status === 'done' && (steer === null
-        ? <button className="btn h-7 self-start px-2.5 text-[12px]" onClick={() => setSteer('')}>Branch from here</button>
-        : (
-          <form className="flex gap-1.5" onSubmit={async (e) => { e.preventDefault(); await branch(star.id, steer); setSteer(null) }}>
-            <input autoFocus aria-label="Steer the new experiments (optional)" value={steer} onChange={(e) => setSteer(e.target.value)} placeholder="Steer it (optional)" className="field min-w-0 flex-1" />
-            <button className="btn btn-primary h-8 px-2.5 text-[12px]">Ask for options</button>
-          </form>
-        ))}
     </div>
   )
 }

@@ -45,7 +45,6 @@ type Store = {
   ask: (question: string) => Promise<void>
   togglePause: () => Promise<void>
   stopBranch: (star_id: string) => Promise<void>
-  branch: (star_id: string, text?: string) => Promise<void>
   generateAbstract: () => Promise<void>
 }
 
@@ -140,7 +139,6 @@ export const useStore = create<Store>((set, get) => {
     togglePause: () => act((sid) => (get().app.session?.status === 'paused' ? current.resume(sid) : current.pause(sid))),
     stopBranch: (star_id) => act((sid) => current.stopBranch(sid, star_id)),
     // Branching from any star, refuted ones included, goes through feedback "suggest": the agent replans from it.
-    branch: (star_id, text) => { set({ follow: true }); return act((sid) => current.feedback(sid, { star_id, kind: 'suggest', text: text?.trim() || 'Branch from here.' })) },
     generateAbstract: async () => { await act((sid) => current.abstract(sid)); if (get().app.session?.abstract) set({ abstractOpen: true, selectedId: null }) },
   }
 })

@@ -289,7 +289,7 @@ npm test             # reducer, layout, simulator + grader-port tests
 ranking row) opens its card in clear space: above it, else below its label, else beside it (right, then left), never over the
 floating UI marked `data-scene-obstacle` (the question dock, the results card, the chat); when nothing fits it takes the roomier
 of above and below, clipped at those cards, and scrolls (`PlacedCard` re-measures every frame) (`NodeCard` in `NodeBubble.tsx`): **About** (the claim it tests, verdict, what it
-found and suggests, Stop / Branch from here) and **Where should I proceed?** (its options). The right panel is for the
+found and suggests, Stop while it trains; new directions come from its options or Test another claim) and **Where should I proceed?** (its options). The right panel is for the
 whole research only: researching now, results, accuracy by path, rankings, where you steered, research log, and the
 **Litmus card** (opened by Litmus's face, which sits under the always-open results card and narrates what the agents do in speech bubbles above it; one conversation; Litmus answers about the open agent, shown as a removable chip, or else "about the whole research"). "Where should we start?" is a speech bubble rising from Litmus's face at the bottom right (`StartBubble`, in the right column),
 with the same expandable claim cards and a Start button each, while the camera holds behind the statue; the claim you start folds into a pearl that flies into the back of Litmus's head (`launchThought(..., oneWay)`), and the camera pans only once it has landed; the results card, the chat
@@ -301,8 +301,6 @@ Test button; open one for its card (paper, your note, Basis, Findings, source). 
 The camera centres the focused agent and its direct children in the space the results card leaves, the agent a little above the middle so its card fits above and its children stay clear of the bottom card (`PANEL_PX`, `ABOVE_MIDDLE`), zoom is
 capped at `MAX_DISTANCE` (520, the user's furthest zoom; the default ≈350 is their ideal), and five dashed accuracy levels (baseline ±1, ±2 points, `AccuracyLines`) run behind the
 graph, the baseline through the fingertip. The floating cards carry the landing's faceted sky (`.card-facets`: rises from the bottom of each card and fades out before the text, so the cards stay white; `.marble-edge` rim; `.plate` panes are frosted so the facets glint through; Litmus's narration bubbles carry it too).
-
-**Branch from anywhere**: "Branch from here" sends `feedback(kind: "suggest")` for that star, so it works against the real backend too (the agent replans from it); the demo backend answers with proposals from that star.
 
 **Design tokens**: `frontend/src/index.css` (`@theme`): cool marble ground, graphite, verdict colours (`confirmed`, `refuted`, `inconclusive`), state colours (`running`, `waiting`), actor colours (`human`, `agent`). The scene reads verdict colours from these CSS variables. Design context: `PRODUCT.md`, `.impeccable/surfaces/`.
 
