@@ -68,11 +68,38 @@ const evenLight: Shading = (_c, _m, r) => FACET_LIGHT + (r() - 0.5) * FACET_SPRE
 
 // The landing's faceted sky, as a quiet ground behind the workspace rails. Sized in CSS pixels so facets
 // keep the same scale whatever the rail's height.
-export function Facets({ seed, width = 400, height = 1400, cell = FACET_CELL }: { seed: number; width?: number; height?: number; cell?: number }) {
-  const tris = gridMesh([0, width, 0], [0, width, height], Math.ceil(width / cell), Math.ceil(height / cell), seed, FACET_TINT, evenLight)
+export function Facets({ seed, width = 400, height = 1400 }: { seed: number; width?: number; height?: number }) {
+  const tris = gridMesh([0, width, 0], [0, width, height], Math.ceil(width / FACET_CELL), Math.ceil(height / FACET_CELL), seed, FACET_TINT, evenLight)
   return (
     <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMinYMin slice" aria-hidden="true">
       {tris.map((t, i) => <polygon key={i} points={t.pts.map((p) => p.join(',')).join(' ')} fill={t.fill} stroke={t.fill} strokeWidth={0.6} strokeLinejoin="round" />)}
+    </svg>
+  )
+}
+// The workspace's backdrop: irregular triangles on a staggered lattice, lit smoothly from the top left, so it reads as soft
+// low-poly sky instead of a patchwork. Sized to its container (slice), so it stays quiet behind the statue and the graph.
+const SKY_LIGHT = [248, 250, 253], SKY_DEEP = [196, 210, 232]
+export function SceneBackdrop({ seed, className }: { seed: number; className?: string }) {
+  const W = 1600, H = 1000, S = 200, ROW = S * 0.866
+  const r = seeded(seed)
+  const rows = Math.ceil(H / ROW) + 3, cols = Math.ceil(W / S) + 3
+  const v: P[][] = Array.from({ length: rows }, (_, i) => Array.from({ length: cols }, (_, j) => [
+    (j - 1) * S + (i % 2 ? S / 2 : 0) + (r() - 0.5) * S * 0.5,
+    (i - 1) * ROW + (r() - 0.5) * S * 0.45,
+  ]))
+  const tris: [P, P, P][] = []
+  for (let i = 0; i < rows - 1; i++) for (let j = 1; j < cols - 1; j++) {
+    if (i % 2 === 0) tris.push([v[i][j], v[i + 1][j - 1], v[i + 1][j]], [v[i][j], v[i][j + 1], v[i + 1][j]])
+    else tris.push([v[i][j], v[i + 1][j], v[i + 1][j + 1]], [v[i][j], v[i][j + 1], v[i + 1][j + 1]])
+  }
+  return (
+    <svg className={className ?? 'pointer-events-none absolute inset-0 h-full w-full'} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      {tris.map((t, i) => {
+        const cx = (t[0][0] + t[1][0] + t[2][0]) / 3 / W, cy = (t[0][1] + t[1][1] + t[2][1]) / 3 / H
+        const k = Math.max(0, Math.min(1, 0.95 - 0.5 * (0.55 * cx + 0.45 * cy) * 1.6 + (r() - 0.5) * 0.12))
+        const fill = `rgb(${mix(SKY_DEEP, SKY_LIGHT, k).join(',')})`
+        return <polygon key={i} points={t.map((p) => p.map((n) => n.toFixed(1)).join(',')).join(' ')} fill={fill} stroke={fill} strokeWidth={0.7} strokeLinejoin="round" />
+      })}
     </svg>
   )
 }
