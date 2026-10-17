@@ -403,9 +403,6 @@ export function Landing() {
 
       {wide && !reduce ? <PinnedStory main={main} cta={cta} /> : <StackedStory cta={cta} />}
 
-      <footer className="border-t border-rule bg-surface px-[clamp(20px,4vw,56px)] py-6 text-[13px] text-muted">
-        Built at Hack the Valley 11 for the Papiers Human-Centred Autoresearch Challenge. Training testbed: airbench by Keller Jordan.
-      </footer>
     </main>
   )
 }
