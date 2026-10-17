@@ -102,12 +102,36 @@ uv run litmus --help
 - **No write-back via CLI**: v0.1.5 has no write command (`supports_write()` checks `papiers help --all`).
   Papiers is a desktop app with no web deep links, so `papiers_url` = the paper's source URL (arXiv).
 
+### Engine (`backend/litmus/engine/`)
+```
+intake → baseline → propose → select ⟂ → Send(branch)×N → join → propose | abstract
+branch subgraph: run → reflect → (run +5 seeds) | (ask ⟂) | END          ⟂ = interrupt()
+```
+- `graph.py` nodes, `ops.py` every state mutation (+ its event, same sync step), `agent.py` LLM calls with
+  validation, `driver.py` runs the graph and applies human actions.
+- **Source of truth for data = `store` snapshot** (SQLite `sessions` table). LangGraph state only carries control
+  flow; the checkpointer (`data/checkpoints.sqlite`, AsyncSqliteSaver, thread = session id) makes the loop durable.
+- Human actions are written to the snapshot first, then `driver.kick()` derives each interrupt's resume value
+  from the snapshot (`_resume_values`). So answers that arrive while other branches are still running are
+  applied as soon as that superstep ends, and a restarted server resumes exactly where it was.
+- A question interrupt pauses only its branch; sibling branches finish (verified in `tests/test_engine.py`).
+- Fair comparison: `ops.comparison_knobs` = parent at the child's epochs, unless the change is epochs alone.
+- Adaptive seeds: inconclusive + |delta| ≥ 0.05 pts + n < 10 → 5 more paired seeds automatically, explained.
+- Refuted → always searches the library; conflicts → one question per wave; answers/feedback land on the
+  session `agenda`, and the next `propose` must implement every human agenda item (validated, repaired once).
+- Shadow branch: when the human skips the agent's pick, the pick runs as `chosen_by:"shadow"` if budget allows.
+- Auto mode dispatches all proposals (≤4) and answers questions with the agent's leaning.
+- Limits: 4 branches per wave, 12 research stars, 3 waves (configurable), per-session GPU budget.
+- Deviation from the original plan: events are emitted straight to the store (persist + broadcast) instead of
+  LangGraph's stream writer, because feedback, shadows, and explain run outside the graph and need the same path.
+
 ### Commands
 | Command | What |
 |---|---|
 | `uv run litmus smoke [--seeds 0 1]` | baseline on Modal, streams epochs |
 | `uv run litmus warmup` | start a warm container |
 | `uv run litmus library [--refresh]` | ranked claims with notes and conditions |
+| `uv run litmus run --auto [--waves N]` | headless end-to-end session, prints the tree |
 | `uv run pytest` | tests (CPU only) |
 
 ## Gotchas
@@ -121,6 +145,12 @@ uv run litmus --help
   no whitening 0.9284, flip none 0.9338 (single seed each).
 - 2026-10-16 papiers-client: `uv run litmus library --refresh` → 5 documents, 12 claims, the 6 annotated
   highlights ranked 1–6, conditions extracted for all 12 in ~10s (e.g. mixup: "200 epochs, PreAct ResNet-18…").
+- 2026-10-17 langgraph-engine: `uv run litmus run --auto --waves 2` → real 9-star tree in 4m37s wall, 401 GPU-s:
+  S1 mixup α=1 refuted (−1.64 [−2.12, −1.17]), S2 no-TTA confirmed hurts (−0.79), S3 random flip inconclusive
+  at n=10 (−0.06 [−0.14, +0.01]), S4 no label smoothing hurts (−0.13), S7 mixup α=0.2 refuted (−0.26),
+  S8 no whitening hurts (−1.24); mixup refutation → library search → question → answer → replanned; abstract
+  with citations; export written. That run exposed and we fixed: epochs-only children compared with themselves,
+  trivial epoch nudges to dodge dedupe, inconclusive results not getting more seeds.
 
 ## Frontend
 (owned by frontend agent)
