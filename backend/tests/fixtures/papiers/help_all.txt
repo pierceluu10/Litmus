@@ -1,0 +1,223 @@
+Papiers CLI: search and read your library from the terminal.
+Your saved papers, highlights, notes, and conversations (your chats) — for you or an AI agent.
+
+GETTING STARTED
+  papiers auth login                     Sign in with a token from Papiers (Settings -> API tokens)
+  papiers list --limit 5 --pretty        Your most recent documents
+  papiers search "your topic" --pretty   Search across your library
+
+COMMANDS
+  search        Search across your library
+  list          List your documents, highlights, notes, and conversations
+  read          Print a document, highlight, note, or conversation
+  browse        Page through an earlier search's results
+  auth          Sign in, check status, or sign out
+  tokens        List or revoke your API tokens
+  doctor        Check your setup, connection, and what's available
+  version       Print the CLI version
+
+  papiers <command> --help     full options and examples for a command
+  papiers help --all           everything, in one page
+
+OUTPUT
+  Commands print JSON by default — built for scripts and agents.
+  --pretty            human-readable output
+  --ids / --doc-ids   pipe result IDs into the next command
+
+SIGNING IN
+  Signing in saves your token on this machine.
+  For scripts or an AI agent, set PAPIERS_TOKEN instead.
+
+Exit codes: 0 ok · 1 command or API failure · 2 bad usage
+
+
+papiers search — search across your library.
+
+USAGE
+  papiers search QUERY [--kind KIND ...] [--filter FIELD.OP=VALUE ...] [--limit N] [--pretty|--json|--ids|--ids0|--doc-ids|--passage-ids|--highlight-ids|--evidence-ids]
+
+OPTIONS
+  --kind KIND          what to search. Defaults to all — your passages, highlights,
+                       equations, notes, conversations, and matching titles. Or focus on one:
+                       passage · highlight · conversation · equation · note.
+  --filter FIELD.OP=VALUE   narrow parent documents — repeatable, up to 25.
+                       e.g. --filter publishedYear.gte=2020 --filter author.contains=hinton. Fields/ops: help --all.
+  --document-id ID     scope to documents: doc_… (comma-separated or repeated), or @-/@file.
+  --limit N            max results, 1–50.
+  --json               machine-readable JSON (the default)
+  --pretty             human-readable text
+  --ids                result/item IDs, one per line, with their native prefix
+  --ids0               the same IDs, NUL-separated, for `xargs -0`
+  --doc-ids            parent document IDs only (doc_…), deduped; conversation hits are skipped
+  --passage-ids        matching passage evidence IDs, flattened in result order
+  --highlight-ids      matching highlight evidence IDs, flattened in result order
+  --evidence-ids       all matching evidence IDs, flattened in result order
+
+EXAMPLES
+  papiers search "mixture of experts" --pretty
+  papiers search "capacity factors" --kind passage --document-id doc_<id> --json
+  papiers search "dropout" --filter author.contains=hinton --json
+  papiers search "diffusion" --filter venue.contains=neurips --json
+  papiers search retrieval --kind passage --limit 5 --passage-ids | papiers read @- --format plain --json
+
+When capabilities.searchResultsBrowse.enabled is true, a search may return ranking.searchId — pass it to `papiers browse` for more pages.
+
+
+papiers list — list your documents, highlights, notes, and conversations.
+
+USAGE
+  papiers list [--kind KIND] [--limit N] [--cursor CURSOR] [--pretty|--json|--ids|--ids0|--doc-ids]
+  papiers list --kind document [--filter FIELD.OP=VALUE ...] [--order-by KEY] [--document-id doc_…|@-|@file]
+  papiers list --kind highlight|conversation [--since WHEN]
+
+OPTIONS
+  --kind KIND          document (default) · passage · highlight · conversation · equation · note.
+  --filter FIELD.OP=VALUE   narrow document results — repeatable, up to 25. document kind only.
+                       e.g. --filter lastEngagedAt.gte=30d --filter annotated=true. Fields/ops: help --all.
+  --order-by KEY       addedAt:desc (default) or lastEngagedAt:desc. document kind only.
+  --document-id ID     scope to documents: doc_… (comma-separated or repeated), or @-/@file.
+                       document and highlight only.
+  --since WHEN         only items at or after an ISO 8601 time, or an Nd shorthand (e.g. 30d).
+                       highlight and conversation only.
+  --limit N            max results, 1–50.
+  --cursor CURSOR      fetch the next page — use page.nextCursor from the previous response.
+  --json               machine-readable JSON (the default)
+  --pretty             human-readable text
+  --ids                result/item IDs, one per line, with their native prefix
+  --ids0               the same IDs, NUL-separated, for `xargs -0`
+  --doc-ids            parent document IDs only (doc_…), deduped; conversation hits are skipped
+
+EXAMPLES
+  papiers list --limit 5 --pretty
+  papiers list --kind highlight --since 30d --pretty
+  papiers list --kind document --filter lastEngagedAt.gte=30d --json
+  papiers list --kind document --filter annotated=true --json
+
+
+papiers read — print documents, highlights, notes, conversations, passages, or equations.
+
+USAGE
+  papiers read ID [ID ...] [--format FORMAT] [--max-chars-per-item N] [--fail-fast] [--json|--pretty]
+  papiers read @- | @file [--input0] [--format FORMAT] [--max-chars-per-item N] [--json|--pretty]
+  Read public IDs or papiers://note|highlight|item|conversation/<uuid> locators; don't mix resource kinds.
+
+OPTIONS
+  --format FORMAT      how to render each item. Default auto (equation defaults to metadata).
+                       document: auto|metadata|markdown|plain.   passage: markdown|plain.
+                       highlight, conversation: metadata|plain.   note: markdown|plain.
+                       equation: metadata.
+  --include SECTION    extra sections, comma-separated: metadata, source, locations.
+                       document only (highlight/conversation/equation/note: metadata only; passage: none).
+  --pages RANGE        restrict a document read to pages, e.g. 1,3-5. document only.
+  --max-chars-per-item N   truncate each item's content to N chars, 1–200000.
+  --cursor CURSOR      continue one long document or note — use items[].nextCursor from the
+                       previous response. One literal document or note identifier only, with
+                       --format auto, markdown, or plain.
+  --fail-fast          exit non-zero if any item fails (default: succeed if at least one does).
+  --json               machine-readable JSON (the default)
+  --pretty             human-readable text
+
+EXAMPLES
+  papiers read doc_<id> --format markdown --max-chars-per-item 2000 --json
+  papiers read nte_<id> --format markdown --json
+  papiers read hl_<id> --json
+  papiers search retrieval --doc-ids | papiers read @- --format metadata --json
+
+
+papiers browse — page deeper into an earlier search's results.
+
+USAGE
+  papiers browse srch_… [--offset N] [--limit N] [--pretty|--json|--ids|--ids0|--doc-ids|--passage-ids|--highlight-ids|--evidence-ids]
+
+OPTIONS
+  --offset N           start at rank N (0-based) in the frozen ranking.
+  --limit N            max results, 1–50.
+    --json               machine-readable JSON (the default)
+  --pretty             human-readable text
+  --ids                result/item IDs, one per line, with their native prefix
+  --ids0               the same IDs, NUL-separated, for `xargs -0`
+  --doc-ids            parent document IDs only (doc_…), deduped; conversation hits are skipped
+  --passage-ids        matching passage evidence IDs, flattened in result order
+  --highlight-ids      matching highlight evidence IDs, flattened in result order
+  --evidence-ids       all matching evidence IDs, flattened in result order
+
+When capabilities.searchResultsBrowse.enabled is true, a search response includes
+ranking.searchId (an srch_… handle); pass it here to page deeper without
+re-running the search. The ranking is frozen and expires after a while.
+
+EXAMPLE
+  papiers browse srch_<id> --offset 10 --json
+
+
+papiers auth — sign in, check status, or sign out.
+
+USAGE
+  papiers auth login [--force] [--json]     Sign in (paste your token, or pipe it in)
+  papiers auth status [--json]              Show whether you're signed in
+  papiers auth inspect [--json]             Show details about the saved token
+  papiers auth logout [--json]              Forget the saved token
+
+OPTIONS
+  --force              when signing in, replace an already-saved token.
+
+Signing in saves your token on this machine. For scripts or an AI agent, set PAPIERS_TOKEN instead.
+
+
+papiers tokens — list or revoke your API tokens.
+
+USAGE
+  papiers tokens list [--json]
+  papiers tokens revoke TOKEN_ID [--json]
+
+Create and name tokens in Papiers (Settings -> API tokens). Revoking is permanent.
+
+
+papiers doctor — check your setup, connection, and what's available.
+
+USAGE
+  papiers doctor [--json]
+
+Verifies your token, the server connection, and which features are available.
+Run it first when something isn't working.
+
+
+papiers version — print the CLI version.
+
+USAGE
+  papiers version | papiers --version | papiers -V
+
+
+REFERENCE — IDs, piping, pagination, and limits.
+
+ID PREFIXES
+  doc_   document        pas_   passage         hl_    highlight
+  cnv_   conversation    eq_    equation        nte_   note
+  srch_  a saved search ranking (for browse)
+  On read, the kind — and which --format/--include apply — is read from the prefix.
+
+RESOURCE LOCATORS
+  papiers://note/<uuid>          papiers://highlight/<uuid>
+  papiers://item/<uuid>          papiers://conversation/<uuid>
+  Locators are accepted by read and resolved with the same ownership checks as public IDs.
+
+PIPING IDS BETWEEN COMMANDS
+  --ids        result IDs, one per line, with their native prefix
+  --ids0       the same IDs, NUL-separated (for `xargs -0`)
+  --doc-ids    parent document IDs only (doc_…), deduped; conversation hits are skipped
+  @-           read identifiers from stdin          @file   read identifiers from a file
+  --input0     read piped identifiers NUL-separated instead of whitespace/newlines
+  @- and @file accept IDs, resource locators, or a Papiers JSON envelope, and may be mixed with literals.
+
+PAGINATION — three separate mechanisms
+  list     response has page.nextCursor          → papiers list … --cursor CURSOR
+  search   response has ranking.searchId           → papiers browse srch_… --offset N
+  read     a truncated item has items[].nextCursor → papiers read NOTE_OR_DOCUMENT --cursor CURSOR
+
+LIMITS
+  --limit 1–50  ·  --max-chars-per-item 1–200000  ·  up to 25 filters  ·  up to 100 IDs per request
+
+FILTER FIELDS — document kind, as FIELD.OP=VALUE (or FIELD=VALUE for equality)
+  id  title  author  venue  doi  arxivId  pmid
+  publishedDate  publishedYear  sourceFamily  sourceDomain
+  annotated  engaged  lastEngagedAt
+  Operators: eq · in · contains · prefix · gte · gt · lte · lt · between (which apply depends on the field).

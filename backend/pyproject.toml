@@ -5,6 +5,7 @@ description = "Litmus backend: turns highlighted research claims into graded exp
 requires-python = ">=3.11"
 dependencies = [
     "modal>=1.6.2",
+    "openai>=3.33.0",
     "pydantic>=2.14.1",
     "python-dotenv>=1.2.4",
     "scipy>=1.17.1",
