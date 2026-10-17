@@ -1,7 +1,0 @@
-# Copy to backend/.env (gitignored). Modal auth lives in ~/.modal.toml, not here.
-OPENAI_API_KEY=sk-...
-OPENAI_MODEL=gpt-5.1
-# Optional if you ran `papiers auth login` on this machine.
-PAPIERS_TOKEN=pap_live_...
-# Per-session GPU budget in seconds (default 1800).
-LITMUS_BUDGET_GPU_SECONDS=1800

@@ -1,6 +1,5 @@
 # secrets
-.env
-.env.*
+.env*
 !.env.example
 
 # python
