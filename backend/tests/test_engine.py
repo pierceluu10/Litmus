@@ -61,6 +61,7 @@ async def fake_structured(prompt_name, schema, **values):
             return agent.ProposalSet(thinking="Testing your doubts.", recommendation_reason="biggest doubt", proposals=[
                 draft("Mixup", "S0", "improves", ["hl_mixup"], recommended=True, mixup_alpha=0.2),
                 draft("No TTA", "S0", "hurts", ["hl_tta"], tta_level=0),
+                draft("Mixup strong", "S0", "improves", ["hl_mixup"], mixup_alpha=1.0),
                 draft("Bad", "S9", "improves", ["hl_tta"], cutout=4),  # unknown parent: must be dropped
             ])
         agenda = [a.id for a in state.agenda if a.source == "answer"]
@@ -125,18 +126,23 @@ async def test_full_session_with_question_mid_branch(engine):
         sid = state.id
         state = await wait_for(sid, lambda s: any(p.wave == 1 for p in s.proposals))
         wave1 = [p for p in state.proposals if p.wave == 1]
-        assert [p.title for p in wave1] == ["Mixup", "No TTA"]  # invalid parent dropped
+        assert [p.title for p in wave1] == ["Mixup", "No TTA", "Mixup strong"]  # invalid parent dropped
         assert sum(p.agent_recommended for p in wave1) == 1
         assert state.status == "waiting_human"
 
         # Human skips the agent's pick (Mixup)? No: picks both, so no shadow. Then a question arrives mid-branch.
-        driver.dispatch(sid, "S0", [{"proposal_id": wave1[0].id}, {"proposal_id": wave1[1].id}], "focus on doubts")
-        driver.dispatch(sid, "S0", [{"proposal_id": wave1[0].id}, {"proposal_id": wave1[1].id}], None)  # idempotent
+        everything = [{"proposal_id": p.id} for p in wave1]
+        driver.dispatch(sid, "S0", everything, "focus on doubts")
+        driver.dispatch(sid, "S0", everything, None)  # idempotent
         state = await wait_for(sid, lambda s: any(q.status == "open" for q in s.questions))
-        assert len([s for s in state.stars if s.wave == 1]) == 2
-        mixup = next(s for s in state.stars if s.title == "Mixup")
-        assert mixup.grade.verdict == "refuted" and mixup.status == "waiting"
+        assert len([s for s in state.stars if s.wave == 1]) == 3
+        state = await wait_for(sid, lambda s: all(x.status in ("done", "waiting") for x in s.stars))
+        assert len(state.questions) == 1  # two refuted mixup branches raced; only one may ask per wave
         q = state.questions[0]
+        mixup = ops.star(state, q.star_id)
+        assert mixup.grade.verdict == "refuted" and mixup.status == "waiting"
+        other = next(s for s in state.stars if s.title.startswith("Mixup") and s.id != mixup.id)
+        state = await wait_for(sid, lambda s: any(a.star_id == other.id for a in s.agenda))  # its idea is kept, not asked
         assert q.star_id == mixup.id and q.agent_leaning == "O2" and any(e.id == "hl_bot" for e in q.evidence)
 
         # The other branch kept running and finished while the mixup line waited.

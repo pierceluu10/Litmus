@@ -9,7 +9,7 @@ import statistics
 from litmus import grader, store
 from litmus.experiments.knobs import BASELINE_KNOBS, DEFAULT_SEEDS, config_hash
 from litmus.experiments.service import ExperimentError, estimate_gpu_seconds, run_config
-from litmus.models import AgendaItem, Answer, Decision, Grade, apply_changes, Proposal, Provenance, Question, RunResult, SessionState, Star, now_iso
+from litmus.models import AgendaItem, Answer, Decision, Grade, Progress, apply_changes, Proposal, Provenance, Question, RunResult, SessionState, Star, now_iso
 
 log = logging.getLogger(__name__)
 
@@ -174,7 +174,7 @@ async def run_star(session_id: str, star_id: str, seeds: list[int] = DEFAULT_SEE
 
     def on_child(event: dict) -> None:
         if event["type"] == "progress":
-            s.progress.append({"seed": event["seed"], "epoch": event["epoch"], "val_acc": event["val_acc"]})
+            s.progress.append(Progress(seed=event["seed"], epoch=event["epoch"], val_acc=event["val_acc"]))
             emit(state, "experiment.progress", {k: event[k] for k in ("seed", "epoch", "val_acc")} | {"star_id": s.id})
         else:
             run = RunResult(**{k: v for k, v in event.items() if k != "type"})
