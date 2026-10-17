@@ -9,13 +9,13 @@ const STATUS: Record<SessionStatus, { label: string; color: string }> = {
 }
 
 export function TopBar() {
-  const { app, conn, togglePause, set, error } = useStore()
+  const { app, conn, togglePause, set, error, leave } = useStore()
   const s = app.session
   const st = s ? STATUS[s.status] : null
   const used = s?.budget_used ?? 0, total = s?.budget_total ?? 0
   return (
     <header className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-rule bg-surface px-4 py-2.5">
-      <h1 className="m-0 text-[20px] font-bold leading-none tracking-tight">Litmus</h1>
+      <h1 className="m-0 leading-none"><button className="border-0 bg-transparent p-0 text-[20px] font-bold tracking-tight" title="Back to the home page" onClick={leave}>Litmus</button></h1>
       <p className="m-0 min-w-0 flex-1 truncate text-muted" title={s?.goal}>{s?.goal ?? 'No session yet'}</p>
       {error && <span role="alert" className="rounded-md border border-refuted px-2 py-0.5 text-refuted">{error}</span>}
       {api.mock && <span className="chip" title="The backend is simulated in your browser">Mock data</span>}

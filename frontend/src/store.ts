@@ -20,6 +20,7 @@ type Store = {
   explainBusy: boolean
   explained: Record<string, { answer: string; provenance: Provenance[] }>
   begin: (replay: boolean, goal?: string) => Promise<void>
+  leave: () => void
   select: (id: string | null) => void
   set: (p: Partial<Store>) => void
   dispatch: (star_id: string, selections: Selection[], instruction?: string) => Promise<void>
@@ -45,6 +46,10 @@ export const useStore = create<Store>((set, get) => {
     follow: true, abstractOpen: false, explainBusy: false, explained: {},
     set: (p) => set(p),
     select: (id) => set({ selectedId: id }),
+    leave() {
+      unsub?.(); unsub = null
+      set({ app: initialState, sid: null, conn: 'closed', selectedId: null, abstractOpen: false, explained: {}, error: null })
+    },
     async begin(replay, goal) {
       unsub?.()
       set({ app: initialState, selectedId: null, error: null, abstractOpen: false, explained: {} })

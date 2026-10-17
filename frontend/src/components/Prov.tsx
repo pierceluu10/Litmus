@@ -24,5 +24,5 @@ export function ProvChip({ p }: { p: Provenance }) {
 }
 
 export function ProvList({ items }: { items: Provenance[] }) {
-  return <div className="flex flex-wrap items-start gap-1.5">{items.map((p) => <ProvChip key={p.id} p={p} />)}</div>
+  return <div className="flex flex-wrap items-start gap-1.5">{items.map((p, i) => <ProvChip key={`${p.id}-${i}`} p={p} />)}</div>
 }
