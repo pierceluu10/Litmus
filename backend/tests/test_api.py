@@ -92,3 +92,25 @@ def test_api_flow_and_every_event_matches_the_contract(engine):  # noqa: F811
 def test_unknown_session_is_404(engine, path):  # noqa: F811
     with TestClient(api.app) as client:
         assert client.post(path).status_code == 404
+
+
+def test_replay_restreams_a_recording_with_the_replay_flag(engine, tmp_path, monkeypatch):  # noqa: F811
+    from litmus import replay
+
+    monkeypatch.setattr(replay, "MAX_GAP_SECONDS", 0.0)
+    with TestClient(api.app) as client:
+        sid = client.post("/api/sessions", json={"auto_mode": True, "max_waves": 1}).json()["session_id"]
+        wait(client, sid, lambda s: s["status"] == "done")
+        monkeypatch.setattr(replay, "DEMO_PATH", tmp_path / "demo.json")
+        info = replay.record(sid, tmp_path / "demo.json")
+        original = store.events_after(sid, 0)
+        assert info["events"] == len(original)
+
+        rid = client.get("/api/replay/demo?speed=100").json()["session_id"]
+        snap = wait(client, rid, lambda s: s["status"] == "done" and s["stars"])
+        assert snap["replay"] is True and snap["last_seq"] == len(original)
+        replayed = store.events_after(rid, 0)
+        assert [e.type for e in replayed] == [e.type for e in original]
+        assert replayed[0].payload["replay"] is True and all(e.session_id == rid for e in replayed)
+        with client.websocket_connect(f"/ws/sessions/{rid}?from_seq=0") as ws:
+            assert Event.model_validate_json(ws.receive_text()).type == "session.started"

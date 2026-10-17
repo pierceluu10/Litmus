@@ -67,13 +67,13 @@ def print_tree(session_id: str) -> None:
         print("\nABSTRACT\n" + state.abstract.text)
 
 
-async def _run(auto: bool, waves: int, goal: str | None) -> None:
+async def _run(auto: bool, waves: int, goal: str | None, fresh: bool) -> None:
     from litmus import store
     from litmus.config import budget_gpu_seconds
     from litmus.engine import driver
 
     await driver.startup()
-    state = driver.create_session(goal, budget_gpu_seconds(), auto_mode=auto, auto_timeout_seconds=None, max_waves=waves)
+    state = driver.create_session(goal, budget_gpu_seconds(), auto_mode=auto, auto_timeout_seconds=None, max_waves=waves, fresh=fresh)
     print(f"session {state.id}")
     queue = store.subscribe(state.id)
     for event in store.events_after(state.id, 0):
@@ -106,10 +106,13 @@ def main() -> None:
     library.add_argument("--refresh", action="store_true", help="re-read Papiers (otherwise use the cache)")
     serve = commands.add_parser("serve", help="start the API on http://localhost:8000")
     serve.add_argument("--port", type=int, default=8000)
+    record = commands.add_parser("record-demo", help="save a finished session to shared/demo-session.json")
+    record.add_argument("session_id")
     run = commands.add_parser("run", help="headless end-to-end session; prints the tree")
     run.add_argument("--auto", action="store_true", help="the agent makes every choice itself")
     run.add_argument("--waves", type=int, default=3)
     run.add_argument("--goal")
+    run.add_argument("--fresh", action="store_true", help="offset seeds so every run trains live (no cache)")
     args = parser.parse_args()
 
     if args.command == "serve":
@@ -124,6 +127,10 @@ def main() -> None:
     elif args.command == "warmup":
         asyncio.run(_warmup())
     elif args.command == "run":
-        asyncio.run(_run(args.auto, args.waves, args.goal))
+        asyncio.run(_run(args.auto, args.waves, args.goal, args.fresh))
+    elif args.command == "record-demo":
+        from litmus import replay
+
+        print(replay.record(args.session_id))
     elif args.command == "library":
         asyncio.run(_library(args.refresh))

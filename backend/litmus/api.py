@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
-from litmus import llm, papiers_client, store, writeback
+from litmus import llm, papiers_client, replay, store, writeback
 from litmus.config import budget_gpu_seconds
 from litmus.engine import driver
 from litmus.experiments import runner
@@ -42,6 +42,7 @@ class CreateSession(BaseModel):
     auto_mode: bool = False
     auto_timeout_seconds: float | None = None
     max_waves: int | None = None
+    fresh: bool = False  # offset seeds so nothing comes from the result cache (live training for demos)
 
 
 class Selection(BaseModel):
@@ -130,7 +131,7 @@ async def library(refresh: bool = False):
 @app.post("/api/sessions")
 async def create_session(body: CreateSession):
     state = driver.create_session(body.goal, body.budget_gpu_seconds or budget_gpu_seconds(), body.auto_mode,
-                                  body.auto_timeout_seconds, body.max_waves or driver.graph.MAX_WAVES)
+                                  body.auto_timeout_seconds, body.max_waves or driver.graph.MAX_WAVES, body.fresh)
     return {"session_id": state.id}
 
 
@@ -208,6 +209,14 @@ async def abstract(session_id: str):
 @app.get("/api/sessions/{session_id}/export", response_class=PlainTextResponse)
 async def export(session_id: str):
     return PlainTextResponse(writeback.findings_markdown(_session(session_id)), media_type="text/markdown")
+
+
+@app.get("/api/replay/demo")
+async def replay_demo(speed: float = 1.0):
+    try:
+        return {"session_id": replay.start(speed)}
+    except replay.ReplayError as error:
+        raise HTTPException(404, str(error)) from None
 
 
 # ---------------------------------------------------------------- event stream

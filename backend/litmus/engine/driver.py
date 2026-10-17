@@ -7,6 +7,7 @@ resume values come from the snapshot, a server restart can always pick up where 
 
 import asyncio
 import logging
+import random
 import uuid
 
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
@@ -27,6 +28,8 @@ CHECKPOINT_PATH = DATA_DIR / "checkpoints.sqlite"
 DEFAULT_GOAL = "Which of the training tricks I highlighted actually hold for a ~10-epoch CIFAR-10 run?"
 ABSTRACT_WAIT_SECONDS = 240
 ABSTRACT_POLL_SECONDS = 0.5
+FRESH_SEED_STRIDE = 1000  # seed lists stay disjoint between fresh sessions (each uses < 1000 seeds)
+FRESH_SEED_BUCKETS = 100_000
 
 _graph = None
 _saver_context = None
@@ -63,10 +66,11 @@ def _thread(session_id: str) -> dict:
 # ---------------------------------------------------------------- graph driving
 
 def create_session(goal: str | None, budget: float, auto_mode: bool, auto_timeout_seconds: float | None,
-                   max_waves: int = graph.MAX_WAVES) -> SessionState:
+                   max_waves: int = graph.MAX_WAVES, fresh: bool = False) -> SessionState:
     state = SessionState(id=f"ses_{uuid.uuid4().hex[:10]}", goal=goal or DEFAULT_GOAL, budget_total=budget)
+    seed_offset = random.randrange(1, FRESH_SEED_BUCKETS) * FRESH_SEED_STRIDE if fresh else 0
     store.create_session(state, {"auto_mode": auto_mode, "auto_timeout_seconds": auto_timeout_seconds,
-                                 "max_waves": max_waves})
+                                 "max_waves": max_waves, "seed_offset": seed_offset})
     store.emit(state.id, "session.started", {"goal": state.goal, "replay": False})
     kick(state.id, first=True)
     return state

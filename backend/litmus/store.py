@@ -57,6 +57,12 @@ def get(session_id: str) -> SessionState:
     return _sessions[session_id]
 
 
+def put(state: SessionState) -> None:
+    """Replace a session's snapshot wholesale (used by replay at the end of a re-stream)."""
+    _sessions[state.id] = state
+    save(state)
+
+
 def config(session_id: str) -> dict:
     row = db().execute("SELECT config FROM sessions WHERE id = ?", (session_id,)).fetchone()
     if row is None:

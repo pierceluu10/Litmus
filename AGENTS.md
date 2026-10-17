@@ -138,6 +138,16 @@ branch subgraph: run → reflect → (run +5 seeds) | (ask ⟂) | END          �
   `GET /api/sessions/{id}/export`; event `papiers.export_ready` tells the UI to show "Add to Papiers" (paste into a
   Papiers note, which Papiers indexes, so later sessions' searches find it). Shadow branches get their own section.
 
+### Replay (`backend/litmus/replay.py`)
+- `uv run litmus record-demo <session_id>` writes `shared/demo-session.json` ({snapshot, events}).
+- `GET /api/replay/demo?speed=1` creates `rpl_…` and re-emits every recorded event through the same WS
+  (gaps capped at 1.5s ÷ speed; `session.started.replay = true`). Mid-replay the snapshot is empty with
+  `last_seq: 0` (clients build from events); at the end it becomes the recorded final snapshot. Needs no network.
+- Current recording: `ses_74aa24a8f2` — the canonical demo story (mixup refuted at ~10 epochs → library search →
+  question → human overrides 20→30 epochs → confirmed +0.22; shadow 20-epoch ghost +0.15).
+- `fresh: true` on session create offsets seeds so nothing comes from the cache: every star trains live with
+  epoch progress. Use it for live judging.
+
 ### Commands
 | Command | What |
 |---|---|
@@ -145,7 +155,8 @@ branch subgraph: run → reflect → (run +5 seeds) | (ask ⟂) | END          �
 | `uv run litmus smoke [--seeds 0 1]` | baseline on Modal, streams epochs |
 | `uv run litmus warmup` | start a warm container |
 | `uv run litmus library [--refresh]` | ranked claims with notes and conditions |
-| `uv run litmus run --auto [--waves N]` | headless end-to-end session, prints the tree |
+| `uv run litmus run --auto [--waves N] [--fresh]` | headless end-to-end session, prints the tree |
+| `uv run litmus record-demo <session_id>` | save a session to `shared/demo-session.json` |
 | `uv run pytest` | tests (CPU only) |
 
 ## Gotchas
@@ -180,6 +191,47 @@ branch subgraph: run → reflect → (run +5 seeds) | (ask ⟂) | END          �
 - 2026-10-17 abstract-and-writeback: `POST /api/sessions/ses_4a61ce2ffe/explain {"star_id":"S7"}` → 5.8s, answer
   quotes 94.79→95.05 (+0.26, CI 0.20–0.32) and cites hl_07db… (Bag of Tricks) + hl_50d0… (mixup).
   `GET …/export` → findings Markdown incl. shadow section.
+- 2026-10-17 replay + hardening (final code, 3 full runs, 0 server errors):
+  1. `ses_74aa24a8f2` (scripted human, fresh seeds): 11 stars, 3 waves; mixup α=1 −1.44 and α=0.2 −0.26 refuted
+     at ~10 ep → question → human chose 30 ep over the agent's 20 → **+0.22 [+0.07, +0.37] confirmed**; shadow
+     (agent's 20 ep) +0.15. No final-wave question. Recorded as the demo.
+  2. `ses_…` second scripted run: α=0.2 mixup @40 ep **+0.33 [+0.17, +0.50]** (replicates), alternating flip
+     confirmed without TTA (−0.20 for random).
+  3. `ses_065433f008` (auto, fresh): **`kill -9` of the server mid-wave-1 with 4 branches running → restart →
+     "recovering session" → finished**, 9 stars, no duplicates.
+  Replay: `GET /api/replay/demo?speed=4` re-streamed 1083 events in 14s; final snapshot 11 stars + abstract.
 
 ## Frontend
-(owned by frontend agent)
+Vite + React 19 + TypeScript (strict), Tailwind v4, `motion`, zustand, d3 (hierarchy/scale/shape). Lives in `frontend/`.
+
+**Run**
+```bash
+cd frontend && npm install
+npm run dev          # http://localhost:5173
+npm test             # reducer unit tests
+```
+`frontend/.env`: `VITE_MOCK=1` (default) simulates the whole backend in the browser; `VITE_MOCK=0` + `VITE_API_URL=http://localhost:8000` talks to the real one. That is the only change needed to switch.
+
+**Folder map** (`frontend/src`)
+| Path | What |
+|---|---|
+| `types.ts` | Contract types, snake_case, mirrors `shared/contract.md` |
+| `reducer.ts` | `applyEvent(state, event)`: the one pure reducer. Ignores `seq <= lastSeq`, logs unknown types |
+| `store.ts` | zustand store: session state, selection, actions; picks the mock or real `api` |
+| `transport/` | `api.ts` interface, `real.ts` (REST + WebSocket, reconnect from last `seq`), `mock.ts` |
+| `mock/` | `server.ts` scripted backend (drives the demo tree, answers every action), `library.ts` demo library |
+| `lib/` | `format.ts` (labels, colours, effect text), `layout.ts` (deterministic left-to-right tree) |
+| `components/` | `StarMap`, `Library`, `Sidebar`, `PathChart`, `Dock` (proposals + question), `Feed`, `Timeline`, `AbstractPanel`, `TopBar`, `Legend`, `Prov` |
+
+**State flow**: `begin()` creates a session, subscribes from `seq 0`, and every event goes through `applyEvent`. The snapshot endpoint is not used for first load because replaying all events rebuilds identical state (see Contract requests).
+
+**Design tokens**: `frontend/src/index.css` (`@theme`). Cream paper background; verdict colours (`confirmed`, `refuted`, `inconclusive`, `baseline`), state colours (`running`, `waiting`), and actor colours (`human`, `agent`) are defined once and used by stars, chips, charts and the legend. Stars are labelled with Greek letters (`S0` = α).
+
+**Animation conventions**: positions ease toward layout targets (new stars grow out of their parent), camera eases with "Follow activity" (any manual pan/zoom turns it off), CSS keyframes for pulse/breathe/bloom/line draw, `motion` for the dock. All motion is disabled under `prefers-reduced-motion`.
+
+**Add an event type**: add a `case` in `reducer.ts`, add a test in `reducer.test.ts`, emit it from `mock/server.ts`, then render it.
+
+**Known gaps**: no "rewind and branch" yet (selection is by star id, so it fits); mock mode does not load `shared/demo-session.json` yet; visual polish pass not done; layout below ~1000px is stacked rather than tuned.
+
+### Contract requests
+- `GET /api/sessions/{id}` should include the highest applied `seq`, so a client can load the snapshot and then subscribe from `seq + 1` instead of replaying everything.
