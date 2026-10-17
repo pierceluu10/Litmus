@@ -8,6 +8,7 @@ import { Claims } from './components/Claims'
 import { Scene } from './components/Scene'
 import { Dock } from './components/Dock'
 import { Inspector } from './components/Inspector'
+import { ThoughtFlight } from './components/ThoughtFlight'
 
 // tiny hash router: '' is the home page, #/login and #/signup are the account pages
 function useHash() {
@@ -53,6 +54,7 @@ export default function App() {
         </main>
         <Inspector />
       </div>
+      <ThoughtFlight />
     </div>
   )
 }

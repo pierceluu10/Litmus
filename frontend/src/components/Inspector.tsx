@@ -1,4 +1,5 @@
 import { Fragment, useState } from 'react'
+import { motion } from 'motion/react'
 import { sessionApi, useStore } from '../store'
 import { agentDetail, agentName, pct, progressFraction, pts, starTone, toneVar } from '../lib/format'
 import type { Star } from '../types'
@@ -35,7 +36,7 @@ function Overview() {
       <section><H>Accuracy by path</H><div className="plate px-3 pb-1.5 pt-2.5"><PathChart stars={s.stars} highlight={null} /></div></section>
       {ranked.length > 0 && (
         <section>
-          <H aside={<span className="label">accuracy · vs parent</span>}>Rankings</H>
+          <H>Rankings</H>
           <ol className="plate m-0 list-none p-1">
             {ranked.map((x, i) => (
               <li key={x.id}>
@@ -171,18 +172,31 @@ function TestedClaims({ s }: { s: Star }) {
   )
 }
 
+// The answer opens out from where the mote lands on its first line.
+const HIDDEN_ANSWER = { clipPath: 'circle(0px at 12px 11px)', opacity: 0, filter: 'blur(4px)' }
+const SHOWN_ANSWER = { clipPath: 'circle(150% at 12px 11px)', opacity: 1, filter: 'blur(0px)' }
 const OPENERS = ['What did you run?', 'Is this result real?', 'What should I try next?']
 const firstSentence = (t: string) => t.match(/^.*?[.!?](\s|$)/)?.[0].trim() ?? t
 
 // A chat about this star: the agent's conclusion opens it, replans appear as notes, then the human's questions.
 function Chat({ s }: { s: Star }) {
-  const { chats, thinking, ask, app } = useStore()
+  const { chats, thinking, thought, ask, app } = useStore()
   const [draft, setDraft] = useState('')
   const [full, setFull] = useState(false)
   const turns = chats[s.id] ?? []
   const replans = app.replans.filter((r) => r.star_id === s.id)
   const busy = thinking === s.id
-  const send = (q: string) => { if (!q.trim() || busy) return; setDraft(''); ask(s.id, q.trim()) }
+  const flying = thought?.starId === s.id
+  const pending = flying && !thought.landed // the newest answer waits for the mote to land on it
+  // `source` is the element the words were typed or shown in: they collapse from exactly there.
+  const send = (q: string, source: HTMLElement) => {
+    if (!q.trim() || busy) return
+    const r = source.getBoundingClientRect(), cs = getComputedStyle(source)
+    useStore.setState((st) => ({ thought: { key: (st.thought?.key ?? 0) + 1, starId: s.id, text: q.trim(), landed: false,
+      from: { left: r.left, top: r.top, width: r.width, height: r.height, padding: parseFloat(cs.paddingLeft), font: cs.font, letterSpacing: cs.letterSpacing } } }))
+    setDraft('')
+    ask(s.id, q.trim())
+  }
   return (
     <section className="flex flex-col gap-3">
       <H>Ask Litmus</H>
@@ -196,12 +210,13 @@ function Chat({ s }: { s: Star }) {
       ))}
       {turns.map((t, i) => t.role === 'human'
         ? <p key={i} className="m-0 max-w-[85%] self-end rounded-xl rounded-br-sm bg-paper px-3 py-2 text-[13px] leading-snug">{t.text}</p>
-        : <p key={i} className="m-0 text-[13px] leading-relaxed">{t.text}</p>)}
-      {busy && <p className="m-0 flex items-center gap-2 text-[12.5px] text-muted" aria-live="polite"><span className="dot live-dot" style={{ background: 'var(--color-agent)' }} />Thinking…</p>}
+        : <motion.p key={i} className="m-0 text-[13px] leading-relaxed" data-answer-slot={pending && i === turns.length - 1 ? 'pending' : undefined} initial={false}
+            animate={pending && i === turns.length - 1 ? HIDDEN_ANSWER : SHOWN_ANSWER} transition={{ duration: 0.6, ease: [0.23, 1, 0.32, 1] }}>{t.text}</motion.p>)}
+      {busy && !flying && <p className="m-0 flex items-center gap-2 text-[12.5px] text-muted" aria-live="polite"><span className="dot live-dot" style={{ background: 'var(--color-agent)' }} />Thinking…</p>}
       {!turns.length && !busy && (
-        <div className="flex flex-wrap gap-1.5">{OPENERS.map((q) => <button key={q} className="chip hover:border-faint hover:text-ink" onClick={() => send(q)}>{q}</button>)}</div>
+        <div className="flex flex-wrap gap-1.5">{OPENERS.map((q) => <button key={q} className="chip hover:border-faint hover:text-ink" onClick={(e) => send(q, e.currentTarget)}>{q}</button>)}</div>
       )}
-      <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); send(draft) }}>
+      <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); send(draft, e.currentTarget.querySelector('input')!) }}>
         <label className="sr-only" htmlFor={`ask-${s.id}`}>Ask Litmus about this experiment</label>
         <input id={`ask-${s.id}`} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Ask about this experiment" className="field min-w-0 flex-1" />
         <button className="btn btn-primary" disabled={!draft.trim() || busy}>Ask</button>

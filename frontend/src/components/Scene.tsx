@@ -7,6 +7,7 @@ import { useStore } from '../store'
 import { FIRST_STEP, layoutStars, STEP, yFor, type Pos } from '../lib/layout'
 import { agentDetail, agentName, pts, progressFraction, provMatches, starTone, type Tone } from '../lib/format'
 import type { Star } from '../types'
+import { statueAnchor, type Point } from '../lib/statueAnchor'
 
 const STATUE_URL = '/litmus-statue.glb'
 const STATUE_COLOR = '#e3e8ef' // cool marble, close to the ground so the statue reads as a relief in the same material
@@ -36,6 +37,30 @@ const INTRO_HOLD_MS = 900
 const INTRO_SMOOTH = 1.5
 const PORTRAIT_ASPECT = 0.9
 const PORTRAIT_PULLBACK = 1.7
+
+// The statue's head in scene units (see EAR_CAM), and a point above it for the Thinking label.
+const HEAD = new Vector3(-69, 16, -5)
+const CROWN = new Vector3(-69, 31, -5)
+// While a question is with Litmus the camera turns to the statue: its head left of centre, the arm leading right.
+const CONSULT_AIM = new Vector3(HEAD.x + 38, HEAD.y - 14, HEAD.z)
+
+function HeadTracker() {
+  const v = useMemo(() => new Vector3(), [])
+  useFrame(({ camera, gl }) => {
+    const r = gl.domElement.getBoundingClientRect()
+    const put = (p: Vector3, out: Point) => {
+      v.copy(p).project(camera)
+      out.x = r.left + ((v.x + 1) / 2) * r.width
+      out.y = r.top + ((1 - v.y) / 2) * r.height
+      return v.z < 1
+    }
+    const front = put(HEAD, statueAnchor.head)
+    put(CROWN, statueAnchor.crown)
+    const { x, y } = statueAnchor.head
+    statueAnchor.visible = front && x >= r.left && x <= r.right && y >= Math.max(r.top, 0) && y <= Math.min(r.bottom, innerHeight)
+  })
+  return null
+}
 
 function Statue() {
   const { scene } = useGLTF(STATUE_URL)
@@ -158,6 +183,7 @@ function CameraRig({ positions, parents }: { positions: Map<string, Pos>; parent
   // held in state (not a plain ref) so the effects below run again once the controls exist
   const [ctl, setCtl] = useState<CameraControls | null>(null)
   const { focusId, fitAll } = useStore()
+  const consulting = useStore((s) => !!s.thought && !s.thought.landed)
   // frame the branch, not just the star: halfway between the focused star and the one it grew from
   const star = focusId ? positions.get(focusId) : undefined
   const from = focusId ? positions.get(parents.get(focusId) ?? '') ?? star : undefined
@@ -191,6 +217,14 @@ function CameraRig({ positions, parents }: { positions: Map<string, Pos>; parent
     }
     toDefault(!reducedMotion(), true)
   }, [ctl, focus.x, focus.y, focus.z, portrait]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const c = ctl
+    if (!c || !introDone.current) return
+    if (consulting) {
+      const view = VIEW.clone().setLength(Math.min(MAX_DISTANCE, Math.max(MIN_DISTANCE, c.distance)))
+      c.setLookAt(CONSULT_AIM.x + view.x, CONSULT_AIM.y + view.y, CONSULT_AIM.z + view.z, CONSULT_AIM.x, CONSULT_AIM.y, CONSULT_AIM.z, !reducedMotion())
+    } else if (!fitAll) toDefault(!reducedMotion(), true)
+  }, [ctl, consulting]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const c = ctl
     if (!c) return
@@ -244,6 +278,7 @@ export function Scene() {
       <directionalLight position={[180, 30, -60]} intensity={0.45} />
       <Suspense fallback={null}><Statue /></Suspense>
       <Fingertip />
+      <HeadTracker />
       <Stars stars={stars} />
     </Canvas>
   )

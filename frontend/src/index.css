@@ -109,6 +109,19 @@ body {
 @keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 .skeleton { border-radius: 4px; background: linear-gradient(90deg, color-mix(in srgb, var(--color-surface) 50%, transparent) 25%, var(--color-surface) 50%, color-mix(in srgb, var(--color-surface) 50%, transparent) 75%); background-size: 200% 100%; animation: shimmer 1.6s linear infinite; }
 
+/* the question in flight: a mote of the same graphite as the experiments */
+.mote { width: 13px; height: 13px; border-radius: 999px; background: radial-gradient(circle at 35% 30%, #6a7079, #15181c 70%); box-shadow: 0 0 0 4px rgb(47 90 134 / 0.1), 0 6px 16px -2px rgb(21 24 28 / 0.35); will-change: transform; }
+.mote-speck { box-shadow: none; }
+.mote-ripple { width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 999px; border: 1.5px solid var(--color-agent); }
+.thinking-pill { display: inline-flex; align-items: center; gap: 7px; padding: 6px 12px 6px 10px; border-radius: 999px; background: var(--color-surface); box-shadow: 0 1px 2px rgb(21 24 28 / 0.08), 0 10px 26px -8px rgb(43 58 82 / 0.28); font-size: 12.5px; font-weight: 500; white-space: nowrap; }
+@keyframes ray { 0%, 100% { opacity: 0.25; } 40% { opacity: 1; } }
+@keyframes spin { to { transform: rotate(360deg); } }
+.spark { color: var(--color-agent); animation: spin 5s linear infinite; }
+.spark line { stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; animation: ray 0.9s ease-in-out infinite; }
+@keyframes shimmer-text { from { background-position: 150% 0; } to { background-position: -50% 0; } }
+/* a sheen sweeping the label, the loading convention; the text itself stays one colour */
+.thinking-text { color: var(--color-muted); background: linear-gradient(100deg, var(--color-muted) 40%, var(--color-ink) 50%, var(--color-muted) 60%) 0 0 / 220% 100%; -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; animation: shimmer-text 1.8s linear infinite; }
+
 .marble-ground { background: radial-gradient(120% 90% at 30% 35%, var(--color-marble) 0%, var(--color-paper) 70%); }
 
 @keyframes breathe { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
