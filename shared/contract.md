@@ -5,6 +5,7 @@ or remove fields, every change gets a Changelog line (newest first) and lands on
 `docs(contract): ...`.
 
 ## Changelog
+- 2026-10-17 — `POST /start` takes exactly one claim id (the session starts from one claim; auto mode uses the top one).
 - 2026-10-17 — Additive: `POST /api/sessions/{id}/start {claim_ids}` answers "Where should we start?" (the session
   waits at `waiting_human` with `wave: 0` until it arrives; auto mode picks the top claims) and event
   `start.chosen {claim_ids}`; `SessionState.start_claim_ids`; `Star.suggestion?` (the star's agent, in its own words:
@@ -43,7 +44,7 @@ All JSON is snake_case. Timestamps are ISO 8601 UTC strings. IDs are stable stri
 | GET | `/api/sessions` | | `{sessions: {id, goal, status, created_at, replay}[]}` newest first |
 | GET | `/api/sessions/{id}` | | full `SessionState` snapshot |
 | POST | `/api/sessions/{id}/dispatch` | `{star_id, selections:[{proposal_id, knob_overrides?}], instruction?}` | `{ok}` |
-| POST | `/api/sessions/{id}/start` | `{claim_ids: string[]}` (1–4 library claim ids) | `{ok}` (409 unknown id or already started) |
+| POST | `/api/sessions/{id}/start` | `{claim_ids: string[]}` (exactly one library claim id) | `{ok}` (409 unknown id or already started) |
 | POST | `/api/sessions/{id}/answer` | `{question_id, option_id, comment?}` | `{ok}` |
 | POST | `/api/sessions/{id}/feedback` | `{star_id, kind:"challenge"\|"suggest"\|"prioritize", text}` | `{ok}` |
 | POST | `/api/sessions/{id}/explain` | `{star_id, question?, history?: ChatTurn[]}` | `{answer, provenance: Provenance[]}` |
