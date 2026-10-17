@@ -5,6 +5,7 @@ import { agentDetail, agentName, pct, progressFraction, pts, starTone, toneVar }
 import type { Provenance, Star } from '../types'
 import { PathChart } from './PathChart'
 import { ProvChip } from './Prov'
+import { Researching } from './Researching'
 import { Steering } from './Steering'
 
 const H = ({ children, aside }: { children: React.ReactNode; aside?: React.ReactNode }) => (
@@ -24,6 +25,7 @@ function Overview() {
   return (
     <div className="space-y-6 p-4">
       {starting && <StartPicker />}
+      <Researching inline />
       <section>
         <h2 className="m-0 text-[15px] font-semibold tracking-[-0.01em]">Results</h2>
         {graded.length > 0 && (
@@ -347,14 +349,15 @@ export function Inspector({ floating }: { floating: boolean }) {
   const s = app.session?.stars.find((x) => x.id === selectedId)
   const showAbstract = abstractOpen && !!app.session?.abstract
   const shell = floating
-    ? 'absolute bottom-3 right-3 top-3 z-20 flex w-[348px] flex-col overflow-hidden rounded-2xl border border-rule bg-surface shadow-[0_20px_50px_-14px_rgba(43,58,82,0.30)]'
+    ? 'absolute bottom-3 right-3 top-[76px] z-20 flex w-[348px] flex-col overflow-hidden rounded-2xl border border-rule bg-surface shadow-[0_20px_50px_-14px_rgba(43,58,82,0.30)]'
     : 'flex flex-col border-t border-rule bg-surface'
   return (
-    <aside className={shell} aria-label="Results">
+    <motion.aside className={shell} aria-label="Results" style={{ transformOrigin: 'top right' }}
+      {...(floating ? { initial: { opacity: 0, scale: 0.96, y: -6 }, animate: { opacity: 1, scale: 1, y: 0 }, exit: { opacity: 0, scale: 0.97, transition: { duration: 0.15 } }, transition: { duration: 0.22, ease: [0.23, 1, 0.32, 1] as const } } : {})}>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {showAbstract ? <AbstractView /> : s ? <Detail s={s} key={s.id} /> : <Overview />}
       </div>
       {s && !showAbstract && <AskBar s={s} key={`ask-${s.id}`} />}
-    </aside>
+    </motion.aside>
   )
 }

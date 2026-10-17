@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { useStore } from './store'
+import { AnimatePresence } from 'motion/react'
+import { useStore, usePanelOpen } from './store'
 import { Login, Signup } from './components/Auth'
 import { Upload } from './components/Upload'
 import { Landing } from './components/Landing'
 import { toneVar } from './lib/format'
 import { TopBar } from './components/TopBar'
-import { Researching } from './components/Researching'
+import { AgentBubbles } from './components/AgentBubbles'
 import { Scene } from './components/Scene'
 import { SceneBackdrop } from './components/LowPolyScene'
 import { Dock } from './components/Dock'
@@ -37,7 +38,7 @@ function SceneChrome() {
           {LEGEND.map(([tone, label]) => <span key={tone} className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full border-[1.5px]" style={{ borderColor: toneVar(tone) }} />{label}</span>)}
         </p>
       </div>
-      <div className="absolute right-3 top-3 z-30 flex gap-1.5 lg:right-[calc(var(--panel)+0.75rem)]">
+      <div className="absolute left-4 top-10 z-30 flex gap-1.5">
         <button className="btn h-7 px-2.5 text-[12px]" aria-pressed={follow} onClick={() => set({ follow: !follow })} style={follow ? { borderColor: 'var(--color-ink)' } : undefined}>
           {follow ? 'Following' : 'Follow'} new branches
         </button>
@@ -51,21 +52,22 @@ function Screens() {
   const session = useStore((s) => s.app.session)
   const hash = useHash()
   const wide = useWide()
+  const open = usePanelOpen()
   if (!session) return hash === '#/login' ? <Login /> : hash === '#/signup' ? <Signup /> : hash === '#/upload' ? <Upload /> : <Landing />
   return (
     <div className="flex h-full flex-col">
       <TopBar />
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:overflow-hidden">
         {/* --panel / --rail: the room the floating cards take on the right and left; the scene's controls and the dock keep clear */}
-        <main className="marble-ground relative min-h-0 flex-1 overflow-hidden max-lg:h-[72vh] max-lg:flex-none lg:[--panel:372px] lg:[--rail:324px]">
+        <main className="marble-ground relative min-h-0 flex-1 overflow-hidden max-lg:h-[72vh] max-lg:flex-none lg:[--rail:0px]" style={{ '--panel': open ? '372px' : '0px' } as React.CSSProperties}>
           <SceneBackdrop seed={SCENE_FACETS} />
           <Scene />
           <SceneChrome />
-          <Researching />
+          <AgentBubbles />
           <Dock />
-          {wide && <Inspector floating />}
+          {wide && <AnimatePresence>{open && <Inspector floating key="panel" />}</AnimatePresence>}
         </main>
-        {!wide && <Inspector floating={false} />}
+        {!wide && open && <Inspector floating={false} />}
       </div>
       <ThoughtFlight />
     </div>

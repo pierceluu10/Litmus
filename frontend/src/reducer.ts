@@ -1,4 +1,4 @@
-import { labelAgents } from './lib/format'
+import { labelAgents, pct, pts } from './lib/format'
 import type { Abstract, Claim, Decision, Document, LitmusEvent, Provenance, Question, SessionState, Star } from './types'
 
 export type FeedItem = {
@@ -66,6 +66,7 @@ export function applyEvent(state: AppState, ev: LitmusEvent): AppState {
       addFeed({ kind: 'decision', star_id: p.star_id, text: `You chose: ${d.human_choice}` }); break
     }
     case 'star.created': case 'shadow.created': case 'star.updated':
+      if (ev.type === 'star.created' && p.star.parent_id && !s.stars.some((x) => x.id === p.star.id)) addFeed({ kind: 'thinking', star_id: p.star.id, text: `Testing: ${p.star.title}.` })
       s = { ...s, stars: labelAgents(upsert(s.stars, p.star as Star)) }; touch(p.star.id); break
     case 'experiment.started': s = patchStar(s, p.star_id, (st) => ({ ...st, status: 'running', progress: [] })); touch(p.star_id); break
     case 'experiment.progress':
@@ -73,8 +74,18 @@ export function applyEvent(state: AppState, ev: LitmusEvent): AppState {
       touch(p.star_id); break
     case 'experiment.run_done':
       s = patchStar(s, p.star_id, (st) => ({ ...st, runs: [...st.runs.filter((r) => r.seed !== p.run.seed), p.run] })); touch(p.star_id); break
-    case 'star.graded':
-      s = patchStar(s, p.star_id, (st) => ({ ...st, grade: p.grade, status: 'done' })); touch(p.star_id); break
+    case 'star.graded': {
+      s = patchStar(s, p.star_id, (st) => ({ ...st, grade: p.grade, status: 'done' })); touch(p.star_id)
+      const done = s.stars.find((x) => x.id === p.star_id)
+      if (done && p.grade.verdict !== 'baseline') {
+        // what the agent says when an experiment finishes: the result, where it ranks, and whether it was your call
+        const ranked = s.stars.filter((x) => x.grade).sort((x, y) => y.grade!.mean_child - x.grade!.mean_child)
+        const rank = ranked.findIndex((x) => x.id === done.id) + 1
+        const yours = done.chosen_by === 'human' || (done.provenance ?? []).some((x) => x.kind === 'human')
+        addFeed({ kind: 'thinking', star_id: done.id, text: `${done.title} is ${p.grade.verdict}: ${pct(p.grade.mean_child)} (${pts(p.grade.delta)} pts). ${rank === 1 ? 'Best so far.' : `Ranked ${rank} of ${ranked.length}.`}${yours ? ' This one came from your choice.' : ''}` })
+      }
+      break
+    }
     case 'star.failed':
       s = patchStar(s, p.star_id, (st) => ({ ...st, status: 'failed', error: p.error }))
       addFeed({ kind: 'error', star_id: p.star_id, text: `Experiment failed: ${p.error}` }); touch(p.star_id); break
@@ -82,6 +93,7 @@ export function applyEvent(state: AppState, ev: LitmusEvent): AppState {
     case 'question.asked': {
       const q: Question = p.question
       s = patchStar({ ...s, questions: upsert(s.questions, q) }, q.star_id, (st) => ({ ...st, status: 'waiting' }))
+      addFeed({ kind: 'thinking', star_id: q.star_id, text: `I need your call: ${q.text}` })
       touch(q.star_id); break
     }
     case 'question.answered': {

@@ -96,7 +96,7 @@ function ClaimCard({ c, status, stars, doc, expanded, onToggle, canPivot }: { c:
 
 // A card over the scene, on the left: which claim each running agent is testing, then every highlight with its
 // status; open one for the old claim card, what the agents found, and a pivot if nothing has tested it yet.
-export function Researching() {
+export function Researching({ inline = false }: { inline?: boolean }) {
   const { app, libraryStage, select, set } = useStore()
   const [expanded, setExpanded] = useState<string | null>(null)
   const session = app.session
@@ -111,7 +111,7 @@ export function Researching() {
   const loading = libraryStage !== 'ready'
   if (!loading && !active.length && !started) return null
   return (
-    <section aria-label="Claims" className="absolute left-4 top-16 z-30 flex w-[min(300px,calc(100%-2rem))] flex-col gap-3 overflow-y-auto rounded-xl border border-rule bg-surface/95 p-3 shadow-[0_10px_30px_-8px_rgba(43,58,82,0.22)] max-h-[calc(100%-6rem)] lg:max-h-[calc(100%-5rem)]">
+    <section aria-label="Claims" className={inline ? 'flex flex-col gap-3' : 'absolute left-4 top-16 z-30 flex w-[min(300px,calc(100%-2rem))] flex-col gap-3 overflow-y-auto rounded-xl border border-rule bg-surface/95 p-3 shadow-[0_10px_30px_-8px_rgba(43,58,82,0.22)] max-h-[calc(100%-6rem)] lg:max-h-[calc(100%-5rem)]'}>
       {loading && (
         <div>
           <h2 className="m-0 text-[12px] font-semibold text-muted">Reading your library</h2>

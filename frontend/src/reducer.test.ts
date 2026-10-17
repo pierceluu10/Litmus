@@ -14,8 +14,8 @@ describe('applyEvent', () => {
     let s = applyEvent(initialState, ev(1, 'star.created', { star }))
     s = applyEvent(s, ev(2, 'experiment.progress', { star_id: 'S1', seed: 0, epoch: 3, val_acc: 0.9 }))
     expect(s.session?.stars[0].status).toBe('running')
-    s = applyEvent(s, ev(3, 'star.graded', { star_id: 'S1', grade: { verdict: 'confirmed' } }))
-    expect(s.session?.stars[0]).toMatchObject({ status: 'done', grade: { verdict: 'confirmed' } })
+    s = applyEvent(s, ev(3, 'star.graded', { star_id: 'S1', grade: { verdict: 'confirmed', mean_child: 0.95, delta: 0.01 } }))
+    expect(s.session?.stars[0]).toMatchObject({ status: 'done', grade: { verdict: 'confirmed', mean_child: 0.95, delta: 0.01 } })
     expect(s.lastSeq).toBe(3)
   })
   it('a question pauses only its own star', () => {
