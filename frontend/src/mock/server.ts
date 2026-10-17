@@ -100,15 +100,29 @@ export class MockServer {
     if (this.session.start_claim_ids) return
     this.emit('start.chosen', { claim_ids })
     // one agent per claim: the first move whose leading provenance is that claim
-    const moves = claim_ids.flatMap((id) => MOVES.find((m) => m.prov[0].id === id) ?? [])
-    this.think(`Starting where you chose: one agent for each of your ${claim_ids.length} claim${claim_ids.length === 1 ? '' : 's'}.`)
+    this.think('Starting where you chose: drafting its first test.')
     this.emit('session.status', { status: 'running' })
+    this.openClaim(claim_ids[0])
+  }
+
+  // A claim no agent has tested yet becomes a new agent from the baseline.
+  pivot(claim_id: string) {
+    if (this.stars.some((s) => s.provenance.some((p) => p.id === claim_id))) throw new Error('That claim is already being tested')
+    this.think('Pivoting to that claim, as you asked: drafting its test from the baseline.')
+    this.openClaim(claim_id)
+  }
+
+  // The move whose leading provenance is the claim (any untried one if the demo has no move for it).
+  private openClaim(claim_id: string) {
     const base = this.star('S0')
-    ;(moves.length ? moves : MOVES.slice(0, 1)).forEach((m, i) => this.later(() => {
-      const changes = m.changes(base.knobs)!
-      const st = this.newStar('S0', m.title(base.knobs), m.hypothesis, changes, m.prov, 'human', m.predicted)
+    const taken = this.stars.filter((s) => s.parent_id === 'S0').map((s) => s.knob_changes)
+    const fresh = (m: Move) => { const c = m.changes(base.knobs); return c && !taken.some((t) => sameChanges(t, c)) }
+    const m = MOVES.find((x) => x.prov[0].id === claim_id && fresh(x)) ?? MOVES.find(fresh)
+    if (!m) { this.think('Every test the demo knows from the baseline has already run.'); return }
+    this.later(() => {
+      const st = this.newStar('S0', m.title(base.knobs), m.hypothesis, m.changes(base.knobs)!, m.prov, 'human', m.predicted)
       this.later(() => this.run(st.id, SEEDS), 500)
-    }, 400 + i * 350))
+    }, 400)
   }
 
   private newStar(parent: string | null, title: string, hypothesis: string, changes: Partial<Knobs>, prov: Provenance[], by: Star['chosen_by'], predicted?: Predicted, extra: Partial<Star> = {}): Star {

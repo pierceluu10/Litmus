@@ -79,6 +79,10 @@ class StartBody(BaseModel):
     claim_ids: list[str]
 
 
+class ClaimRef(BaseModel):
+    claim_id: str
+
+
 class StarRef(BaseModel):
     star_id: str
 
@@ -196,6 +200,16 @@ async def start(session_id: str, body: StartBody):
     _session(session_id)
     _, claims = await get_library()
     return _act(driver.start, session_id, body.claim_ids, {c.id for c in claims})
+
+
+@app.post("/api/sessions/{session_id}/pivot")
+async def pivot(session_id: str, body: ClaimRef):
+    _session(session_id)
+    _, claims = await get_library()
+    claim = next((c for c in claims if c.id == body.claim_id), None)
+    if claim is None:
+        raise HTTPException(409, f"unknown claim {body.claim_id}")
+    return _act(driver.pivot, session_id, claim)
 
 
 @app.post("/api/sessions/{session_id}/answer")

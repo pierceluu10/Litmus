@@ -33,8 +33,8 @@ log = logging.getLogger(__name__)
 MAX_WAVES = 3
 MAX_STARS = 12
 MAX_BRANCHES = 4
-START_INSTRUCTION = ("The human chose where to start. Propose exactly one plain test of the library claim listed, as the "
-                     "human's note frames it, with parent_star_id S0.")
+CLAIM_INSTRUCTION = ("The human chose this claim to test next. Propose exactly one plain test of the library claim listed, "
+                     "as the human's note frames it, with parent_star_id S0.")
 
 
 class EngineState(TypedDict):
@@ -110,15 +110,19 @@ async def start(es: EngineState) -> dict:
     state.wave = 1
     ops.think(state, f"Starting where you chose: drafting the first test of \"{chosen[0].summary or chosen[0].text[:80]}\".")
     try:
-        proposals, _ = await agent.propose(state, chosen, START_INSTRUCTION, session_config(state.id)["max_waves"], 1)
+        await open_claim(state, chosen[0])
     except (agent.ProposalError, LLMError) as error:
         store.emit(state.id, "error", {"message": f"Could not draft the first tests: {error}"})
         state.finish_requested = True
         store.save(state)
-        return {}
+    return {}
+
+
+async def open_claim(state, claim) -> None:
+    """Litmus drafts the plain test of one claim from the baseline and runs it as a new agent (start and pivots)."""
+    proposals, _ = await agent.propose(state, [claim], CLAIM_INSTRUCTION, session_config(state.id)["max_waves"], 1)
     state.proposals.extend(proposals)
     ops.dispatch(state, [{"proposal_id": p.id} for p in proposals], "human")
-    return {}
 
 
 async def propose(es: EngineState) -> dict:

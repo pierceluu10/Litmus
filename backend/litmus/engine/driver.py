@@ -214,6 +214,34 @@ def start(session_id: str, claim_ids: list[str], known: set[str]) -> None:
     kick(session_id)
 
 
+def pivot(session_id: str, claim) -> None:
+    """The human turns to a claim no agent has tested: Litmus drafts its plain test, and it runs as a new agent
+    (in the next wave if one is running)."""
+    state = store.get(session_id)
+    if not state.start_claim_ids:
+        raise ActionError("choose where to start first")
+    if state.finish_requested or state.status == "done":
+        raise ActionError("this session is finishing; nothing new will run")
+    if ops.target_wave(state) > store.config(session_id)["max_waves"]:
+        raise ActionError("no waves left in this session")
+    if any(p.id == claim.id for s in state.stars for p in s.provenance):
+        raise ActionError(f"{claim.id} is already being tested")
+    if len(graph.research_stars(state)) >= graph.MAX_STARS:
+        raise ActionError(f"this session is capped at {graph.MAX_STARS} stars")
+    ops.think(state, f"Pivoting to \"{claim.summary or claim.text[:80]}\", as you asked: drafting its test from the baseline.")
+    ops.spawn(_pivot(session_id, claim))
+
+
+async def _pivot(session_id: str, claim) -> None:
+    state = store.get(session_id)
+    try:
+        await graph.open_claim(state, claim)
+    except (agent.ProposalError, LLMError) as error:
+        store.emit(session_id, "error", {"message": f"Could not draft a test for that claim: {error}"})
+        return
+    kick(session_id)
+
+
 def answer(session_id: str, question_id: str, option_id: str, comment: str | None) -> None:
     state = store.get(session_id)
     q = ops.question(state, question_id)

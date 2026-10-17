@@ -18,6 +18,7 @@ export interface Api {
   replayDemo(): Promise<string>
   subscribe(sessionId: string, fromSeq: number, onEvent: (e: LitmusEvent) => void, onConn: (c: ConnState) => void): () => void
   start(sid: string, claim_ids: string[]): Promise<void>
+  pivot(sid: string, claim_id: string): Promise<void>
   dispatch(sid: string, body: { star_id: string; selections: Selection[]; instruction?: string }): Promise<void>
   answer(sid: string, body: { question_id: string; option_id: string; comment?: string }): Promise<void>
   feedback(sid: string, body: { star_id: string; kind: 'challenge' | 'suggest' | 'prioritize'; text: string }): Promise<void>

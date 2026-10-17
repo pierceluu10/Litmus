@@ -34,6 +34,7 @@ type Store = {
   select: (id: string | null) => void
   set: (p: Partial<Store>) => void
   start: (claim_ids: string[]) => Promise<void>
+  pivot: (claim_id: string) => Promise<void>
   dispatch: (star_id: string, selections: Selection[], instruction?: string) => Promise<void>
   answer: (question_id: string, option_id: string, comment?: string) => Promise<void>
   feedback: (star_id: string, kind: 'challenge' | 'suggest' | 'prioritize', text: string) => Promise<void>
@@ -90,6 +91,7 @@ export const useStore = create<Store>((set, get) => {
       } catch (e) { set({ error: (e as Error).message }) }
     },
     start: (claim_ids) => { set({ follow: true }); return act((sid) => current.start(sid, claim_ids)) },
+    pivot: (claim_id) => { set({ follow: true }); return act((sid) => current.pivot(sid, claim_id)) },
     dispatch: (star_id, selections, instruction) => { set({ follow: true }); return act((sid) => current.dispatch(sid, { star_id, selections, instruction })) },
     answer: (question_id, option_id, comment) => { set({ follow: true }); return act((sid) => current.answer(sid, { question_id, option_id, comment })) },
     feedback: (star_id, kind, text) => act((sid) => current.feedback(sid, { star_id, kind, text })),

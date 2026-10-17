@@ -203,6 +203,33 @@ async def test_session_starts_from_one_claim_and_agents_suggest_their_own_next_s
         await driver.shutdown()
 
 
+async def test_pivot_to_an_untested_claim_runs_it_as_a_new_agent(engine):
+    await driver.startup()
+    try:
+        state = driver.create_session(None, 1800, auto_mode=False, auto_timeout_seconds=None, max_waves=2)
+        sid = state.id
+        await wait_for(sid, lambda s: s.status == "waiting_human" and s.stars[0].status == "done")
+        tta = next(c for c in CLAIMS if c.id == "hl_tta")
+        with pytest.raises(driver.ActionError):
+            driver.pivot(sid, tta)  # nothing to pivot from before the start
+        driver.start(sid, ["hl_mixup"], {c.id for c in CLAIMS})
+        state = await wait_for(sid, lambda s: any(q.status == "open" for q in s.questions))
+        with pytest.raises(driver.ActionError):
+            driver.pivot(sid, CLAIMS[0])  # mixup is already on the tree
+
+        # Mid-wave, the pivot queues for the next wave: a new agent from the baseline, testing the new claim.
+        driver.pivot(sid, tta)
+        state = await wait_for(sid, lambda s: any(p.id == "hl_tta" for x in s.stars for p in x.provenance))
+        pivoted = next(x for x in state.stars if any(p.id == "hl_tta" for p in x.provenance))
+        assert pivoted.parent_id == "S0" and pivoted.wave == 2 and pivoted.status == "queued"
+
+        driver.answer(sid, state.questions[0].id, "O2", None)
+        state = await wait_for(sid, lambda s: s.status == "done")
+        assert ops.star(state, pivoted.id).grade is not None
+    finally:
+        await driver.shutdown()
+
+
 async def test_chat_about_a_star_carries_history_and_searches_the_library_once(engine):
     await driver.startup()
     try:
