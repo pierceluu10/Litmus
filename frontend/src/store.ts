@@ -79,7 +79,8 @@ export const useStore = create<Store>((set, get) => {
       const { imported } = get()
       try {
         if (imported) {
-          await api.importLibrary(imported)
+          // an older backend has no import endpoint: carry on, it reads the same Papiers library (the ids match)
+          await api.importLibrary(imported).catch((e: Error) => console.warn(`library import skipped: ${e.message}`))
           set((st) => ({ app: { ...st.app, documents: imported.documents, claims: imported.claims }, libraryStage: 'ready' }))
         } else {
           api.library((libraryStage) => set({ libraryStage }), load.signal)
