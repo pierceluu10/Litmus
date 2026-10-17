@@ -97,21 +97,21 @@ function ClaimCard({ c, status, stars, doc, expanded, onToggle }: { c: Claim; st
       <AnimatePresence initial={false}>
         {expanded && (
           <motion.div key="body" initial={closed} animate={open} exit={closed} transition={reveal} className="overflow-hidden">
-            <div className="space-y-3 px-3 pb-3">
+            <div className="flex flex-col gap-4 px-3 pb-3.5 pt-0.5">
               {c.annotation && <p className="m-0 text-[12.5px] leading-snug text-human"><span className="font-medium">Your note:</span> {c.annotation}</p>}
-              <div role="tablist" aria-label="About this claim" className="segmented">
+              <div role="tablist" aria-label="About this claim" className="tabs">
                 {tabs.map((t) => (
                   <button key={t} role="tab" aria-selected={shown === t} onClick={() => setTab(shown === t ? null : t)}>{t === 'basis' ? 'Basis' : 'Findings'}</button>
                 ))}
               </div>
               {shown === 'basis' && (
-                <div role="tabpanel" className="space-y-2 text-[12.5px] leading-relaxed">
+                <div role="tabpanel" className="flex flex-col gap-2 text-[12.5px] leading-relaxed">
                   <blockquote className="m-0 border-l border-rule pl-3 text-ink">{c.text}</blockquote>
-                  {c.conditions && <p className="m-0 text-muted"><span className="text-faint">Paper setting:</span> {c.conditions}</p>}
+                  {c.conditions && <p className="m-0 text-muted"><span className="mb-0.5 block text-[11px] font-medium text-faint">Paper setting</span>{c.conditions}</p>}
                 </div>
               )}
               {shown === 'findings' && <div role="tabpanel"><Findings stars={stars} /></div>}
-              <p className="m-0 flex flex-wrap items-center gap-x-1.5 border-t border-rule pt-2.5 text-[11.5px] text-faint">
+              <p className="m-0 flex flex-wrap items-center gap-x-1.5 border-t border-rule pt-3 text-[11.5px] text-faint">
                 <span>{shortCite(doc)}</span>
                 {c.page && <><span aria-hidden="true">·</span><span>p.{c.page}</span></>}
                 {source && <><span aria-hidden="true">·</span><a className="inline-flex items-center gap-1 text-muted underline decoration-rule underline-offset-[3px] hover:text-ink hover:decoration-ink" href={source} target="_blank" rel="noreferrer">Source<ExternalIcon /></a></>}

@@ -61,7 +61,7 @@ function column(cx: number, top: number, bottom: number, w: number, seed: number
 const AEGEAN = [112, 146, 188]
 const FACET_TINT = [196, 210, 228]
 const FACET_CELL = 56
-const FACET_LIGHT = 0.7, FACET_SPREAD = 0.3
+const FACET_LIGHT = 0.66, FACET_SPREAD = 0.36
 // a rail is tall and narrow, so light it evenly with per-facet jitter instead of from the mesh's centre
 const evenLight: Shading = (_c, _m, r) => FACET_LIGHT + (r() - 0.5) * FACET_SPREAD
 

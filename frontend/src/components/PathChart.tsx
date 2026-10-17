@@ -44,7 +44,8 @@ export function PathChart({ stars, highlight }: { stars: Star[]; highlight: Star
   const onFocus = new Set(focusPath.map((s) => s.id))
   const values = [...graded.map((s) => s.grade!.mean_child), ...focusPath.flatMap(band)]
   const lo = Math.min(...values), hi = Math.max(...values), pad = (hi - lo) * 0.12 || 0.002
-  const depth = Math.max(1, ...graded.map((s) => s.depth))
+  const reached = Math.max(...graded.map((s) => s.depth))
+  const depth = Math.max(1, reached)
   const x = scaleLinear().domain([0, depth]).range([M.l, W - M.r])
   const y = scaleLinear().domain([lo - pad, hi + pad]).range([H - M.b, M.t])
   const digits = hi - lo + 2 * pad < FINE_SPAN ? 2 : 1
@@ -58,7 +59,7 @@ export function PathChart({ stars, highlight }: { stars: Star[]; highlight: Star
           <text x={M.l - 8} y={y(t)} dy="0.32em" textAnchor="end" fontSize={10} fill="var(--color-faint)" fontFamily="var(--font-mono)">{(t * 100).toFixed(digits)}%</text>
         </g>
       ))}
-      {Array.from({ length: depth + 1 }, (_, d) => (
+      {Array.from({ length: reached + 1 }, (_, d) => (
         <text key={d} x={x(d)} y={H - 6} textAnchor="middle" fontSize={10} fill="var(--color-faint)" fontFamily="var(--font-mono)">{d === 0 ? 'base' : `gen ${d}`}</text>
       ))}
       <path d={bandArea(focusPath) ?? ''} fill="var(--color-ink)" opacity={0.07} />

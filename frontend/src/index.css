@@ -82,6 +82,8 @@ body {
 @media (hover: hover) and (pointer: fine) { .star-label:hover { background: color-mix(in srgb, var(--color-surface) 80%, transparent); } }
 
 .rail { background: var(--color-paper); isolation: isolate; }
+/* facets gather in the bottom-right corner and dissolve toward the top-left */
+.rail > svg { -webkit-mask-image: radial-gradient(140% 80% at 100% 100%, #000 0%, rgb(0 0 0 / 0.55) 38%, transparent 72%); mask-image: radial-gradient(140% 80% at 100% 100%, #000 0%, rgb(0 0 0 / 0.55) 38%, transparent 72%); }
 .plate { border-radius: 10px; background: var(--color-surface); box-shadow: 0 1px 2px rgb(21 24 28 / 0.05), 0 8px 24px -8px rgb(43 58 82 / 0.14); }
 
 /* a claim lifts into a marble plaque when hovered or opened */
@@ -89,10 +91,10 @@ body {
 @media (hover: hover) and (pointer: fine) { .claim:hover { background: color-mix(in srgb, var(--color-surface) 62%, transparent); } }
 .claim[data-expanded] { background: var(--color-surface); box-shadow: 0 1px 2px rgb(21 24 28 / 0.06), 0 10px 28px -6px rgb(43 58 82 / 0.16); }
 
-.segmented { display: inline-flex; gap: 2px; padding: 2px; border-radius: 8px; background: color-mix(in srgb, var(--color-ink) 6%, transparent); }
-.segmented > button { height: 24px; padding: 0 11px; border-radius: 6px; font-size: 12px; font-weight: 500; color: var(--color-muted); transition: background-color 160ms, color 160ms, box-shadow 160ms; }
-.segmented > button[aria-selected="true"] { background: var(--color-surface); color: var(--color-ink); box-shadow: 0 1px 2px rgb(21 24 28 / 0.1), 0 0 0 0.5px rgb(21 24 28 / 0.06); }
-@media (hover: hover) and (pointer: fine) { .segmented > button:hover { color: var(--color-ink); } }
+.tabs { display: flex; gap: 6px; }
+.tabs > button { height: 26px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--color-rule); font-size: 12px; font-weight: 500; color: var(--color-muted); transition: background-color 160ms, color 160ms, border-color 160ms; }
+.tabs > button[aria-selected="true"] { background: var(--color-ink); border-color: var(--color-ink); color: var(--color-surface); }
+@media (hover: hover) and (pointer: fine) { .tabs > button:hover:not([aria-selected="true"]) { color: var(--color-ink); border-color: var(--color-faint); } }
 
 @keyframes shimmer { from { background-position: 100% 0; } to { background-position: -100% 0; } }
 .skeleton { border-radius: 4px; background: linear-gradient(90deg, color-mix(in srgb, var(--color-surface) 50%, transparent) 25%, var(--color-surface) 50%, color-mix(in srgb, var(--color-surface) 50%, transparent) 75%); background-size: 200% 100%; animation: shimmer 1.6s linear infinite; }
@@ -108,6 +110,6 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .intro-in { animation: none; opacity: 1; }
   .live-dot, .skeleton { animation: none; }
-  .claim, .segmented > button { transition: none; }
+  .claim, .tabs > button { transition: none; }
   .btn, .star-label { transition: none; }
 }

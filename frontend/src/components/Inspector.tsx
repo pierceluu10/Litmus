@@ -30,7 +30,7 @@ function Overview() {
           {graded.length ? <>{graded.length} graded · <span style={{ color: toneVar('confirmed') }}>{count('confirmed')} confirmed</span> · <span style={{ color: toneVar('refuted') }}>{count('refuted')} refuted</span> · {count('inconclusive')} inconclusive</> : 'Waiting for the first verdict.'}
         </p>
       </section>
-      <section><H>Accuracy by path</H><div className="plate"><PathChart stars={s.stars} highlight={null} /></div></section>
+      <section><H>Accuracy by path</H><div className="plate px-3 pb-1.5 pt-2.5"><PathChart stars={s.stars} highlight={null} /></div></section>
       {ranked.length > 0 && (
         <section>
           <H aside={<span className="label">accuracy · vs parent</span>}>Rankings</H>
@@ -76,7 +76,7 @@ function Activity() {
   return (
     <section>
       <button className="flex w-full items-baseline justify-between text-left" aria-expanded={open} onClick={() => setOpen(!open)}>
-        <h3 className="m-0 text-[12px] font-semibold text-muted">Agent log</h3><span className="label">{open ? 'hide' : `${app.feed.length} entries`}</span>
+        <h3 className="m-0 text-[12px] font-semibold text-muted">Agent log</h3><span className="label">{open ? 'hide' : `${app.feed.length} ${app.feed.length === 1 ? 'entry' : 'entries'}`}</span>
       </button>
       {open && (
         <ol className="m-0 mt-2 list-none space-y-1.5 p-0 text-[12.5px] leading-snug" aria-live="polite">
@@ -166,8 +166,8 @@ function Detail({ s }: { s: Star }) {
   const stars = app.session!.stars
   const replans = app.replans.filter((r) => r.star_id === s.id)
   return (
-    <div className="space-y-5 p-4">
-      <button className="btn btn-quiet -ml-2 h-7 px-2" onClick={() => select(null)}>← All results</button>
+    <div className="flex flex-col gap-5 p-4">
+      <button className="btn btn-quiet -ml-2 h-7 self-start px-2" onClick={() => select(null)}>← All results</button>
       <section>
         <div className="flex items-center gap-2">
           <span className="h-3 w-3 rounded-full ring-2 ring-offset-2 ring-offset-surface" style={{ background: 'var(--color-graphite)', ['--tw-ring-color' as string]: toneVar(starTone(s)) }} />
@@ -178,7 +178,7 @@ function Detail({ s }: { s: Star }) {
         <p className="m-0 mt-0.5 text-[12px] text-muted">{s.parent_id && `From ${agentName(stars.find((x) => x.id === s.parent_id)!)}`}</p>
       </section>
       <Verdict s={s} />
-      <section><H>Accuracy along this path</H><div className="plate"><PathChart stars={stars} highlight={s} /></div></section>
+      <section><H>Accuracy along this path</H><div className="plate px-3 pb-1.5 pt-2.5"><PathChart stars={stars} highlight={s} /></div></section>
       {s.reflection && <p className="m-0 text-[13px] leading-relaxed">{s.reflection}</p>}
       {replans.map((r) => <p key={r.seq} className="m-0 text-[12.5px] text-human">“{r.because}” → {r.change}</p>)}
       {s.provenance.length > 0 && <section><H>Tested claim</H><ProvList items={s.provenance} /></section>}
@@ -207,8 +207,8 @@ function AbstractView() {
     const el = document.createElement('a'); el.href = url; el.download = 'litmus-findings.md'; el.click(); URL.revokeObjectURL(url)
   }
   return (
-    <article className="space-y-4 p-4" aria-label="Abstract">
-      <button className="btn btn-quiet -ml-2 h-7 px-2" onClick={() => set({ abstractOpen: false })}>← All results</button>
+    <article className="flex flex-col gap-4 p-4" aria-label="Abstract">
+      <button className="btn btn-quiet -ml-2 h-7 self-start px-2" onClick={() => set({ abstractOpen: false })}>← All results</button>
       <h2 className="m-0 text-[17px] font-semibold tracking-[-0.02em]">Abstract</h2>
       <p className="m-0 text-[13.5px] leading-relaxed">{render(a.text)}</p>
       <section>
@@ -216,7 +216,7 @@ function AbstractView() {
         <ul className="m-0 list-none space-y-2 p-0 text-[12.5px] leading-snug">{a.findings.map((f, i) => <li key={i} className="border-t border-rule pt-2">{render(f)}</li>)}</ul>
       </section>
       {app.exportInfo && <p className="m-0 rounded-md bg-paper p-3 text-[12.5px] leading-snug text-muted">{app.exportInfo.instructions}</p>}
-      <button className="btn btn-primary" onClick={download}>Download findings (.md)</button>
+      <button className="btn btn-primary self-start" onClick={download}>Download findings (.md)</button>
     </article>
   )
 }
