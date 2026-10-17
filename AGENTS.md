@@ -270,7 +270,7 @@ npm test             # reducer, layout, simulator + grader-port tests
 
 **Camera**: locked: no rotate or pan, zoom capped (170-480 units). At the start of a session it opens just behind the statue's head, looking over its shoulder along the arm, and glides once to the default view (`EAR_CAM`/`EAR_AIM`, `INTRO_SMOOTH` in `Scene.tsx`). The default view (`VIEW`) is swung a little toward the nodes' side so the tree is met head-on, aimed at the midpoint of the focused star and its parent. The camera frames the whole column of the focused star and zooms out (up to 760 units) when a generation gets tall. Focus = the newest star while following; dispatching, answering or branching turns following back on; clicking any star or claim re-centres on it and keeps your zoom. "Fit all" is a toggle (`fitAll` in the store): on frames every star, off returns to the default view. There is no pause button.
 
-**Asking Litmus**: the thread reads as a conversation (your words in graphite bubbles, Litmus's in marble with its facet mark, replans as notes between them). Litmus answers about one star but sees the whole tree. Answers appear in place (the flight to the statue was removed).
+**Asking Litmus**: the thread reads as a conversation (your words in graphite bubbles, Litmus's in marble beside its low-poly face, `public/litmus-face.svg`, which is also the favicon; replans as notes between them). Litmus answers about one star but sees the whole tree. While it answers, a shimmering "Thinking" bubble stands in (the demo waits 1.6s like a real call).
 
 **Branch from anywhere**: "Branch from here" sends `feedback(kind: "suggest")` for that star, so it works against the real backend too (the agent replans from it); the demo backend answers with proposals from that star.
 

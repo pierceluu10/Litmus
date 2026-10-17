@@ -150,15 +150,10 @@ const MAX_CITED = 3
 const OPENERS = ['What did you run?', 'Is this result real?', 'What should I try next?']
 const firstSentence = (t: string) => t.match(/^.*?[.!?](\s|$)/)?.[0].trim() ?? t
 
-// Litmus's mark: a few marble facets, one of them lit, like the statue it speaks for.
-function FacetMark() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" className="shrink-0">
-      <polygon points="9,1 16,6 9,9" fill="#f4f6f9" /><polygon points="9,1 9,9 2,6" fill="#c9d3e0" />
-      <polygon points="2,6 9,9 5,16" fill="#aebccf" /><polygon points="16,6 13,16 9,9" fill="#dfe5ee" />
-      <polygon points="5,16 9,9 13,16" fill="var(--color-agent)" />
-    </svg>
-  )
+// Litmus's face: the statue's bearded head, low poly (also the favicon). Nudged down so it sits level with the
+// bubble's first line.
+function Face() {
+  return <img src="/litmus-face.svg" alt="" width={24} height={24} className="mt-[7px] shrink-0" />
 }
 
 function LitmusMessage({ text, provenance }: { text: string; provenance?: Provenance[] }) {
@@ -166,7 +161,7 @@ function LitmusMessage({ text, provenance }: { text: string; provenance?: Proven
   const cited = (provenance ?? []).filter((p, i, all) => p.kind === 'highlight' && all.findIndex((q) => q.id === p.id) === i).slice(0, MAX_CITED)
   return (
     <div className="flex items-start gap-2">
-      <FacetMark />
+      <Face />
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
         <motion.div className="msg-litmus" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}>
           {text}
@@ -188,10 +183,10 @@ function StartPicker() {
     <section aria-label="Where should we start?" className="flex flex-col gap-2.5">
       <LitmusMessage text="Where should we start?" />
       {libraryStage !== 'ready'
-        ? <p className="m-0 pl-[26px] text-[12px] text-muted">Reading your highlights and notes…</p>
+        ? <p className="m-0 pl-[32px] text-[12px] text-muted">Reading your highlights and notes…</p>
         : (
           <>
-            <ul className="m-0 flex list-none flex-col gap-1.5 p-0 pl-[26px]">
+            <ul className="m-0 flex list-none flex-col gap-1.5 p-0 pl-[32px]">
               {claims.map((c) => {
                 const on = chosen === c.id
                 return (
@@ -208,7 +203,7 @@ function StartPicker() {
               })}
             </ul>
             {/* the list is long; the answer stays in reach at the bottom of the panel */}
-            <div className="sticky bottom-0 -mx-4 border-t border-rule bg-surface px-4 py-3 pl-[42px]">
+            <div className="sticky bottom-0 -mx-4 border-t border-rule bg-surface px-4 py-3 pl-[48px]">
               <button className="btn btn-primary" disabled={!chosen || busy} onClick={go}>
                 {chosen ? 'Start with this claim' : 'Pick one claim to start'}
               </button>
@@ -245,7 +240,7 @@ function Story({ s }: { s: Star }) {
         : <LitmusMessage key={i} text={t.text} provenance={t.provenance} />)}
       {busy && (
         <div className="flex items-start gap-2" aria-live="polite" aria-label="Litmus is thinking">
-          <FacetMark /><div className="msg-litmus typing"><span /><span /><span /></div>
+          <Face /><div className="msg-litmus thinking"><span className="thinking-text">Thinking</span><span className="typing"><span /><span /><span /></span></div>
         </div>
       )}
     </section>

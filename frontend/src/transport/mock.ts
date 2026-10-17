@@ -5,7 +5,9 @@ import { streamLibrary } from './real'
 
 let srv: MockServer | null = null
 const cur = () => { if (!srv) throw new Error('No mock session'); return srv }
-const wait = <T,>(v: T) => new Promise<T>((r) => setTimeout(() => r(v), 150))
+const RESPONSE_MS = 150
+const THINK_MS = 1600 // about as long as a real chat answer, so the Thinking indicator is seen
+const wait = <T,>(v: T, ms = RESPONSE_MS) => new Promise<T>((r) => setTimeout(() => r(v), ms))
 
 export const mockApi: Api = {
   mock: true,
@@ -27,7 +29,7 @@ export const mockApi: Api = {
   dispatch: async (_s, b) => cur().dispatch(b.star_id, b.selections, b.instruction),
   answer: async (_s, b) => cur().answer(b.question_id, b.option_id, b.comment),
   feedback: async (_s, b) => cur().feedback(b.star_id, b.kind, b.text),
-  explain: (_s, b) => wait(cur().chat(b.star_id, b.question ?? '')),
+  explain: (_s, b) => wait(cur().chat(b.star_id, b.question ?? ''), THINK_MS),
   pause: async () => cur().pause(),
   resume: async () => cur().resume(),
   stopBranch: async (_s, id) => cur().stopBranch(id),
