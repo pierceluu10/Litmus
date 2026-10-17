@@ -81,6 +81,14 @@ uv run litmus --help
   per call (one container per branch), `max_containers=8`, `scaledown_window=600`.
 - CIFAR is cached as `train.pt`/`test.pt` on the `cifar-data` volume (created on first container start).
 
+### Grader (`backend/litmus/grader.py`) — LOCKED
+- Pure stats, scipy only. Paired t-interval (same seeds), Welch fallback; formulas in the docstring.
+- Verdict is relative to the claim's predicted direction (`improves|hurts|no_effect`).
+  `PRACTICAL_THRESHOLD=0.0005` (0.05 points) flags significant-but-negligible effects;
+  `EQUIVALENCE_MARGIN=0.002` (0.2 points) is how small an effect must surely be to confirm "no effect".
+- Baseline star: `baseline_grade` — `ci_low/ci_high` are the CI of its own mean accuracy, not of a delta.
+- Never edited by the agent path; bump `GRADER_VERSION` on any change.
+
 ### Commands
 | Command | What |
 |---|---|
