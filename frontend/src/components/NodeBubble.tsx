@@ -106,6 +106,7 @@ const GAP = 10 // px between the node's ring and the card
 const LABEL_PX = 46 // the name-and-accuracy label under a node, which a card opening below must clear
 const MARGIN = 8 // px the card keeps from the edges of the scene
 const TOP_CLEAR = 64 // px the card keeps from the top of the scene: the legend and the scene buttons live there
+const STICKY = 0.8 // a card in fallback keeps its side while it has this share of the other side's room
 const OBSTACLES = '[data-scene-obstacle]' // the floating UI a card must not cover: the dock, the results card, the chat
 type Box = { left: number; top: number; right: number; bottom: number }
 const hits = (a: Box, b: Box) => a.left < b.right + GAP && a.right > b.left - GAP && a.top < b.bottom + GAP && a.bottom > b.top - GAP
@@ -117,6 +118,7 @@ const hits = (a: Box, b: Box) => a.left < b.right + GAP && a.right > b.left - GA
 export function PlacedCard({ ringPx, children }: { ringPx: { current: number }; children: (side: Side) => React.ReactNode }) {
   const box = useRef<HTMLDivElement>(null)
   const [side, setSide] = useState<Side>('above')
+  const current = useRef<Side>('above')
   useEffect(() => {
     let frame = 0
     const place = () => {
@@ -142,6 +144,8 @@ export function PlacedCard({ ringPx, children }: { ringPx: { current: number }; 
           ['right', right, besideTop(right)],
           ['left', left, besideTop(left)],
         ]
+        // the spot it is in stays first while the whole card still fits there, so panning does not flip it around
+        spots.sort((a, b) => Number(b[0] === current.current) - Number(a[0] === current.current))
         const free = spots.find(([, left, top]) => {
           const card = { left, top, right: left + w, bottom: top + h }
           return left >= scene.left + MARGIN && card.right <= scene.right - MARGIN && top >= minTop && card.bottom <= maxBottom && !obstacles.some((o) => hits(card, o))
@@ -159,10 +163,13 @@ export function PlacedCard({ ringPx, children }: { ringPx: { current: number }; 
           const aboveEnd = y - ring - GAP, belowStart = y + ring + LABEL_PX + GAP
           const above = aboveEnd - Math.max(minTop, ...inColumn.filter((o) => o.bottom <= aboveEnd).map((o) => o.bottom + GAP))
           const below = Math.min(maxBottom, ...inColumn.filter((o) => o.top >= belowStart).map((o) => o.top - GAP)) - belowStart
-          next = above >= below ? 'above' : 'below'
+          // keeps its side until the other has clearly more room
+          const stay = current.current === 'above' ? above >= below * STICKY : current.current === 'below' ? below >= above * STICKY : false
+          next = stay ? current.current : above >= below ? 'above' : 'below'
           el.style.transform = next === 'above' ? `translate(-50%, calc(-100% - ${ring + GAP}px))` : `translate(-50%, ${ring + LABEL_PX + GAP}px)`
           el.style.setProperty('--card-max', `${Math.max(0, Math.max(above, below))}px`)
         }
+        current.current = next
         setSide((s) => (s === next ? s : next))
       }
       frame = requestAnimationFrame(place)
@@ -184,7 +191,10 @@ export function NodeCard({ star, items, side = 'above' }: { star: Star; items: P
   const [tab, setTab] = useState<Tab>(items.length ? 'proceed' : 'about')
   const shown = tab === 'proceed' && !items.length ? 'about' : tab
   return (
-    <div className="relative w-[300px] rounded-2xl marble-edge border border-rule bg-surface text-[12.5px]" role="dialog" aria-label={agentName(star)}>
+    <div className="pointer-events-auto relative w-[300px] rounded-2xl marble-edge border border-rule bg-surface text-[12.5px]" role="dialog" aria-label={agentName(star)}
+      // the card lives inside the canvas's container: without this, pressing on it starts a camera drag that captures the
+      // pointer (so the click never reaches the checkbox) and scrolling it zooms the camera
+      onPointerDown={(e) => e.stopPropagation()} onWheel={(e) => e.stopPropagation()}>
       {/* beside the node the pointer follows its height, kept off the rounded corners */}
       <span aria-hidden className={`absolute h-3.5 w-3.5 rotate-45 border-rule bg-surface ${POINTER[side]}`}
         style={side === 'left' || side === 'right' ? { top: 'clamp(18px, var(--arrow-y), calc(100% - 18px))' } : undefined} />

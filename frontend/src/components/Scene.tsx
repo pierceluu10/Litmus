@@ -205,7 +205,8 @@ function StarBlob({ star, target, live, dim, selected }: { star: Star; target: P
       <Eyes r={r} running={running} waiting={star.status === 'waiting'} />
       {hasOptions && <Bulb r={r} onClick={openNode} />}
       {cardFor === star.id && !fitAll && (
-        <Html position={[0, 0, 0]} zIndexRange={[60, 40]}>
+        // the wrapper keeps the card's untransformed box at the node: it must not take clicks, only the card itself
+        <Html position={[0, 0, 0]} zIndexRange={[60, 40]} style={{ pointerEvents: 'none' }}>
           <PlacedCard ringPx={ringPx}>{(side) => <NodeCard star={star} items={hasOptions ? options : []} side={side} />}</PlacedCard>
         </Html>
       )}
@@ -387,7 +388,8 @@ export function Scene() {
   return (
     <Canvas className="!absolute inset-0" camera={{ fov: 30, near: 1, far: 3000, position: [12, -4, 300] }} dpr={[1, 2]}
       aria-label="Research tree: each node is an experiment, each column a generation"
-      onPointerMissed={() => { const st = useStore.getState(); if (st.selectedId || st.cardFor) st.select(null) }}>
+      // only a click on the scene itself lets go: clicks inside a node's card bubble up here too and must not close it
+      onPointerMissed={(e) => { const st = useStore.getState(); if ((e.target as Element).tagName === 'CANVAS' && (st.selectedId || st.cardFor)) st.select(null) }}>
       <Background />
       <hemisphereLight args={['#ffffff', '#a6b4c8', 0.9]} />
       <directionalLight position={[-140, 160, 140]} intensity={2.1} />
