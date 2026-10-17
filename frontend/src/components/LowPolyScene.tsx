@@ -1,4 +1,4 @@
-import { THINKER } from './thinkerData'
+import { thinkerPolys } from './thinkerRender'
 // A low-poly temple: pediment, columns and a marble bust, all flat-shaded triangles.
 // Generated from seeded jitter so it renders identically every time.
 type P = [number, number]
@@ -74,21 +74,15 @@ export function LowPolyScene({ className }: { className?: string }) {
   ]
   const halo: Tri[] = Array.from({ length: 16 }, (_, i) => {
     const a0 = (i / 16) * Math.PI * 2, a1 = ((i + 1) / 16) * Math.PI * 2
-    return tri([450, 290], [450 + Math.cos(a0) * 175, 290 + Math.sin(a0) * 175], [450 + Math.cos(a1) * 175, 290 + Math.sin(a1) * 175], 0.62 + 0.22 * Math.cos(a0 - 3.9) * (i % 2 ? 1 : 0.7), [168, 190, 220])
+    return tri([450, 290], [450 + Math.cos(a0) * 175, 290 + Math.sin(a0) * 175], [450 + Math.cos(a1) * 175, 290 + Math.sin(a1) * 175], 0.62 + 0.22 * Math.cos(a0 - 3.9) * (i % 2 ? 1 : 0.7), [200, 214, 234])
   })
-  const SC = 1.08 // statue scale; its feet land on the top step
-  const tx = 450 - (THINKER.w * SC) / 2, ty = 466 - THINKER.h * SC
+  const statue = thinkerPolys(450, 466, 2.5)
   const marble = [...sky, ...floor, ...halo, ...behind, ...pediment, ...front, ...steps]
   const poly = (t: Tri, i: number) => <polygon key={i} points={t.pts.map((p) => p.join(',')).join(' ')} fill={t.fill} stroke={t.fill} strokeWidth={0.6} strokeLinejoin="round" />
   return (
     <svg viewBox="-240 -60 1380 700" className={className} preserveAspectRatio="xMidYMid meet" role="img" aria-label="A low-poly Greek temple with a metal statue of a seated thinker between two columns">
       {marble.map(poly)}
-      <g transform={`translate(${tx} ${ty}) scale(${SC})`}>
-        {THINKER.tris.map((t, i) => {
-          const fill = `rgb(${t[6]},${t[7]},${t[8]})`
-          return <polygon key={i} points={`${t[0]},${t[1]} ${t[2]},${t[3]} ${t[4]},${t[5]}`} fill={fill} stroke={fill} strokeWidth={0.7} strokeLinejoin="round" />
-        })}
-      </g>
+      {statue.map((p, i) => <polygon key={`s${i}`} points={p.points} fill={p.fill} stroke={p.fill} strokeWidth={0.6} strokeLinejoin="round" />)}
     </svg>
   )
 }
