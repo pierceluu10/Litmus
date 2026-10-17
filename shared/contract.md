@@ -5,6 +5,9 @@ or remove fields, every change gets a Changelog line (newest first) and lands on
 `docs(contract): ...`.
 
 ## Changelog
+- 2026-10-16 — `Claim.page` added. Clarified: baseline star `grade.ci_low/ci_high` are the CI of its own
+  mean accuracy (not a delta); `papiers_url` is the paper's source link (arXiv), because Papiers is a desktop
+  app with no web deep links; Papiers CLI is read-only, so write-back arrives as `papiers.export_ready`.
 - 2026-10-16 — v1 bootstrap.
 
 ---
@@ -43,6 +46,8 @@ repeating the same request returns `{ok: true}` and does nothing.
 ```ts
 Provenance = { kind: "highlight"|"note"|"conversation"|"passage"|"document"|"search"|"human",
                id: string, doc_id?: string, doc_title?: string, text: string, papiers_url?: string }
+// papiers_url: link that opens the source (the paper's arXiv URL). A highlight's annotation arrives as a
+// separate kind:"note" item with id "<hl_id>#annotation".
 
 Document = { id: string, title: string, authors: string[], year?: number, url?: string,
              highlight_count: number, note_count: number, papiers_url?: string }
@@ -54,6 +59,7 @@ Claim = { id: string,                      // the highlight id (hl_...) or note/
           weight: number,                  // judgment weight, higher = rank first
           rank: number,                    // 1-based
           conditions?: string,             // experimental conditions behind the claim, from the paper text
+          page?: number,                   // page of the highlight in its document
           provenance: Provenance[] }
 
 Knobs = { label_smoothing:number, epochs:number, tta_level:0|1|2, flip:"random"|"alternating"|"none",
@@ -70,6 +76,7 @@ Grade = { metric:"val_acc"|"tta_val_acc", mean_parent, mean_child, delta, sd_par
           ci_low, ci_high, p_value, verdict:"confirmed"|"refuted"|"inconclusive"|"baseline",
           practical:boolean, grader_version:string }
 // accuracies are fractions in [0,1]; delta/ci are child - parent in the same units.
+// Baseline star (verdict "baseline"): mean_parent = mean_child = its mean, delta = 0, ci = CI of its mean.
 
 Star = { id,                                // "S0" is the baseline, then S1, S2, ... in creation order
          parent_id: string|null, depth, title, hypothesis, knobs: Knobs, knob_changes: Partial<Knobs>,
