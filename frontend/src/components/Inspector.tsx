@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import { sessionApi, useStore } from '../store'
 import { agentDetail, agentName, pct, progressFraction, pts, starTone, toneVar } from '../lib/format'
@@ -131,6 +131,7 @@ function BranchForm({ s, done }: { s: Star; done: () => void }) {
   )
 }
 
+const CARD = 'rounded-2xl border border-rule bg-surface shadow-[0_20px_50px_-14px_rgba(43,58,82,0.30)]'
 const MAX_CITED = 3
 const OPENERS = ['What did you run?', 'Is this result real?', 'What should I try next?']
 const firstSentence = (t: string) => t.match(/^.*?[.!?](\s|$)/)?.[0].trim() ?? t
@@ -199,6 +200,20 @@ function Story({ s }: { s: Star }) {
   )
 }
 
+// The conversation scrolls inside the Litmus card, newest at the bottom.
+function Thread({ s }: { s: Star }) {
+  const { chats, thinking, thought } = useStore()
+  const box = useRef<HTMLDivElement>(null)
+  const count = (chats[s.id] ?? []).length
+  const landed = thought?.landed
+  useEffect(() => { if (box.current) box.current.scrollTop = box.current.scrollHeight }, [count, thinking, landed])
+  return (
+    <div ref={box} className="-mx-3 max-h-[42vh] overflow-y-auto px-3">
+      <Story s={s} />
+    </div>
+  )
+}
+
 // The question bar is pinned to the bottom of the panel, so the details above can scroll without losing it.
 function AskBar({ s }: { s: Star }) {
   const { chats, thinking, ask } = useStore()
@@ -215,14 +230,21 @@ function AskBar({ s }: { s: Star }) {
     ask(s.id, q.trim())
   }
   return (
-    <div className="flex flex-col gap-2 border-t border-rule bg-surface p-3">
+    <motion.section aria-label="Ask Litmus" className={`${CARD} flex shrink-0 flex-col gap-2 p-3`}
+      initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8, transition: { duration: 0.15 } }} transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}>
+      <div className="flex items-center gap-2">
+        <img src="/litmus-face.svg" alt="" width={22} height={22} />
+        <span className="text-[13px] font-semibold tracking-[-0.01em]">Litmus</span>
+        <span className="text-[11.5px] text-faint">has followed every agent</span>
+      </div>
+      <Thread s={s} />
       {!turns.length && !busy && <div className="flex flex-wrap gap-1.5">{OPENERS.map((q) => <button key={q} className="chip hover:border-faint hover:text-ink" onClick={(e) => send(q, e.currentTarget)}>{q}</button>)}</div>}
       <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); send(draft, e.currentTarget.querySelector('input')!) }}>
         <label className="sr-only" htmlFor={`ask-${s.id}`}>Ask Litmus about this experiment</label>
         <input id={`ask-${s.id}`} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Ask Litmus" className="field min-w-0 flex-1" />
         <button className="btn btn-primary" disabled={!draft.trim() || busy}>Ask</button>
       </form>
-    </div>
+    </motion.section>
   )
 }
 
@@ -257,7 +279,6 @@ function Detail({ s }: { s: Star }) {
         <PathChart stars={stars} highlight={s} />
       </div>
       <AgentReport s={s} />
-      <Story s={s} />
     </div>
   )
 }
@@ -306,16 +327,17 @@ export function Inspector({ floating }: { floating: boolean }) {
   const { app, selectedId, abstractOpen } = useStore()
   const s = app.session?.stars.find((x) => x.id === selectedId)
   const showAbstract = abstractOpen && !!app.session?.abstract
-  const shell = floating
-    ? 'absolute bottom-3 right-3 top-[76px] z-20 flex w-[348px] flex-col overflow-hidden rounded-2xl border border-rule bg-surface shadow-[0_20px_50px_-14px_rgba(43,58,82,0.30)]'
-    : 'flex flex-col border-t border-rule bg-surface'
+  // The results card and the Litmus chat are two cards stacked in one column: what you're looking at, and who you ask.
+  const column = floating ? 'absolute bottom-3 right-3 top-[76px] z-20 flex w-[348px] flex-col gap-2.5' : 'flex flex-col gap-2.5 border-t border-rule bg-paper p-3'
   return (
-    <motion.aside className={shell} aria-label="Results" style={{ transformOrigin: 'top right' }}
-      {...(floating ? { initial: { opacity: 0, scale: 0.96, y: -6 }, animate: { opacity: 1, scale: 1, y: 0 }, exit: { opacity: 0, scale: 0.97, transition: { duration: 0.15 } }, transition: { duration: 0.22, ease: [0.23, 1, 0.32, 1] as const } } : {})}>
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {showAbstract ? <AbstractView /> : s ? <Detail s={s} key={s.id} /> : <Overview />}
-      </div>
+    <div className={column}>
+      <motion.aside className={`${CARD} flex min-h-0 flex-1 flex-col overflow-hidden`} aria-label="Results" style={{ transformOrigin: 'top right' }}
+        {...(floating ? { initial: { opacity: 0, scale: 0.96, y: -6 }, animate: { opacity: 1, scale: 1, y: 0 }, exit: { opacity: 0, scale: 0.97, transition: { duration: 0.15 } }, transition: { duration: 0.22, ease: [0.23, 1, 0.32, 1] as const } } : {})}>
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {showAbstract ? <AbstractView /> : s ? <Detail s={s} key={s.id} /> : <Overview />}
+        </div>
+      </motion.aside>
       {s && !showAbstract && <AskBar s={s} key={`ask-${s.id}`} />}
-    </motion.aside>
+    </div>
   )
 }
