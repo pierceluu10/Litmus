@@ -2,7 +2,7 @@ import { Fragment, useState } from 'react'
 import { motion } from 'motion/react'
 import { sessionApi, useStore } from '../store'
 import { agentDetail, agentName, pct, progressFraction, pts, starTone, toneVar } from '../lib/format'
-import type { Claim, Provenance, Star } from '../types'
+import type { Provenance, Star } from '../types'
 import { PathChart } from './PathChart'
 import { ProvChip } from './Prov'
 
@@ -10,7 +10,6 @@ const H = ({ children, aside }: { children: React.ReactNode; aside?: React.React
   <div className="mb-2 flex items-baseline justify-between"><h3 className="m-0 text-[12px] font-semibold text-muted">{children}</h3>{aside}</div>
 )
 const VERDICT_TEXT = { confirmed: 'Confirmed', refuted: 'Refuted', inconclusive: 'Inconclusive', baseline: 'Baseline' }
-const MAX_START = 4 // first agents at once (the backend's MAX_BRANCHES)
 
 // ---------------------------------------------------------------- overview
 
@@ -147,19 +146,6 @@ function BranchForm({ s, done }: { s: Star; done: () => void }) {
   )
 }
 
-// Each claim the star tested once, named by its short title rather than "Highlight from …".
-function TestedClaims({ s }: { s: Star }) {
-  const claims = useStore((st) => st.app.claims)
-  const tested = s.provenance.filter((p, i, all) => p.kind !== 'note' && p.kind !== 'human' && all.findIndex((q) => q.id === p.id) === i)
-  if (!tested.length) return null
-  return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <span className="label mr-0.5">Tests</span>
-      {tested.map((p) => <ProvChip key={p.id} p={p} label={claims.find((c) => c.id === p.id)?.summary} />)}
-    </div>
-  )
-}
-
 const MAX_CITED = 3
 const OPENERS = ['What did you run?', 'Is this result real?', 'What should I try next?']
 const firstSentence = (t: string) => t.match(/^.*?[.!?](\s|$)/)?.[0].trim() ?? t
@@ -194,11 +180,10 @@ function LitmusMessage({ text, provenance }: { text: string; provenance?: Proven
 // "Where should we start?": Litmus's first line, and the human's claims as the answers.
 function StartPicker() {
   const { app, libraryStage, start } = useStore()
-  const [chosen, setChosen] = useState<string[]>([])
+  const [chosen, setChosen] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const claims = app.claims.slice().sort((a, b) => a.rank - b.rank)
-  const toggle = (c: Claim) => setChosen((x) => x.includes(c.id) ? x.filter((i) => i !== c.id) : x.length < MAX_START ? [...x, c.id] : x)
-  const go = async () => { setBusy(true); await start(chosen); setBusy(false) }
+  const go = async () => { if (!chosen) return; setBusy(true); await start([chosen]); setBusy(false) }
   return (
     <section aria-label="Where should we start?" className="flex flex-col gap-2.5">
       <LitmusMessage text="Where should we start?" />
@@ -208,11 +193,11 @@ function StartPicker() {
           <>
             <ul className="m-0 flex list-none flex-col gap-1.5 p-0 pl-[26px]">
               {claims.map((c) => {
-                const on = chosen.includes(c.id)
+                const on = chosen === c.id
                 return (
                   <li key={c.id}>
-                    <button aria-pressed={on} disabled={!on && chosen.length >= MAX_START} onClick={() => toggle(c)}
-                      className="block w-full rounded-lg border px-2.5 py-2 text-left transition-colors disabled:opacity-50"
+                    <button aria-pressed={on} onClick={() => setChosen(on ? null : c.id)}
+                      className="block w-full rounded-lg border px-2.5 py-2 text-left transition-colors"
                       style={{ borderColor: on ? 'var(--color-ink)' : 'var(--color-rule)', background: on ? 'var(--color-marble)' : undefined }}>
                       <span className="block text-[12.5px] font-medium leading-snug">{c.summary ?? c.text}</span>
                       {c.annotation && <span className="mt-0.5 block line-clamp-2 text-[11.5px] leading-snug text-human">Your note: {c.annotation}</span>}
@@ -224,8 +209,8 @@ function StartPicker() {
             </ul>
             {/* the list is long; the answer stays in reach at the bottom of the panel */}
             <div className="sticky bottom-0 -mx-4 border-t border-rule bg-surface px-4 py-3 pl-[42px]">
-              <button className="btn btn-primary" disabled={!chosen.length || busy} onClick={go}>
-                {chosen.length ? `Start with ${chosen.length} claim${chosen.length === 1 ? '' : 's'}` : 'Pick up to 4 claims'}
+              <button className="btn btn-primary" disabled={!chosen || busy} onClick={go}>
+                {chosen ? 'Start with this claim' : 'Pick one claim to start'}
               </button>
             </div>
           </>
@@ -317,7 +302,6 @@ function Detail({ s }: { s: Star }) {
         <PathChart stars={stars} highlight={s} />
       </div>
       <AgentReport s={s} />
-      <TestedClaims s={s} />
       <Story s={s} />
     </div>
   )

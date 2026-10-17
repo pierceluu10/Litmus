@@ -203,8 +203,8 @@ def start(session_id: str, claim_ids: list[str], known: set[str]) -> None:
         if state.start_claim_ids == claim_ids:
             return
         raise ActionError("this session already started")
-    if not claim_ids or len(claim_ids) > graph.MAX_BRANCHES:
-        raise ActionError(f"choose 1 to {graph.MAX_BRANCHES} claims")
+    if len(claim_ids) != 1:
+        raise ActionError("choose exactly one claim to start from")
     unknown = [c for c in claim_ids if c not in known]
     if unknown:
         raise ActionError(f"unknown claims: {', '.join(unknown)}")

@@ -3,7 +3,7 @@
     intake → baseline → start ⟂ → select → Send(branch) ×N → join → propose → select ⟂ … | abstract → END
     branch (one agent): run → reflect → (run with 5 more seeds) | (ask ⟂ → suggest) | suggest → END
 
-start: the human picks the claims to begin with ("Where should we start?"); Litmus drafts one plain test per claim.
+start: the human picks the one claim to begin with ("Where should we start?"); Litmus drafts its plain test.
 suggest: the agent reads its siblings' results and offers its own next steps ("Where should I proceed?"). The card
 appears as soon as that agent finishes; what the human picks starts with the next generation, at the join.
 propose: Litmus plans only what the agents left uncovered (no open options, or human feedback nobody implemented).
@@ -33,9 +33,8 @@ log = logging.getLogger(__name__)
 MAX_WAVES = 3
 MAX_STARS = 12
 MAX_BRANCHES = 4
-AUTO_START_CLAIMS = 3
-START_INSTRUCTION = ("The human chose where to start. Propose exactly one plain test per library claim listed, as the "
-                     "human's note frames it, each with parent_star_id S0.")
+START_INSTRUCTION = ("The human chose where to start. Propose exactly one plain test of the library claim listed, as the "
+                     "human's note frames it, with parent_star_id S0.")
 
 
 class EngineState(TypedDict):
@@ -100,7 +99,7 @@ async def start(es: EngineState) -> dict:
     _, claims = await get_library()
     if not state.start_claim_ids:
         if session_config(state.id)["auto_mode"]:
-            state.start_claim_ids = [c.id for c in claims[:AUTO_START_CLAIMS]]
+            state.start_claim_ids = [claims[0].id]
             store.emit(state.id, "start.chosen", {"claim_ids": state.start_claim_ids})
         else:
             ops.refresh_status(state)
@@ -109,10 +108,9 @@ async def start(es: EngineState) -> dict:
     chosen = [c for c in claims if c.id in state.start_claim_ids]
     await ops.gate(state.id).wait()
     state.wave = 1
-    ops.think(state, f"Starting where you chose: drafting one test for each of your {len(chosen)} claims, one agent apiece.")
+    ops.think(state, f"Starting where you chose: drafting the first test of \"{chosen[0].summary or chosen[0].text[:80]}\".")
     try:
-        proposals, _ = await agent.propose(state, chosen, START_INSTRUCTION, session_config(state.id)["max_waves"],
-                                           min(len(chosen), MAX_BRANCHES))
+        proposals, _ = await agent.propose(state, chosen, START_INSTRUCTION, session_config(state.id)["max_waves"], 1)
     except (agent.ProposalError, LLMError) as error:
         store.emit(state.id, "error", {"message": f"Could not draft the first tests: {error}"})
         state.finish_requested = True

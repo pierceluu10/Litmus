@@ -127,8 +127,8 @@ uv run litmus --help
 intake → baseline → start ⟂ → select → Send(branch)×N → join → propose → select ⟂ … | abstract
 branch subgraph (one agent): run → reflect → (run +5 seeds) | (ask ⟂ → suggest) | suggest → END     ⟂ = interrupt()
 ```
-- **Litmus vs agents** (user decision, 2026-10-17): Litmus is the lead researcher. It drafts the first tests from the
-  claims the human picked ("Where should we start?", `POST /start`), plans only when no agent left an open option or a
+- **Litmus vs agents** (user decision, 2026-10-17): Litmus is the lead researcher. It drafts the first test from the
+  one claim the human picked ("Where should we start?", `POST /start`), plans only when no agent left an open option or a
   human answer/feedback went unimplemented (`propose`), answers the chat, and writes the abstract, always from the
   whole tree. Each star has its own agent (`agent.agent_name`: "Smoothing agent", …). After its verdict the agent
   `suggest`s 1–3 next steps and a first-person `Star.suggestion`, reading its generation's siblings and the options
@@ -149,7 +149,7 @@ branch subgraph (one agent): run → reflect → (run +5 seeds) | (ask ⟂ → s
   session `agenda`; the agent whose star it is implements them in its card, and Litmus's `propose` implements any
   left over (validated, repaired once).
 - No agent's pick and no shadow branches (user decision, 2026-10-17): only what the human chose runs. `chosen_by:"shadow"`, `shadow.created` and `Proposal.agent_recommended` stay in the contract (additive only) but are never emitted or true.
-- Auto mode starts from the top 3 claims, runs each agent's first option (≤4), and answers questions with the agent's leaning.
+- Auto mode starts from the top claim, runs each agent's first option (≤4), and answers questions with the agent's leaning.
 - Limits: 4 branches per wave, 12 research stars, 3 waves (configurable), per-session GPU budget.
 - Deviation from the original plan: events are emitted straight to the store (persist + broadcast) instead of
   LangGraph's stream writer, because feedback, shadows, and explain run outside the graph and need the same path.
@@ -249,7 +249,7 @@ npm test             # reducer, layout, simulator + grader-port tests
 
 **The library is always real**: on launch the claims rail streams `GET /api/library/stream` from the backend (Getting papers… highlights… notes… Summarizing…), in the demo too, so run `uv run litmus serve`. If the backend is unreachable the demo falls back to `src/mock/library.json`, a snapshot of `backend/data/library_cache.json` with the same ids (refresh it by copying the cache).
 
-**The demo backend** (`src/mock/`): `sim.ts` is a simulated airbench94 whose knob effects are calibrated from the recorded real session (`shared/demo-session.json`: mixup α=1 −1.44, α=0.2 +0.22 at 30 epochs, no TTA −0.75, no whitening −1.48, …) with seed-paired noise, plus a port of the locked grader (paired t-interval, verdict relative to prediction). `server.ts` emits the contract's events: any star can be branched (a catalog of moves tied to library highlights), there is no agent's pick and no shadow runs, inconclusive results get 5 more seeds, the first mixup refutation triggers library search + a question, the session waits for "Where should we start?" (one agent per chosen claim), each agent offers its own card with a short take when its verdict lands, and Litmus plans from the best star only when no card is open. `library.ts` maps the demo's moves onto highlights in that snapshot by their real ids.
+**The demo backend** (`src/mock/`): `sim.ts` is a simulated airbench94 whose knob effects are calibrated from the recorded real session (`shared/demo-session.json`: mixup α=1 −1.44, α=0.2 +0.22 at 30 epochs, no TTA −0.75, no whitening −1.48, …) with seed-paired noise, plus a port of the locked grader (paired t-interval, verdict relative to prediction). `server.ts` emits the contract's events: any star can be branched (a catalog of moves tied to library highlights), there is no agent's pick and no shadow runs, inconclusive results get 5 more seeds, the first mixup refutation triggers library search + a question, the session waits for "Where should we start?" (one claim, one first agent), each agent offers its own card with a short take when its verdict lands, and Litmus plans from the best star only when no card is open. `library.ts` maps the demo's moves onto highlights in that snapshot by their real ids.
 
 **Folder map** (`frontend/src`)
 | Path | What |
@@ -262,7 +262,7 @@ npm test             # reducer, layout, simulator + grader-port tests
 | `App.tsx` | Hash router: home `Landing`, `#/login` and `#/signup` (`Auth`, demo account in `auth.ts`), then the workspace once a session exists |
 | `components/Landing.tsx`, `LowPolyScene.tsx`, `thinker*.ts` | The home page is one pinned horizontal scene: the hero is panel 0, vertical scroll drives `x` (slides dwell in the middle of their range, `dwell()`), and as the first slide comes in from the right the temple plays its intro backwards (`LowPolyScene` `exit`: roof lifts, columns sink, the Thinker and sky settle into a faint backdrop that drifts behind the slides). The slides are plain-language cards that copy the real workspace (claims, proposal dock, tree, leaderboard, question card, write-up). Below 860px or with reduced motion the slides stack vertically. SVG low-poly temple with the Thinker |
 | `components/Scene.tsx` | The 3D canvas: statue, blobs, edges, accuracy scale, follow camera |
-| `components/` | `TopBar` (GPU budget, Generate abstract), `Researching` (a card over the scene: the library loading stages, then the claim each running agent is testing), `Inspector` (a rounded results card that floats over the scene on the right, and sits below it on narrow screens; the question bar is pinned to its bottom: results, rankings, "Where should we start?" before the first agents, one agent's detail with what its agent found and suggests, its tested claims and an Ask Litmus chat, abstract), `PathChart`, `Dock` (everything waiting on you: one tab per open question and per agent card, "Where should I proceed? — Flip agent", so you can branch from several agents at once), `Prov`, `Icons` |
+| `components/` | `TopBar` (GPU budget, Generate abstract), `Researching` (a card over the scene: the library loading stages, then the claim each running agent is testing), `Inspector` (a rounded results card that floats over the scene on the right, and sits below it on narrow screens; the question bar is pinned to its bottom: results, rankings, "Where should we start?" before the first agents, one agent's detail with what its agent found and suggests, and an Ask Litmus chat, abstract), `PathChart`, `Dock` (everything waiting on you: one tab per open question and per agent card, "Where should I proceed? — Flip agent", so you can branch from several agents at once), `Prov`, `Icons` |
 | `components/LowPolyScene.tsx` `Facets` | The landing's faceted low-poly sky, reused as the rails' ground |
 | `public/litmus-statue.glb` | The agent: SMK's public-domain scan of the Artemision Bronze (KAS2100, api.smk.dk), decimated to 1,200 faces, fingertip at the origin |
 
