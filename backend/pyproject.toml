@@ -3,7 +3,11 @@ name = "litmus"
 version = "0.1.0"
 description = "Litmus backend: turns highlighted research claims into graded experiments."
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "modal>=1.6.2",
+    "pydantic>=2.14.1",
+    "python-dotenv>=1.2.4",
+]
 
 [project.scripts]
 litmus = "litmus.cli:main"
@@ -14,3 +18,9 @@ build-backend = "hatchling.build"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "torch>=2.14.1",
+]
