@@ -22,7 +22,7 @@ export function layoutStars(stars: Star[]): Map<string, Pos> {
     const base = heading.get(s.parent_id!)!
     const atRoot = s.parent_id === rootId
     const shadow = s.chosen_by === 'shadow'
-    const dist = shadow ? 170 : 215 + hash(s.id + 'd') * 60
+    const dist = shadow ? 250 : 215 + hash(s.id + 'd') * 60
     const tries = atRoot ? 14 : 11
     let best = base, bestScore = -Infinity
     for (let k = 0; k < tries; k++) {

@@ -174,7 +174,7 @@ export function StarMap() {
   const fit = (ids?: string[]) => {
     const pts = (ids?.length ? ids : stars.map((s) => s.id)).map((id) => target.get(id)).filter(Boolean) as Pos[]
     if (!pts.length) return
-    const minX = Math.min(...pts.map((p) => p.x)) - 110, maxX = Math.max(...pts.map((p) => p.x)) + 150
+    const minX = Math.min(...pts.map((p) => p.x)) - 170, maxX = Math.max(...pts.map((p) => p.x)) + 170
     const minY = Math.min(...pts.map((p) => p.y)) - 60, maxY = Math.max(...pts.map((p) => p.y)) + 80
     const h = dockOpen ? size.h * 0.5 : size.h
     const k = Math.max(0.35, Math.min(1.15, (size.w - 40) / (maxX - minX), (h - 40) / (maxY - minY)))

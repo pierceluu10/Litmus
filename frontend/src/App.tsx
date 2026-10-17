@@ -14,7 +14,7 @@ import { LowPolyScene } from './components/LowPolyScene'
 function Start() {
   const { begin, health, set, error } = useStore()
   const [goal, setGoal] = useState('Which training tricks actually help a tiny CIFAR-10 classifier?')
-  useEffect(() => { api.health().then((h) => set({ health: h })).catch((e) => set({ error: `Backend unreachable: ${e.message}` })) }, [set])
+  useEffect(() => { api.health().then((h) => set({ health: h })).catch((e) => set({ error: api.mock ? null : `Could not read backend health (${e.message}). Is the backend running, and is OPENAI_API_KEY set in backend/.env? Replay demo works without keys.` })) }, [set])
   return (
     <main className="relative h-full overflow-hidden bg-[#eef2f7] font-[Helvetica_Neue,Helvetica,Arial,sans-serif]">
       <LowPolyScene className="absolute inset-0 h-full w-full" />
