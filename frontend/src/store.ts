@@ -5,7 +5,8 @@ import { realApi } from './transport/real'
 import type { ConnState, Health } from './transport/api'
 import type { Provenance, Selection } from './types'
 
-export const api = import.meta.env.VITE_MOCK === '1' ? mockApi : realApi
+// The in-browser demo backend is the default; VITE_MOCK=0 talks to the real one.
+export const api = import.meta.env.VITE_MOCK === '0' ? realApi : mockApi
 
 type Store = {
   app: AppState
@@ -15,7 +16,9 @@ type Store = {
   error: string | null
   selectedId: string | null
   hoveredClaim: string | null
-  follow: boolean
+  follow: boolean // the camera jumps to each new branch
+  focusId: string | null // what the camera is centred on
+  fitRequest: number // bump to frame the whole tree
   abstractOpen: boolean
   explainBusy: boolean
   explained: Record<string, { answer: string; provenance: Provenance[] }>
@@ -28,7 +31,8 @@ type Store = {
   explain: (star_id: string, question?: string) => Promise<void>
   togglePause: () => Promise<void>
   stopBranch: (star_id: string) => Promise<void>
-  addToPapiers: () => Promise<void>
+  branch: (star_id: string, text?: string) => Promise<void>
+  generateAbstract: () => Promise<void>
 }
 
 let unsub: (() => void) | null = null
@@ -42,22 +46,20 @@ export const useStore = create<Store>((set, get) => {
   }
   return {
     app: initialState, sid: null, conn: 'closed', health: null, error: null, selectedId: null, hoveredClaim: null,
-    follow: true, abstractOpen: false, explainBusy: false, explained: {},
+    follow: true, focusId: null, fitRequest: 0, abstractOpen: false, explainBusy: false, explained: {},
     set: (p) => set(p),
-    select: (id) => set({ selectedId: id }),
+    select: (id) => set(id ? { selectedId: id, focusId: id, abstractOpen: false } : { selectedId: null }),
     async begin(replay, goal) {
       unsub?.()
-      set({ app: initialState, selectedId: null, error: null, abstractOpen: false, explained: {} })
+      set({ app: initialState, selectedId: null, focusId: null, follow: true, error: null, abstractOpen: false, explained: {} })
       try {
         const sid = replay ? await api.replayDemo() : await api.createSession({ goal })
         set({ sid })
         unsub = api.subscribe(sid, 0, (e) => {
           set((st) => {
             const app = applyEvent(st.app, e)
-            // Select the baseline when it first appears so the sidebar is never empty.
-            const selectedId = st.selectedId ?? (app.session?.stars[0]?.id ?? null)
-            const abstractOpen = e.type === 'abstract.ready' ? true : st.abstractOpen
-            return { app, selectedId, abstractOpen }
+            const born = (e.type === 'star.created' || e.type === 'shadow.created') && st.follow ? (e.payload.star.id as string) : null
+            return { app, focusId: born ?? st.focusId }
           })
         }, (conn) => set({ conn }))
       } catch (e) { set({ error: (e as Error).message }) }
@@ -75,6 +77,8 @@ export const useStore = create<Store>((set, get) => {
     },
     togglePause: () => act((sid) => (get().app.session?.status === 'paused' ? api.resume(sid) : api.pause(sid))),
     stopBranch: (star_id) => act((sid) => api.stopBranch(sid, star_id)),
-    addToPapiers: () => act((sid) => api.abstract(sid)),
+    // Branching from any star, refuted ones included, goes through feedback "suggest": the agent replans from it.
+    branch: (star_id, text) => act((sid) => api.feedback(sid, { star_id, kind: 'suggest', text: text?.trim() || 'Branch from here.' })),
+    generateAbstract: async () => { await act((sid) => api.abstract(sid)); if (get().app.session?.abstract) set({ abstractOpen: true, selectedId: null }) },
   }
 })

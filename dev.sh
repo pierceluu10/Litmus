@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Start the backend API (:8000) and the frontend (:5173) together; Ctrl-C stops both.
+# The frontend talks to this backend only with VITE_MOCK=0 in frontend/.env (copy frontend/.env.example).
 set -euo pipefail
 cd "$(dirname "$0")"
 (cd backend && uv sync -q && uv run litmus serve) &

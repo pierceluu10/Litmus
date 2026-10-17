@@ -29,7 +29,7 @@ Grader (pure stats) ◀── seeds ── results (cached by config hash in SQL
 | Path | Owner | What |
 |---|---|---|
 | `shared/contract.md` | shared | API + event contract. Source of truth. Additive changes only, on `main`. |
-| `shared/demo-session.json` | backend | Recorded real session for replay + frontend mock mode. |
+| `shared/demo-session.json` | backend | Recorded real session for replay; calibrates the frontend's demo backend. |
 | `backend/` | backend agent | Python 3.11 package `litmus` (uv). Frontend agent never edits here. |
 | `frontend/` | frontend agent | React + TS + Vite. Backend agent never edits here. |
 
@@ -214,36 +214,43 @@ branch subgraph: run → reflect → (run +5 seeds) | (ask ⟂) | END          �
   Replay: `GET /api/replay/demo?speed=4` re-streamed 1083 events in 14s; final snapshot 11 stars + abstract.
 
 ## Frontend
-Vite + React 19 + TypeScript (strict), Tailwind v4, `motion`, zustand, d3 (hierarchy/scale/shape). Lives in `frontend/`.
+Vite + React 19 + TypeScript (strict), Tailwind v4, three.js via `@react-three/fiber` + `drei`, `motion`, zustand, d3 (scale/shape), Geist + Geist Mono (self-hosted via `@fontsource-variable`). Lives in `frontend/`.
 
 **Run**
 ```bash
 cd frontend && npm install
 npm run dev          # http://localhost:5173
-npm test             # reducer unit tests
+npm test             # reducer, layout, simulator + grader-port tests
 ```
-`frontend/.env`: real backend at `VITE_API_URL` (default `http://localhost:8000`) by default; `VITE_MOCK=1` simulates the whole backend in the browser. That is the only change needed to switch.
+**Demo backend is the default** (user decision, 2026-10-17): with no `frontend/.env`, the app runs the in-browser backend in `src/mock/` and shows no demo badge. `VITE_MOCK=0` switches to the real backend at `VITE_API_URL` (default `http://localhost:8000`).
+
+**The demo backend** (`src/mock/`): `sim.ts` is a simulated airbench94 whose knob effects are calibrated from the recorded real session (`shared/demo-session.json`: mixup α=1 −1.44, α=0.2 +0.22 at 30 epochs, no TTA −0.75, no whitening −1.48, …) with seed-paired noise, plus a port of the locked grader (paired t-interval, verdict relative to prediction). `server.ts` emits the contract's events: any star can be branched (a catalog of moves tied to library highlights), skipped agent picks run as shadows, inconclusive results get 5 more seeds, the first mixup refutation triggers library search + a question, and the next wave is proposed from the best star. `library.ts` is the demo library with hand-written claim summaries (live sessions fall back to the claim's opening words).
 
 **Folder map** (`frontend/src`)
 | Path | What |
 |---|---|
-| `types.ts` | Contract types, snake_case, mirrors `shared/contract.md` |
+| `types.ts` | Contract types, snake_case, mirrors `shared/contract.md` (+ optional `Claim.summary`, frontend only) |
 | `reducer.ts` | `applyEvent(state, event)`: the one pure reducer. Ignores `seq <= lastSeq`, logs unknown types |
-| `store.ts` | zustand store: session state, selection, actions; picks the mock or real `api` |
+| `store.ts` | zustand store: session state, selection, camera focus/follow, actions; picks the demo or real `api` |
 | `transport/` | `api.ts` interface, `real.ts` (REST + WebSocket, reconnect from last `seq`), `mock.ts` |
-| `mock/` | `server.ts` scripted backend (drives the demo tree, answers every action), `library.ts` demo library |
-| `lib/` | `format.ts` (labels, colours, effect text), `layout.ts` (deterministic left-to-right tree) |
-| `components/` | `StarMap`, `Library`, `Sidebar`, `PathChart`, `Dock` (proposals + question), `Feed`, `Timeline`, `AbstractPanel`, `TopBar`, `Legend`, `Prov` |
+| `lib/` | `format.ts` (agent names, numbers, colours), `layout.ts` (3D positions) |
+| `components/Scene.tsx` | The 3D canvas: statue, blobs, edges, accuracy scale, follow camera |
+| `components/` | `TopBar` (status, GPU budget, Generate abstract), `Claims` (left rail), `Inspector` (right rail: results overview, one agent's detail, abstract), `PathChart`, `Dock` (proposals + questions), `Prov` |
+| `public/litmus-statue.glb` | The agent: SMK's public-domain scan of the Artemision Bronze (KAS2100, api.smk.dk), decimated to 1,200 faces, fingertip at the origin |
 
-**State flow**: `begin()` creates a session, subscribes from `seq 0`, and every event goes through `applyEvent`. The snapshot endpoint is not used for first load because replaying all events rebuilds identical state (see Contract requests).
+**The scene is a chart**: x = generations from the statue's fingertip (siblings take their own column), y = measured accuracy (22 units per point, baseline at the fingertip's height), z = a little depth per sibling. An ungraded star rides at its parent's height and glides to its accuracy when graded. Blob = experiment (graphite, distorts faster while training); ring = verdict colour (partial arc = training progress, amber = needs you); dashed edge = shadow branch or training. Scale labels are pinned to the canvas's right edge.
 
-**Design tokens**: `frontend/src/index.css` (`@theme`). Cream paper background; verdict colours (`confirmed`, `refuted`, `inconclusive`, `baseline`), state colours (`running`, `waiting`), and actor colours (`human`, `agent`) are defined once and used by stars, chips, charts and the legend. Stars are labelled with Greek letters (`S0` = α).
+**Camera**: a fixed offset from the midpoint of the focused star and its parent. Focus = the newest star while "Follow new branches" is on; clicking any star or claim re-centres on it; dragging the view turns follow off. "Fit all" frames the tree.
 
-**Animation conventions**: positions ease toward layout targets (new stars grow out of their parent), camera eases with "Follow activity" (any manual pan/zoom turns it off), CSS keyframes for pulse/breathe/bloom/line draw, `motion` for the dock. All motion is disabled under `prefers-reduced-motion`.
+**Branch from anywhere**: "Branch from here" sends `feedback(kind: "suggest")` for that star, so it works against the real backend too (the agent replans from it); the demo backend answers with proposals from that star.
+
+**Design tokens**: `frontend/src/index.css` (`@theme`): cool marble ground, graphite, verdict colours (`confirmed`, `refuted`, `inconclusive`), state colours (`running`, `waiting`), actor colours (`human`, `agent`). The scene reads verdict colours from these CSS variables. Design context: `PRODUCT.md`, `.impeccable/surfaces/`.
+
+**Motion**: stars ease to layout targets, camera transitions via `CameraControls`, `motion` for the dock. Disabled under `prefers-reduced-motion`.
 
 **Add an event type**: add a `case` in `reducer.ts`, add a test in `reducer.test.ts`, emit it from `mock/server.ts`, then render it.
 
-**Known gaps**: no "rewind and branch" yet (selection is by star id, so it fits); mock mode does not load `shared/demo-session.json` yet; visual polish pass not done; layout below ~1000px is stacked rather than tuned.
+**Known gaps**: three.js makes the bundle ~1 MB (fine locally, not code-split); below 1024px the rails stack under the canvas; star labels can still touch when a cousin's subtree lands on the same height.
 
 ### Contract requests
 - `GET /api/sessions/{id}` should include the highest applied `seq`, so a client can load the snapshot and then subscribe from `seq + 1` instead of replaying everything.

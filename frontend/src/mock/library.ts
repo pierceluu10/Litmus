@@ -2,7 +2,7 @@ import type { Claim, Document, Provenance } from '../types'
 
 // Source: the demo Papiers library described in the hackathon brief, 2026-10-16. Mock data, not live.
 export const documents: Document[] = [
-  { id: 'doc_jordan', title: '94% on CIFAR-10 in 3.29 Seconds on a Single GPU', authors: ['Keller Jordan'], year: 2024, url: 'https://arxiv.org/abs/2404.00498', highlight_count: 4, note_count: 2, papiers_url: 'https://arxiv.org/abs/2404.00498' },
+  { id: 'doc_jordan', title: '94% on CIFAR-10 in 3.29 Seconds on a Single GPU', authors: ['Keller Jordan'], year: 2024, url: 'https://arxiv.org/abs/2404.00498', highlight_count: 6, note_count: 2, papiers_url: 'https://arxiv.org/abs/2404.00498' },
   { id: 'doc_szegedy', title: 'Rethinking the Inception Architecture for Computer Vision', authors: ['Szegedy', 'Vanhoucke', 'Ioffe', 'Shlens', 'Wojna'], year: 2015, url: 'https://arxiv.org/abs/1512.00567', highlight_count: 1, note_count: 1, papiers_url: 'https://arxiv.org/abs/1512.00567' },
   { id: 'doc_muller', title: 'When Does Label Smoothing Help?', authors: ['Müller', 'Kornblith', 'Hinton'], year: 2019, url: 'https://arxiv.org/abs/1906.02629', highlight_count: 1, note_count: 0, papiers_url: 'https://arxiv.org/abs/1906.02629' },
   { id: 'doc_zhang', title: 'mixup: Beyond Empirical Risk Minimization', authors: ['Zhang', 'Cissé', 'Dauphin', 'Lopez-Paz'], year: 2017, url: 'https://arxiv.org/abs/1710.09412', highlight_count: 1, note_count: 1, papiers_url: 'https://arxiv.org/abs/1710.09412' },
@@ -24,16 +24,20 @@ export const P = {
   mixNote: note('hl_mix', 'doc_zhang', 'They trained 200 epochs. Does this hold in a 10-epoch run?'),
   bot: hl('hl_bot', 'doc_he', 'Mixup needs more epochs to converge: we increase the number of epochs when using mixup.'),
   botNote: note('hl_bot', 'doc_he', 'Mixup may need long training. Conflicts with short runs.'),
+  whiten: hl('hl_whiten', 'doc_jordan', 'Patch-whitening initialization of the first convolution speeds up training substantially.'),
+  dirac: hl('hl_dirac', 'doc_jordan', 'Identity (Dirac) initialization of the convolutions after the first improves accuracy.'),
 }
 
-const claim = (rank: number, id: string, doc_id: string, text: string, prov: Provenance[], conditions: string, annotation?: string, page?: number): Claim =>
-  ({ id, rank, weight: 10 - rank, text, doc_id, doc_title: doc(doc_id).title, annotation, conditions, page, provenance: prov })
+const claim = (rank: number, id: string, doc_id: string, summary: string, text: string, prov: Provenance[], conditions: string, annotation?: string, page?: number): Claim =>
+  ({ id, rank, weight: 10 - rank, summary, text, doc_id, doc_title: doc(doc_id).title, annotation, conditions, page, provenance: prov })
 
 export const claims: Claim[] = [
-  claim(1, 'hl_mix', 'doc_zhang', P.mix.text, [P.mix, P.mixNote], '200 epochs, ResNet-18 / PreAct, CIFAR-10', P.mixNote.text, 4),
-  claim(2, 'hl_ls', 'doc_szegedy', P.ls.text, [P.ls, P.lsNote], 'ImageNet, Inception-v3, epsilon 0.1', P.lsNote.text, 6),
-  claim(3, 'hl_flip', 'doc_jordan', P.flip.text, [P.flip, P.flipNote], 'airbench, ~10 epochs, CIFAR-10', P.flipNote.text, 3),
-  claim(4, 'hl_tta', 'doc_jordan', P.tta.text, [P.tta, P.ttaNote], 'airbench, 94% target', P.ttaNote.text, 5),
-  claim(5, 'hl_bot', 'doc_he', P.bot.text, [P.bot, P.botNote], 'ImageNet, ResNet-50, 200 epochs with mixup', P.botNote.text, 8),
-  claim(6, 'hl_ls_cal', 'doc_muller', P.lsCal.text, [P.lsCal], 'Image classification, translation, calibration metrics', undefined, 2),
+  claim(1, 'hl_mix', 'doc_zhang', 'Mixup beats plain training', P.mix.text, [P.mix, P.mixNote], '200 epochs, ResNet-18 / PreAct, CIFAR-10', P.mixNote.text, 4),
+  claim(2, 'hl_bot', 'doc_he', 'Mixup needs longer training', P.bot.text, [P.bot, P.botNote], 'ImageNet, ResNet-50, 200 epochs with mixup', P.botNote.text, 8),
+  claim(3, 'hl_tta', 'doc_jordan', 'Multi-crop TTA lifts accuracy', P.tta.text, [P.tta, P.ttaNote], 'airbench, 94% target', P.ttaNote.text, 5),
+  claim(4, 'hl_flip', 'doc_jordan', 'Alternating flips beat random flips', P.flip.text, [P.flip, P.flipNote], 'airbench, ~10 epochs, CIFAR-10', P.flipNote.text, 3),
+  claim(5, 'hl_ls', 'doc_szegedy', 'Label smoothing adds ~0.2%', P.ls.text, [P.ls, P.lsNote], 'ImageNet, Inception-v3, epsilon 0.1', P.lsNote.text, 6),
+  claim(6, 'hl_whiten', 'doc_jordan', 'Patch whitening speeds training', P.whiten.text, [P.whiten], 'airbench, CIFAR-10', undefined, 4),
+  claim(7, 'hl_dirac', 'doc_jordan', 'Identity init helps deeper convs', P.dirac.text, [P.dirac], 'airbench, CIFAR-10', undefined, 4),
+  claim(8, 'hl_ls_cal', 'doc_muller', 'Smoothing helps calibration, not distillation', P.lsCal.text, [P.lsCal], 'Image classification, translation, calibration metrics', undefined, 2),
 ]

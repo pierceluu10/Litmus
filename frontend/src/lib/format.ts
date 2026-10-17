@@ -1,12 +1,7 @@
-import type { Document, Grade, Knobs, Provenance, Star } from '../types'
-
-const GREEK = ['α', 'β', 'γ', 'δ', 'ε', 'ζ', 'η', 'θ', 'ι', 'κ', 'λ', 'μ', 'ν', 'ξ', 'ο', 'π', 'ρ', 'σ', 'τ', 'υ', 'φ', 'χ', 'ψ', 'ω']
-export const starLetter = (id: string) => GREEK[Number(id.replace(/\D/g, '')) % GREEK.length] ?? '•'
+import type { Document, Knobs, Provenance, Star } from '../types'
 
 export const pts = (x: number, digits = 2) => `${x >= 0 ? '+' : '−'}${Math.abs(x * 100).toFixed(digits)}`
 export const pct = (x: number, digits = 2) => `${(x * 100).toFixed(digits)}%`
-export const effectText = (g: Grade) => g.verdict === 'baseline' ? pct(g.mean_child, 1) : `${pts(g.delta)} pts`
-export const ciText = (g: Grade) => `[${(g.ci_low * 100).toFixed(2)}, ${(g.ci_high * 100).toFixed(2)}]`
 
 const KNOB_NAMES: Record<keyof Knobs, string> = {
   label_smoothing: 'label smoothing', epochs: 'epochs', tta_level: 'TTA level', flip: 'flip', mixup_alpha: 'mixup α',
@@ -20,6 +15,31 @@ export function knobText(changes: Partial<Knobs>): string {
     return `${KNOB_NAMES[k as keyof Knobs] ?? k} ${v}`
   })
   return parts.join(', ') || 'no change'
+}
+
+const AGENT_NAMES: Record<keyof Knobs, string> = {
+  label_smoothing: 'Smoothing', epochs: 'Long training', tta_level: 'TTA', flip: 'Flip', mixup_alpha: 'Mixup',
+  cutout: 'Cutout', lr_scale: 'Learning rate', whiten: 'Whitening', dirac_init: 'Identity init', translate: 'Translate',
+}
+// The short name shown under a star: the method it tests, plus training length when that changed too.
+export function agentName(s: Star): string {
+  const keys = Object.keys(s.knob_changes) as (keyof Knobs)[]
+  if (!s.parent_id) return 'Baseline'
+  const method = keys.find((k) => k !== 'epochs')
+  return method ? `${AGENT_NAMES[method]} agent` : `${AGENT_NAMES.epochs} agent`
+}
+export function agentDetail(s: Star): string {
+  const k = s.knob_changes
+  const parts = Object.entries(k).map(([key, v]) => key === 'epochs' ? `${v} ep` : key === 'mixup_alpha' ? `α ${v}` : key === 'tta_level' ? (v === 0 ? 'off' : `level ${v}`)
+    : key === 'flip' ? String(v) : typeof v === 'boolean' ? (v ? 'on' : 'off') : key === 'label_smoothing' ? `ε ${v}` : String(v))
+  return parts.join(' · ')
+}
+
+// "Zhang '17" for a document.
+export function shortCite(d: Document | undefined): string {
+  if (!d) return ''
+  const last = d.authors[0]?.split(' ').slice(-1)[0] ?? d.title
+  return `${last}${d.authors.length > 1 ? ' et al.' : ''}${d.year ? ` ’${String(d.year).slice(2)}` : ''}`
 }
 
 export function provLabel(p: Provenance, docs: Document[]): string {
@@ -39,7 +59,6 @@ export function starTone(s: Star): Tone {
   return s.grade?.verdict ?? 'inconclusive'
 }
 export const toneVar = (t: Tone) => `var(--color-${t})`
-export const chosenVar = (c: Star['chosen_by']) => c === 'human' ? 'var(--color-human)' : c === 'shadow' ? 'var(--color-inconclusive)' : c === 'agent' ? 'var(--color-agent)' : 'var(--color-muted)'
 export const chosenLabel = (c: Star['chosen_by']) => ({ human: 'Chosen by you', agent: 'Agent recommended, you agreed', auto: 'Automatic', shadow: 'Agent alone (shadow run)' })[c]
 
 export function progressFraction(s: Star): number {

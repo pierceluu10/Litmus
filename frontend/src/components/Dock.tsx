@@ -1,107 +1,109 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useStore } from '../store'
-import { knobText } from '../lib/format'
+import { agentName, knobText } from '../lib/format'
 import type { Proposal, Question } from '../types'
-import { ProvList } from './Prov'
+import { ProvChip, ProvList } from './Prov'
 
-const spring = { type: 'spring' as const, duration: 0.45, bounce: 0.12 }
-const PRED = { improves: 'predicts a gain', hurts: 'predicts a loss', no_effect: 'predicts no effect' }
+const MAX_AGENTS = 4
+const spring = { type: 'spring' as const, duration: 0.45, bounce: 0.1 }
+const EXPECTS = { improves: 'expects a gain', hurts: 'expects a loss', no_effect: 'expects no change' }
+const panel = 'mx-auto w-full max-w-[920px] rounded-xl border border-rule bg-surface p-3 shadow-[0_1px_2px_rgb(21_24_28/0.06),0_12px_32px_rgb(21_24_28/0.10)]'
 
-function Proposals({ starId, items }: { starId: string; items: Proposal[] }) {
-  const dispatch = useStore((s) => s.dispatch)
+function Proposals({ starId, items, background }: { starId: string; items: Proposal[]; background: boolean }) {
+  const { dispatch, app, select } = useStore()
+  const from = app.session!.stars.find((s) => s.id === starId)
   const [sel, setSel] = useState<string[]>(() => items.filter((p) => p.agent_recommended).map((p) => p.id))
   const [instr, setInstr] = useState('')
   const [busy, setBusy] = useState(false)
-  const toggle = (id: string) => setSel((s) => s.includes(id) ? s.filter((x) => x !== id) : s.length < 4 ? [...s, id] : s)
+  const [folded, setFolded] = useState<boolean | null>(null) // null: fold while something newer needs attention, until the human chooses
+  const collapsed = folded ?? background
+  const toggle = (id: string) => setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : s.length < MAX_AGENTS ? [...s, id] : s))
   return (
-    <section aria-label="Proposed experiments" className="rounded-lg border border-waiting bg-surface p-3 shadow-[0_8px_24px_rgba(42,38,32,0.12)]">
-      <h2 className="m-0 font-serif text-[17px] font-semibold">Where should the agents go next?</h2>
-      <p className="m-0 mb-2 text-[12.5px] text-muted">Each comes from something you read. Pick up to 4. The agent’s picks are pre-selected.</p>
-      <ul className="m-0 grid list-none gap-2 p-0" style={{ gridTemplateColumns: `repeat(${Math.min(items.length, 4)}, minmax(0, 1fr))` }}>
+    <section aria-label="Proposed experiments" className={panel}>
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="m-0 text-[13.5px] font-semibold">{items.length} experiments ready from <button className="underline decoration-rule underline-offset-4 hover:decoration-ink" onClick={() => from && select(from.id)}>{from ? agentName(from) : starId}</button></h2>
+        <button className="label hover:text-ink" aria-expanded={!collapsed} onClick={() => setFolded(!collapsed)}>{collapsed ? 'review' : 'hide'}</button>
+      </div>
+      {!collapsed && <>
+      <ul className="m-0 mt-2.5 grid list-none gap-2 p-0" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(150px, 1fr))` }}>
         {items.map((p) => {
           const on = sel.includes(p.id)
+          const claim = p.provenance.find((x) => x.kind === 'highlight')
           return (
             <li key={p.id}>
-              <div className="flex h-full flex-col rounded-md border-2 p-2.5 text-left" style={{ borderColor: on ? 'var(--color-human)' : 'var(--color-rule)', background: on ? 'color-mix(in srgb, var(--color-human) 5%, var(--color-surface))' : undefined }}>
-                <label className="flex cursor-pointer items-start gap-2">
-                  <input type="checkbox" className="mt-1" checked={on} onChange={() => toggle(p.id)} disabled={!on && sel.length >= 4} />
-                  <span className="font-medium leading-snug" title={p.condition_notes}>{p.title}</span>
-                </label>
-                {p.agent_recommended && <span className="tag mt-1" style={{ color: 'var(--color-agent)' }}>agent recommends</span>}
-                <p className="m-0 mt-1 font-serif text-[13px] leading-snug">{p.hypothesis}</p>
-                <p className="m-0 mt-1 text-[12px] text-muted"><span className="num">{knobText(p.knob_changes)}</span> · {PRED[p.predicted]}</p>
-                <div className="mt-auto pt-2"><ProvList items={p.provenance.slice(0, 3)} /></div>
-              </div>
+              <label className="flex h-full cursor-pointer flex-col rounded-lg border p-2.5 transition-colors" style={{ borderColor: on ? 'var(--color-ink)' : 'var(--color-rule)', background: on ? 'var(--color-marble)' : undefined }}>
+                <span className="flex items-start gap-2">
+                  <input type="checkbox" className="mt-0.5 accent-[var(--color-ink)]" checked={on} onChange={() => toggle(p.id)} disabled={!on && sel.length >= MAX_AGENTS} />
+                  <span className="text-[13px] font-medium leading-snug">{p.title}</span>
+                </span>
+                <span className="num mt-1 pl-5 text-[11px] text-muted">{knobText(p.knob_changes)} · {EXPECTS[p.predicted]}</span>
+                <span className="mt-auto flex flex-wrap items-center gap-1.5 pl-5 pt-2">
+                  {p.agent_recommended && <span className="text-[11px] font-medium text-agent">agent’s pick</span>}
+                  {claim && <ProvChip p={claim} />}
+                </span>
+              </label>
             </li>
           )
         })}
       </ul>
-      <div className="mt-3 flex items-center gap-2">
-        <label className="sr-only" htmlFor="instr">Instruction for the agents</label>
-        <input id="instr" value={instr} onChange={(e) => setInstr(e.target.value)} placeholder="Optional instruction, e.g. “use 8 seeds on anything near zero”" className="min-w-0 flex-1 rounded-md border border-rule bg-paper px-2.5 py-1.5" />
-        <button className="btn btn-human" disabled={!sel.length || busy} onClick={async () => { setBusy(true); await dispatch(starId, sel.map((proposal_id) => ({ proposal_id })), instr.trim() || undefined); setBusy(false) }}>
-          Dispatch {sel.length} agent{sel.length === 1 ? '' : 's'}
+      <div className="mt-2.5 flex items-center gap-2">
+        <label className="sr-only" htmlFor={`instr-${starId}`}>Instruction for the agents</label>
+        <input id={`instr-${starId}`} value={instr} onChange={(e) => setInstr(e.target.value)} placeholder="Instruction for the agents (optional)" className="field min-w-0 flex-1" />
+        <button className="btn btn-primary" disabled={!sel.length || busy} onClick={async () => { setBusy(true); await dispatch(starId, sel.map((proposal_id) => ({ proposal_id })), instr.trim() || undefined); setBusy(false) }}>
+          Dispatch {sel.length || ''} agent{sel.length === 1 ? '' : 's'}
         </button>
       </div>
+      <p className="label m-0 mt-2">Pick up to {MAX_AGENTS}. If you skip the agent’s pick, it still runs on its own so you can compare.</p>
+      </>}
     </section>
   )
 }
 
 function QuestionCard({ q }: { q: Question }) {
   const { answer, app } = useStore()
-  const [opt, setOpt] = useState<string>('')
+  const [opt, setOpt] = useState(q.agent_leaning ?? '')
   const [comment, setComment] = useState('')
   const [busy, setBusy] = useState(false)
-  const working = (app.session?.stars ?? []).filter((s) => s.status === 'running' && s.id !== q.star_id).length
-  const lean = q.options.find((o) => o.id === q.agent_leaning)
+  const star = app.session!.stars.find((s) => s.id === q.star_id)
   return (
-    <section aria-label="The agent has a question for you" className="rounded-lg border-2 border-waiting bg-surface p-3 shadow-[0_8px_24px_rgba(42,38,32,0.14)]">
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="m-0 font-serif text-[17px] font-semibold">Your call</h2>
-        {working > 0 && <span className="text-[12.5px] text-muted">{working} agent{working === 1 ? ' is' : 's are'} still working while this waits for you</span>}
+    <section aria-label="The agent needs your call" className={panel} style={{ borderColor: 'color-mix(in srgb, var(--color-waiting) 55%, var(--color-rule))' }}>
+      <div className="flex items-baseline gap-2">
+        <span className="dot live-dot" style={{ background: 'var(--color-waiting)' }} />
+        <h2 className="m-0 text-[13.5px] font-semibold">Your call{star ? ` on ${agentName(star)}` : ''}</h2>
       </div>
-      <p className="m-0 mt-1 font-serif text-[14.5px] leading-snug">{q.text}</p>
-      <div className="mt-2"><span className="mb-1 block text-[12px] text-muted">The evidence conflicts. Read both sides:</span><ProvList items={q.evidence} /></div>
-      <fieldset className="m-0 mt-3 grid gap-2 border-0 p-0" style={{ gridTemplateColumns: `repeat(${q.options.length}, minmax(0, 1fr))` }}>
+      <p className="m-0 mt-1.5 max-w-[80ch] leading-snug">{q.text}</p>
+      <div className="mt-2"><ProvList items={q.evidence} /></div>
+      <fieldset className="m-0 mt-2.5 grid gap-2 border-0 p-0" style={{ gridTemplateColumns: `repeat(${q.options.length}, minmax(0, 1fr))` }}>
         <legend className="sr-only">Choose a direction</legend>
         {q.options.map((o) => (
-          <label key={o.id} className="cursor-pointer rounded-md border-2 p-2.5" style={{ borderColor: opt === o.id ? 'var(--color-human)' : 'var(--color-rule)' }}>
-            <span className="flex items-start gap-2"><input type="radio" name={q.id} className="mt-1" checked={opt === o.id} onChange={() => setOpt(o.id)} /><span className="font-medium leading-snug">{o.label}</span></span>
-            <span className="mt-1 block pl-5 text-[12.5px] text-muted">{o.consequence}</span>
-            {o.id === q.agent_leaning && <span className="tag mt-1 block pl-5" style={{ color: 'var(--color-agent)' }}>agent leans this way</span>}
+          <label key={o.id} className="cursor-pointer rounded-lg border p-2.5 transition-colors" style={{ borderColor: opt === o.id ? 'var(--color-ink)' : 'var(--color-rule)', background: opt === o.id ? 'var(--color-marble)' : undefined }}>
+            <span className="flex items-start gap-2"><input type="radio" name={q.id} className="mt-0.5 accent-[var(--color-ink)]" checked={opt === o.id} onChange={() => setOpt(o.id)} /><span className="text-[13px] font-medium leading-snug">{o.label}</span></span>
+            <span className="mt-1 block pl-5 text-[12px] text-muted">{o.consequence}</span>
+            {o.id === q.agent_leaning && <span className="mt-1 block pl-5 text-[11px] font-medium text-agent">agent leans this way</span>}
           </label>
         ))}
       </fieldset>
-      {lean && <p className="m-0 mt-2 text-[12px] text-muted">If you do not choose, the agent would go with: {lean.label}.</p>}
-      <div className="mt-2 flex items-center gap-2">
-        <label className="sr-only" htmlFor="qc">Comment</label>
-        <input id="qc" value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Optional: tell the agent why" className="min-w-0 flex-1 rounded-md border border-rule bg-paper px-2.5 py-1.5" />
-        <button className="btn btn-human" disabled={!opt || busy} onClick={async () => { setBusy(true); await answer(q.id, opt, comment.trim() || undefined); setBusy(false) }}>Answer</button>
+      <div className="mt-2.5 flex items-center gap-2">
+        <label className="sr-only" htmlFor={`qc-${q.id}`}>Why (optional)</label>
+        <input id={`qc-${q.id}`} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Why (optional)" className="field min-w-0 flex-1" />
+        <button className="btn btn-primary" disabled={!opt || busy} onClick={async () => { setBusy(true); await answer(q.id, opt, comment.trim() || undefined); setBusy(false) }}>Answer</button>
       </div>
     </section>
   )
 }
 
 export function Dock() {
-  const app = useStore((s) => s.app)
-  const s = app.session
+  const s = useStore((st) => st.app.session)
   const questions = (s?.questions ?? []).filter((q) => q.status === 'open')
   const open = (s?.proposals ?? []).filter((p) => p.status === 'open')
   const starIds = [...new Set(open.map((p) => p.star_id))]
+  const enter = { initial: { opacity: 0, y: 24 }, animate: { opacity: 1, y: 0 }, exit: { opacity: 0, y: 12, transition: { duration: 0.15 } }, transition: spring }
   return (
-    <div className="pointer-events-none absolute inset-x-3 bottom-3 flex max-h-[62%] flex-col gap-2 overflow-y-auto">
+    <div className="pointer-events-none absolute inset-x-4 bottom-4 z-30 flex max-h-[50%] flex-col gap-2 overflow-y-auto">
       <AnimatePresence initial={false}>
-        {questions.map((q) => (
-          <motion.div key={q.id} className="pointer-events-auto" initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16, transition: { duration: 0.15 } }} transition={spring}>
-            <QuestionCard q={q} />
-          </motion.div>
-        ))}
-        {starIds.map((id) => (
-          <motion.div key={id} className="pointer-events-auto" initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16, transition: { duration: 0.15 } }} transition={spring}>
-            <Proposals starId={id} items={open.filter((p) => p.star_id === id)} />
-          </motion.div>
-        ))}
+        {questions.map((q) => <motion.div key={q.id} className="pointer-events-auto" {...enter}><QuestionCard q={q} /></motion.div>)}
+        {starIds.map((id, i) => <motion.div key={id} className="pointer-events-auto" {...enter}><Proposals starId={id} items={open.filter((p) => p.star_id === id)} background={questions.length > 0 || i < starIds.length - 1} /></motion.div>)}
       </AnimatePresence>
     </div>
   )

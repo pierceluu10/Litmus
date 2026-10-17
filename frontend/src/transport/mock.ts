@@ -1,5 +1,5 @@
 import { MockServer } from '../mock/server'
-import type { Api } from './api'
+import { DEFAULT_GOAL, type Api } from './api'
 
 let srv: MockServer | null = null
 const cur = () => { if (!srv) throw new Error('No mock session'); return srv }
@@ -9,8 +9,8 @@ export const mockApi: Api = {
   mock: true,
   health: () => wait({ ok: true, modal_warm: true, papiers_ok: true, openai_ok: true }),
   warmup: () => wait(undefined),
-  createSession: async (b) => { srv = new MockServer(b.goal || 'Which training tricks actually help a tiny CIFAR-10 classifier?', false); return srv.sid },
-  replayDemo: async () => { srv = new MockServer('Replay: which training tricks actually help airbench?', true); return srv.sid },
+  createSession: async (b) => { srv = new MockServer(b.goal || DEFAULT_GOAL, false); return srv.sid },
+  replayDemo: async () => { srv = new MockServer(DEFAULT_GOAL, true); return srv.sid },
   subscribe(_sid, fromSeq, onEvent, onConn) {
     onConn('live')
     return cur().subscribe(fromSeq, onEvent)
@@ -22,6 +22,6 @@ export const mockApi: Api = {
   pause: async () => cur().pause(),
   resume: async () => cur().resume(),
   stopBranch: async (_s, id) => cur().stopBranch(id),
-  abstract: async () => { cur().writeBack(); const a = cur().state.session?.abstract; return { abstract: a?.text ?? '', findings: a?.findings ?? [] } },
+  abstract: async () => { cur().generateAbstract(); const a = cur().state.session?.abstract; return { abstract: a?.text ?? '', findings: a?.findings ?? [] } },
   exportMarkdown: async () => cur().exportMarkdown(),
 }

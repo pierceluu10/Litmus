@@ -43,11 +43,13 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
-Run everything: `./dev.sh` (backend on :8000 with a Modal warmup, frontend on :5173, which talks to the real backend by default). Mock mode: `VITE_MOCK=1` in `frontend/.env`. Mock mode shows a "Mock data" badge so it is never mistaken for real results.
+The frontend runs an in-browser demo backend by default: a simulated airbench calibrated from a recorded real session, graded by a port of the same locked grader. For real experiments set `VITE_MOCK=0` in `frontend/.env` and run `./dev.sh` (backend on :8000 with a Modal warmup, frontend on :5173).
+
+The statue is the Artemision Bronze, from the public-domain 3D scan by SMK, the National Gallery of Denmark.
 
 ## Architecture
 
-React + TypeScript frontend (one pure event reducer, a REST + WebSocket client, an in-browser mock of the same API). FastAPI backend orchestrating agents with LangGraph, OpenAI for reasoning, Modal A100s for training, the Papiers CLI for your library, and a locked statistics grader. The API and event stream are defined in `shared/contract.md`.
+React + TypeScript frontend (one pure event reducer, a REST + WebSocket client, an in-browser demo backend for the same API, a three.js scene). FastAPI backend orchestrating agents with LangGraph, OpenAI for reasoning, Modal A100s for training, the Papiers CLI for your library, and a locked statistics grader. The API and event stream are defined in `shared/contract.md`.
 
 ## Backend details
 

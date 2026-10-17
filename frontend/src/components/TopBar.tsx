@@ -1,43 +1,43 @@
-import { api, useStore } from '../store'
+import { useStore } from '../store'
 import type { SessionStatus } from '../types'
 
 const STATUS: Record<SessionStatus, { label: string; color: string }> = {
-  running: { label: 'Running', color: 'var(--color-running)' },
-  paused: { label: 'Paused', color: 'var(--color-muted)' },
+  running: { label: 'Agents running', color: 'var(--color-running)' },
+  paused: { label: 'Paused', color: 'var(--color-faint)' },
   waiting_human: { label: 'Waiting for you', color: 'var(--color-waiting)' },
   done: { label: 'Done', color: 'var(--color-confirmed)' },
 }
 
 export function TopBar() {
-  const { app, conn, togglePause, set, error } = useStore()
-  const s = app.session
-  const st = s ? STATUS[s.status] : null
-  const used = s?.budget_used ?? 0, total = s?.budget_total ?? 0
+  const { app, conn, togglePause, generateAbstract, error, set } = useStore()
+  const s = app.session!
+  const st = STATUS[s.status]
+  const graded = s.stars.filter((x) => x.grade && x.grade.verdict !== 'baseline').length
+  const share = s.budget_total ? Math.min(1, s.budget_used / s.budget_total) : 0
   return (
-    <header className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-rule bg-surface px-4 py-2.5">
-      <h1 className="m-0 text-[20px] font-bold leading-none tracking-tight">Litmus</h1>
-      <p className="m-0 min-w-0 flex-1 truncate text-muted" title={s?.goal}>{s?.goal ?? 'No session yet'}</p>
-      {error && <span role="alert" className="rounded-md border border-refuted px-2 py-0.5 text-refuted">{error}</span>}
-      {api.mock && <span className="chip" title="The backend is simulated in your browser">Mock data</span>}
-      {s?.replay && <span className="chip" style={{ color: 'var(--color-human)' }}>Replay</span>}
-      {conn !== 'live' && s && <span className="chip" style={{ color: 'var(--color-waiting)' }}>{conn === 'closed' ? 'Disconnected' : 'Reconnecting…'}</span>}
-      {total > 0 && (
-        <div className="flex items-center gap-2" title="GPU seconds used of the session budget">
-          <span className="text-muted">GPU</span>
-          <div className="h-1.5 w-24 overflow-hidden rounded-full bg-rule" role="meter" aria-valuenow={used} aria-valuemax={total} aria-label="GPU budget used">
-            <div className="h-full rounded-full" style={{ width: `${Math.min(100, (used / total) * 100)}%`, background: used / total > 0.9 ? 'var(--color-refuted)' : 'var(--color-baseline)', transition: 'width 400ms var(--ease-out)' }} />
+    <header className="flex h-12 items-center gap-5 border-b border-rule bg-surface px-4">
+      <span className="text-[15px] font-semibold tracking-[-0.02em]">Litmus</span>
+      <span className="inline-flex items-center gap-2 text-muted" aria-live="polite">
+        <span className={`dot ${s.status === 'running' || s.status === 'waiting_human' ? 'live-dot' : ''}`} style={{ background: st.color }} />{st.label}
+      </span>
+      {conn === 'reconnecting' && <span className="text-waiting">Reconnecting…</span>}
+      {error && <span role="alert" className="min-w-0 truncate text-refuted">{error}</span>}
+      <div className="ml-auto flex items-center gap-4">
+        {s.budget_total > 0 && (
+          <div className="flex items-center gap-2 text-muted" title="GPU seconds used of this session's budget">
+            <span>GPU</span>
+            <div className="h-1 w-20 overflow-hidden rounded-full bg-rule" role="meter" aria-label="GPU budget used" aria-valuenow={s.budget_used} aria-valuemin={0} aria-valuemax={s.budget_total}>
+              <div className="h-full rounded-full transition-[width] duration-500" style={{ width: `${share * 100}%`, background: share > 0.9 ? 'var(--color-refuted)' : 'var(--color-ink)' }} />
+            </div>
+            <span className="num text-[12px]">{Math.round(s.budget_used)}/{s.budget_total}s</span>
           </div>
-          <span className="num text-muted">{used}/{total}s</span>
-        </div>
-      )}
-      {st && (
-        <span className="inline-flex items-center gap-2 rounded-full border border-rule px-3 py-1" aria-live="polite">
-          <span className="h-2 w-2 rounded-full" style={{ background: st.color, animation: s!.status === 'running' || s!.status === 'waiting_human' ? 'breathe 2s ease-in-out infinite' : undefined }} />
-          {st.label}
-        </span>
-      )}
-      {s && s.status !== 'done' && <button className="btn" onClick={togglePause}>{s.status === 'paused' ? 'Resume' : 'Pause'}</button>}
-      {s?.abstract && <button className="btn btn-primary" onClick={() => set({ abstractOpen: true })}>Abstract</button>}
+        )}
+        {s.status !== 'done' && <button className="btn btn-quiet" onClick={togglePause}>{s.status === 'paused' ? 'Resume' : 'Pause'}</button>}
+        {s.abstract && <button className="btn" onClick={() => set({ abstractOpen: true, selectedId: null })}>Read abstract</button>}
+        <button className="btn btn-primary" disabled={!graded} onClick={generateAbstract}>
+          {s.abstract ? 'Regenerate abstract' : 'Generate abstract'}
+        </button>
+      </div>
     </header>
   )
 }

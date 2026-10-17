@@ -2,7 +2,7 @@
 export type ProvKind = 'highlight' | 'note' | 'conversation' | 'passage' | 'document' | 'search' | 'human'
 export type Provenance = { kind: ProvKind; id: string; doc_id?: string; doc_title?: string; text: string; papiers_url?: string }
 export type Document = { id: string; title: string; authors: string[]; year?: number; url?: string; highlight_count: number; note_count: number; papiers_url?: string }
-export type Claim = { id: string; text: string; doc_id: string; doc_title: string; annotation?: string; weight: number; rank: number; conditions?: string; page?: number; provenance: Provenance[] }
+export type Claim = { id: string; text: string; doc_id: string; doc_title: string; annotation?: string; weight: number; rank: number; conditions?: string; page?: number; provenance: Provenance[]; summary?: string }
 
 export type Knobs = { label_smoothing: number; epochs: number; tta_level: 0 | 1 | 2; flip: 'random' | 'alternating' | 'none'; mixup_alpha: number; cutout: number; lr_scale: number; whiten: boolean; dirac_init: boolean; translate: number }
 export type Predicted = 'improves' | 'hurts' | 'no_effect'
