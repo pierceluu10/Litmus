@@ -4,6 +4,9 @@ import { agentDetail, agentName, pct, progressFraction, pts, starTone, toneVar }
 import type { Star } from '../types'
 import { PathChart } from './PathChart'
 import { ProvChip, ProvList } from './Prov'
+import { Facets } from './LowPolyScene'
+
+const FACET_SEED = 73
 
 const H = ({ children, aside }: { children: React.ReactNode; aside?: React.ReactNode }) => (
   <div className="mb-2 flex items-baseline justify-between"><h3 className="m-0 text-[12px] font-semibold text-muted">{children}</h3>{aside}</div>
@@ -27,11 +30,11 @@ function Overview() {
           {graded.length ? <>{graded.length} graded · <span style={{ color: toneVar('confirmed') }}>{count('confirmed')} confirmed</span> · <span style={{ color: toneVar('refuted') }}>{count('refuted')} refuted</span> · {count('inconclusive')} inconclusive</> : 'Waiting for the first verdict.'}
         </p>
       </section>
-      <section><H>Accuracy by path</H><PathChart stars={s.stars} highlight={null} /></section>
+      <section><H>Accuracy by path</H><div className="plate"><PathChart stars={s.stars} highlight={null} /></div></section>
       {ranked.length > 0 && (
         <section>
-          <H aside={<span className="label">accuracy · vs parent</span>}>Leaderboard</H>
-          <ol className="m-0 list-none p-0">
+          <H aside={<span className="label">accuracy · vs parent</span>}>Rankings</H>
+          <ol className="plate m-0 list-none p-1">
             {ranked.map((x, i) => (
               <li key={x.id}>
                 <button className="flex w-full items-center gap-2.5 rounded-md px-1.5 py-1.5 text-left hover:bg-paper" onClick={() => select(x.id)}>
@@ -175,7 +178,7 @@ function Detail({ s }: { s: Star }) {
         <p className="m-0 mt-0.5 text-[12px] text-muted">{s.parent_id && `From ${agentName(stars.find((x) => x.id === s.parent_id)!)}`}</p>
       </section>
       <Verdict s={s} />
-      <section><H>Accuracy along this path</H><PathChart stars={stars} highlight={s} /></section>
+      <section><H>Accuracy along this path</H><div className="plate"><PathChart stars={stars} highlight={s} /></div></section>
       {s.reflection && <p className="m-0 text-[13px] leading-relaxed">{s.reflection}</p>}
       {replans.map((r) => <p key={r.seq} className="m-0 text-[12.5px] text-human">“{r.because}” → {r.change}</p>)}
       {s.provenance.length > 0 && <section><H>Tested claim</H><ProvList items={s.provenance} /></section>}
@@ -222,8 +225,11 @@ export function Inspector() {
   const { app, selectedId, abstractOpen } = useStore()
   const s = app.session?.stars.find((x) => x.id === selectedId)
   return (
-    <aside className="min-h-0 overflow-y-auto border-l border-rule bg-surface" aria-label="Results">
-      {abstractOpen && app.session?.abstract ? <AbstractView /> : s ? <Detail s={s} key={s.id} /> : <Overview />}
+    <aside className="rail relative min-h-0 overflow-hidden border-l border-rule" aria-label="Results">
+      <Facets seed={FACET_SEED} />
+      <div className="relative h-full overflow-y-auto">
+        {abstractOpen && app.session?.abstract ? <AbstractView /> : s ? <Detail s={s} key={s.id} /> : <Overview />}
+      </div>
     </aside>
   )
 }

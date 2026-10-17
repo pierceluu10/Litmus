@@ -46,6 +46,7 @@ class Claim(BaseModel):
     conditions: str | None = None
     page: int | None = None
     provenance: list[Provenance]
+    summary: str | None = None
 
 
 class Knobs(BaseModel):

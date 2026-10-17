@@ -1,0 +1,392 @@
+{
+ "documents": [
+  {
+   "id": "doc_1376c970268a1cbf86d03a9cfbec2b4a",
+   "title": "Bag of Tricks for Image Classification with Convolutional Neural Networks",
+   "authors": [
+    "Tong He",
+    "Zhi Zhang",
+    "Hang Zhang",
+    "Zhongyue Zhang",
+    "Junyuan Xie",
+    "Mu Li"
+   ],
+   "year": 2018,
+   "url": "https://arxiv.org/abs/1812.01187",
+   "highlight_count": 2,
+   "note_count": 1,
+   "papiers_url": "https://arxiv.org/abs/1812.01187"
+  },
+  {
+   "id": "doc_aa53835c4f45e814cacc582b04612708",
+   "title": "mixup: Beyond Empirical Risk Minimization",
+   "authors": [
+    "Hongyi Zhang",
+    "Moustapha Cisse",
+    "Yann N. Dauphin",
+    "David Lopez-Paz"
+   ],
+   "year": 2018,
+   "url": "https://arxiv.org/abs/1710.09412",
+   "highlight_count": 3,
+   "note_count": 1,
+   "papiers_url": "https://arxiv.org/abs/1710.09412"
+  },
+  {
+   "id": "doc_2e6fb3fbe41dbba1af2930ea4cba3c4a",
+   "title": "When Does Label Smoothing Help?",
+   "authors": [
+    "Rafael Müller",
+    "Simon Kornblith",
+    "Geoffrey Hinton"
+   ],
+   "year": 2019,
+   "url": "https://arxiv.org/abs/1906.02629",
+   "highlight_count": 2,
+   "note_count": 1,
+   "papiers_url": "https://arxiv.org/abs/1906.02629"
+  },
+  {
+   "id": "doc_082fba6b9d0daeaaac0c5ee51195d185",
+   "title": "Rethinking the Inception Architecture for Computer Vision",
+   "authors": [
+    "Christian Szegedy",
+    "Vincent Vanhoucke",
+    "Sergey Ioffe",
+    "Jonathon Shlens",
+    "Zbigniew Wojna"
+   ],
+   "year": 2015,
+   "url": "https://arxiv.org/abs/1512.00567",
+   "highlight_count": 1,
+   "note_count": 1,
+   "papiers_url": "https://arxiv.org/abs/1512.00567"
+  },
+  {
+   "id": "doc_5810f60816d3c54d55d3fa9fcfe4b5ae",
+   "title": "94% on CIFAR-10 in 3.29 Seconds on a Single GPU",
+   "authors": [
+    "Keller Jordan"
+   ],
+   "year": 2024,
+   "url": "https://arxiv.org/abs/2404.00498",
+   "highlight_count": 4,
+   "note_count": 2,
+   "papiers_url": "https://arxiv.org/abs/2404.00498"
+  }
+ ],
+ "claims": [
+  {
+   "id": "hl_0c73f204787e1043e26d4b984a8756c2",
+   "text": "In both CIFAR-10 and CIFAR-100 classification problems, the models trained using mixup significantly outperform their analogues trained with ERM",
+   "doc_id": "doc_aa53835c4f45e814cacc582b04612708",
+   "doc_title": "mixup: Beyond Empirical Risk Minimization",
+   "annotation": "200 epochs here. airbench trains about 10. Does it still hold?",
+   "weight": 3.0,
+   "rank": 1,
+   "conditions": "On CIFAR-10 and CIFAR-100, the paper compares PreAct ResNet-18, WideResNet-28-10, and DenseNet-BC-190 (growth rate 40), trained for 200 epochs on a single Tesla P100 with batch size 128; mixup uses alpha=1, weight decay 1e-4, no dropout, and learning-rate decays at epochs 100 and 150 (WideResNet: 60, 120, and 180). Test-error results were: CIFAR-10, ERM vs. mixup of 5.6 vs. 4.2, 3.8 vs. 2.7, and 3.7 vs. 2.7; CIFAR-100, 25.6 vs. 21.1, 19.4 vs. 17.5, and 19.0 vs. 16.8, respectively—improvements of 1.0–1.4 and 1.9–4.5 percentage points. The testbed matches the CIFAR-10 classification setting but differs substantially in scale and training: airbench is a ~2M-parameter VGG-style CNN trained for ~10 epochs with batch size 1024, whereas the paper uses three larger architectures for 200 epochs with batch size 128; airbench also uses label smoothing and augmentations rather than the paper's alpha=1 mixup comparison.",
+   "page": 5,
+   "provenance": [
+    {
+     "kind": "highlight",
+     "id": "hl_0c73f204787e1043e26d4b984a8756c2",
+     "doc_id": "doc_aa53835c4f45e814cacc582b04612708",
+     "doc_title": "mixup: Beyond Empirical Risk Minimization",
+     "text": "In both CIFAR-10 and CIFAR-100 classification problems, the models trained using mixup significantly outperform their analogues trained with ERM",
+     "papiers_url": "https://arxiv.org/abs/1710.09412"
+    },
+    {
+     "kind": "note",
+     "id": "hl_0c73f204787e1043e26d4b984a8756c2#annotation",
+     "doc_id": "doc_aa53835c4f45e814cacc582b04612708",
+     "doc_title": "mixup: Beyond Empirical Risk Minimization",
+     "text": "200 epochs here. airbench trains about 10. Does it still hold?",
+     "papiers_url": "https://arxiv.org/abs/1710.09412"
+    }
+   ],
+   "summary": "Mixup beats plain training"
+  },
+  {
+   "id": "hl_07db8d8d60e86170dda2cc24919b3c35",
+   "text": "In the mixup training, we choose α = 0.2 in the Beta distribution and increase the number of epochs from 120 to 200 because the mixed examples ask for a longer training progress to converge better.",
+   "doc_id": "doc_1376c970268a1cbf86d03a9cfbec2b4a",
+   "doc_title": "Bag of Tricks for Image Classification with Convolutional Neural Networks",
+   "annotation": "Mixup may need long training.",
+   "weight": 3.0,
+   "rank": 2,
+   "conditions": "In the paper’s ImageNet training-refinement experiments, mixup uses λ sampled from Beta(α, α) with α = 0.2, and training is extended from 120 to 200 epochs because the mixed examples require longer training to converge better. The specific model/parameter scale and any numerical effect size for this claim are not stated on this page; label smoothing is set to ε = 0.1, and the distillation teacher is a pretrained ResNet-152-D. The testbed differs substantially: it trains a ~2M-parameter VGG-style CNN on CIFAR-10 for ~10 epochs rather than the paper’s ImageNet experiments with 200 epochs; it also uses label smoothing 0.2 rather than 0.1.",
+   "page": 7,
+   "provenance": [
+    {
+     "kind": "highlight",
+     "id": "hl_07db8d8d60e86170dda2cc24919b3c35",
+     "doc_id": "doc_1376c970268a1cbf86d03a9cfbec2b4a",
+     "doc_title": "Bag of Tricks for Image Classification with Convolutional Neural Networks",
+     "text": "In the mixup training, we choose α = 0.2 in the Beta distribution and increase the number of epochs from 120 to 200 because the mixed examples ask for a longer training progress to converge better.",
+     "papiers_url": "https://arxiv.org/abs/1812.01187"
+    },
+    {
+     "kind": "note",
+     "id": "hl_07db8d8d60e86170dda2cc24919b3c35#annotation",
+     "doc_id": "doc_1376c970268a1cbf86d03a9cfbec2b4a",
+     "doc_title": "Bag of Tricks for Image Classification with Convolutional Neural Networks",
+     "text": "Mixup may need long training.",
+     "papiers_url": "https://arxiv.org/abs/1812.01187"
+    }
+   ],
+   "summary": "Mixup needs longer training"
+  },
+  {
+   "id": "hl_4e2b627ef691ff5db03de84f431f570e",
+   "text": "We show that label smoothing impairs distillation, i.e., when teacher models are trained with label smoothing, student models perform worse. We further show that this adverse effect results from loss of information in the logits.",
+   "doc_id": "doc_2e6fb3fbe41dbba1af2930ea4cba3c4a",
+   "doc_title": "When Does Label Smoothing Help?",
+   "annotation": "So not a free win",
+   "weight": 3.0,
+   "rank": 3,
+   "conditions": "The paper states only that teacher models trained with label smoothing produce worse-performing student models during distillation, and attributes this to information loss in the logits. The distillation dataset, teacher and student architectures/scales, training epochs, label-smoothing value (α), distillation settings, and effect size are not stated on this page. Our airbench testbed matches the paper’s mentioned CIFAR-10 setting and uses label smoothing (α=0.2), but the paper’s distillation conditions and effect size are not stated here, so no direct match can be established.",
+   "page": 2,
+   "provenance": [
+    {
+     "kind": "highlight",
+     "id": "hl_4e2b627ef691ff5db03de84f431f570e",
+     "doc_id": "doc_2e6fb3fbe41dbba1af2930ea4cba3c4a",
+     "doc_title": "When Does Label Smoothing Help?",
+     "text": "We show that label smoothing impairs distillation, i.e., when teacher models are trained with label smoothing, student models perform worse. We further show that this adverse effect results from loss of information in the logits.",
+     "papiers_url": "https://arxiv.org/abs/1906.02629"
+    },
+    {
+     "kind": "note",
+     "id": "hl_4e2b627ef691ff5db03de84f431f570e#annotation",
+     "doc_id": "doc_2e6fb3fbe41dbba1af2930ea4cba3c4a",
+     "doc_title": "When Does Label Smoothing Help?",
+     "text": "So not a free win",
+     "papiers_url": "https://arxiv.org/abs/1906.02629"
+    }
+   ],
+   "summary": "Label smoothing hurts distillation"
+  },
+  {
+   "id": "hl_193fdd44b77cd074275ad6e176c7012a",
+   "text": "In our experiments, using more crops does improve performance, but the increase to inference time outweighs the potential training speedup.",
+   "doc_id": "doc_5810f60816d3c54d55d3fa9fcfe4b5ae",
+   "doc_title": "94% on CIFAR-10 in 3.29 Seconds on a Single GPU",
+   "annotation": "How much of the 94% is just test-time augmentation?",
+   "weight": 3.0,
+   "rank": 4,
+   "conditions": "On CIFAR-10, the paper uses six test-time views per image: the original, translations one pixel up-left and down-right, and the mirrored versions of all three. The untranslated views receive weight 0.25 each and the other four 0.125 each; with this feature added, training reaches 94% accuracy in 10.8 epochs and takes 4.2 A100-seconds. The page does not quantify how much accuracy comes specifically from multi-crop inference, nor does it state the model size or architecture here; it only says that using more crops improves performance while increasing inference time enough to outweigh potential training-speed gains. The airbench94 testbed matches on CIFAR-10, roughly 94% accuracy, about 10 epochs, and mirror/translation test-time augmentation at roughly 4 seconds, but it uses a different explicitly described ~2M-parameter VGG-style model and its exact crop weighting/count is not stated as the paper’s six-view scheme.",
+   "page": 4,
+   "provenance": [
+    {
+     "kind": "highlight",
+     "id": "hl_193fdd44b77cd074275ad6e176c7012a",
+     "doc_id": "doc_5810f60816d3c54d55d3fa9fcfe4b5ae",
+     "doc_title": "94% on CIFAR-10 in 3.29 Seconds on a Single GPU",
+     "text": "In our experiments, using more crops does improve performance, but the increase to inference time outweighs the potential training speedup.",
+     "papiers_url": "https://arxiv.org/abs/2404.00498"
+    },
+    {
+     "kind": "note",
+     "id": "hl_193fdd44b77cd074275ad6e176c7012a#annotation",
+     "doc_id": "doc_5810f60816d3c54d55d3fa9fcfe4b5ae",
+     "doc_title": "94% on CIFAR-10 in 3.29 Seconds on a Single GPU",
+     "text": "How much of the 94% is just test-time augmentation?",
+     "papiers_url": "https://arxiv.org/abs/2404.00498"
+    }
+   ],
+   "summary": "More crops improve accuracy but slow inference"
+  },
+  {
+   "id": "hl_f00e337c8a98ab91885e251883ed6dd3",
+   "text": "Switching from random flip to alternating flip improves performance in every setting.",
+   "doc_id": "doc_5810f60816d3c54d55d3fa9fcfe4b5ae",
+   "doc_title": "94% on CIFAR-10 in 3.29 Seconds on a Single GPU",
+   "annotation": "Effect is about 0.1 points. Is it real or noise?",
+   "weight": 3.0,
+   "rank": 5,
+   "conditions": "The paper compares random flip with alternating flip across each listed configuration, averaging mean accuracy over n = 400 training runs. For airbench94, the comparisons use Translate(2), with or without Cutout(12), and with or without test-time augmentation (TTA), over roughly 10–80 epochs; the paper’s concrete example is 6.26% versus 6.13% error at 20 epochs for random versus alternating flip without TTA and without Cutout (about 0.13 percentage points, reported as a 27% effective speedup). It also compares airbench96 with Translate(2)+Cutout(12), and ResNet-18/ImageNet with Light RRC plus random versus alternating flip; the exact model scale and all hyperparameters are not stated on this page. Our testbed matches the airbench94/CIFAR-10 setting and uses alternating flip, 2-pixel translation, and TTA, but trains for only about 9.9 epochs versus the paper’s comparisons extending to 80 epochs; patch whitening and the number of repeated runs are not stated for the paper here.",
+   "page": 7,
+   "provenance": [
+    {
+     "kind": "highlight",
+     "id": "hl_f00e337c8a98ab91885e251883ed6dd3",
+     "doc_id": "doc_5810f60816d3c54d55d3fa9fcfe4b5ae",
+     "doc_title": "94% on CIFAR-10 in 3.29 Seconds on a Single GPU",
+     "text": "Switching from random flip to alternating flip improves performance in every setting.",
+     "papiers_url": "https://arxiv.org/abs/2404.00498"
+    },
+    {
+     "kind": "note",
+     "id": "hl_f00e337c8a98ab91885e251883ed6dd3#annotation",
+     "doc_id": "doc_5810f60816d3c54d55d3fa9fcfe4b5ae",
+     "doc_title": "94% on CIFAR-10 in 3.29 Seconds on a Single GPU",
+     "text": "Effect is about 0.1 points. Is it real or noise?",
+     "papiers_url": "https://arxiv.org/abs/2404.00498"
+    }
+   ],
+   "summary": "Alternating flips beat random flips"
+  },
+  {
+   "id": "hl_550c437bfcb2078e75f1d6b912bc3f7f",
+   "text": "In our ImageNet experiments with K = 1000 classes, we used u(k) = 1/1000 and  = 0.1. For ILSVRC 2012, we have found a consistent improvement of about 0.2% absolute both for top-1 error and the top-5 error (cf. Table 3).",
+   "doc_id": "doc_082fba6b9d0daeaaac0c5ee51195d185",
+   "doc_title": "Rethinking the Inception Architecture for Computer Vision",
+   "annotation": "Only 0.2% on ImageNet. Still true for 10-epoch CIFAR runs?",
+   "weight": 3.0,
+   "rank": 6,
+   "conditions": "For ILSVRC 2012/ImageNet with K=1000 classes, the paper used uniform label smoothing u(k)=1/1000 and ε=0.1, reporting a consistent improvement of about 0.2 percentage points in both top-1 and top-5 error. The networks were trained for 100 epochs with batch size 32 on 50 distributed NVIDIA Kepler GPUs; the specific model architecture is not stated on this page (the reported training setup used RMSProp with decay 0.9, learning rate 0.045, and gradient clipping at 2.0). airbench94 differs substantially: it is a ~2M-parameter VGG-style CIFAR-10 model trained for ~10 epochs with batch size 1024 and label smoothing 0.2, rather than the paper's ImageNet/100-epoch, ε=0.1 setup; therefore the cited 0.2% effect does not directly establish the result for the testbed.",
+   "page": 7,
+   "provenance": [
+    {
+     "kind": "highlight",
+     "id": "hl_550c437bfcb2078e75f1d6b912bc3f7f",
+     "doc_id": "doc_082fba6b9d0daeaaac0c5ee51195d185",
+     "doc_title": "Rethinking the Inception Architecture for Computer Vision",
+     "text": "In our ImageNet experiments with K = 1000 classes, we used u(k) = 1/1000 and  = 0.1. For ILSVRC 2012, we have found a consistent improvement of about 0.2% absolute both for top-1 error and the top-5 error (cf. Table 3).",
+     "papiers_url": "https://arxiv.org/abs/1512.00567"
+    },
+    {
+     "kind": "note",
+     "id": "hl_550c437bfcb2078e75f1d6b912bc3f7f#annotation",
+     "doc_id": "doc_082fba6b9d0daeaaac0c5ee51195d185",
+     "doc_title": "Rethinking the Inception Architecture for Computer Vision",
+     "text": "Only 0.2% on ImageNet. Still true for 10-epoch CIFAR runs?",
+     "papiers_url": "https://arxiv.org/abs/1512.00567"
+    }
+   ],
+   "summary": "Label smoothing adds about 0.2% on ImageNet"
+  },
+  {
+   "id": "hl_50d0a13772972038598976aba67aef0c",
+   "text": "We also find that models with higher capacities and/or longer training runs are the ones to benefit the most from mixup.",
+   "doc_id": "doc_aa53835c4f45e814cacc582b04612708",
+   "doc_title": "mixup: Beyond Empirical Risk Minimization",
+   "annotation": null,
+   "weight": 2.0,
+   "rank": 7,
+   "conditions": "The paper reports the claim for ResNet-101 and ResNeXt-101 versus the smaller ResNet-50 at 90 epochs: mixup improved top-1 error by 0.5–0.6% for the larger models versus 0.2% for ResNet-50. For ResNet-50, extending training from 90 to 200 epochs reduced mixup error by a further 1.2%, while ERM was unchanged; mixup used α in [0.1, 0.4] for these experiments, with batch size 1,024. The dataset is not stated on this page. airbench matches the paper's batch size of 1,024 but differs in scale and duration: it uses a ~2M-parameter VGG-style CIFAR-10 CNN for ~10 epochs, whereas the cited comparison uses ResNet-50/101 and ResNeXt-101 for 90 or 200 epochs.",
+   "page": 5,
+   "provenance": [
+    {
+     "kind": "highlight",
+     "id": "hl_50d0a13772972038598976aba67aef0c",
+     "doc_id": "doc_aa53835c4f45e814cacc582b04612708",
+     "doc_title": "mixup: Beyond Empirical Risk Minimization",
+     "text": "We also find that models with higher capacities and/or longer training runs are the ones to benefit the most from mixup.",
+     "papiers_url": "https://arxiv.org/abs/1710.09412"
+    }
+   ],
+   "summary": "Mixup benefits larger models and longer runs"
+  },
+  {
+   "id": "hl_e6fe7e4e99096612ffd416e8c57d5ee0",
+   "text": "ll models are trained on a single Nvidia Tesla P100 GPU using PyTorch2 for 200 epochs on the training set with 128 examples per minibatch, and evaluated on the test set. L",
+   "doc_id": "doc_aa53835c4f45e814cacc582b04612708",
+   "doc_title": "mixup: Beyond Empirical Risk Minimization",
+   "annotation": null,
+   "weight": 2.0,
+   "rank": 8,
+   "conditions": "On CIFAR-10 and CIFAR-100, the paper compares ERM with mixup for PreAct ResNet-18, WideResNet-28-10, and DenseNet-BC-190 (DenseNet growth rate changed to 40); mixup uses α=1, giving λ uniformly distributed from 0 to 1. All models were trained for 200 epochs on the training set and evaluated on the test set using one Nvidia Tesla P100 GPU, PyTorch, and minibatches of 128; the learning rate started at 0.1 and was decayed by 10 after epochs 100 and 150 (after 60, 120, and 180 for WideResNet), with weight decay 10^-4 and no dropout. The paper uses CIFAR-10/100 models trained for 200 epochs with batch size 128 and mixup/ERM, whereas airbench94 uses a ~2M-parameter VGG-style CNN on CIFAR-10 for ~10 epochs with batch size 1024, SGD+Nesterov, label smoothing, augmentations, and test-time augmentation.",
+   "page": 5,
+   "provenance": [
+    {
+     "kind": "highlight",
+     "id": "hl_e6fe7e4e99096612ffd416e8c57d5ee0",
+     "doc_id": "doc_aa53835c4f45e814cacc582b04612708",
+     "doc_title": "mixup: Beyond Empirical Risk Minimization",
+     "text": "ll models are trained on a single Nvidia Tesla P100 GPU using PyTorch2 for 200 epochs on the training set with 128 examples per minibatch, and evaluated on the test set. L",
+     "papiers_url": "https://arxiv.org/abs/1710.09412"
+    }
+   ],
+   "summary": "Training uses one P100 for 200 epochs"
+  },
+  {
+   "id": "hl_33c941e6438e93e3bb07a030aca138fa",
+   "text": "The idea of label smoothing was first proposed to train Inception-v2 [26]. It changes the construction of the true probability to\nqi = { 1 − ε if i = y, ε/(K − 1) otherwise,  (4)\nwhere ε is a small constant. Now the optimal solution becomes\nz ∗ i = { log((K − 1)(1 − ε)/ε) + α if i = y, α otherwise,  (5)\nwhere α can be an arbitrary real number. This encourages a finite output from the fully-connected layer and can generalize better.",
+   "doc_id": "doc_1376c970268a1cbf86d03a9cfbec2b4a",
+   "doc_title": "Bag of Tricks for Image Classification with Convolutional Neural Networks",
+   "annotation": null,
+   "weight": 2.0,
+   "rank": 9,
+   "conditions": "The claim concerns label smoothing as proposed for training Inception-v2 [26], replacing the one-hot target with ε=small constant: 1−ε for the true class and ε/(K−1) for every other class. The page does not state the dataset, model scale, number of epochs, or a numeric ε; it claims qualitatively that smoothing yields finite fully connected-layer outputs and can generalize better. Our airbench94 testbed differs in model and scale (a ~2M-parameter VGG-style CIFAR-10 CNN rather than Inception-v2) and uses ε=0.2 for ~10 epochs; the paper's Inception-v2 training conditions and effect size are not stated on this page.",
+   "page": 6,
+   "provenance": [
+    {
+     "kind": "highlight",
+     "id": "hl_33c941e6438e93e3bb07a030aca138fa",
+     "doc_id": "doc_1376c970268a1cbf86d03a9cfbec2b4a",
+     "doc_title": "Bag of Tricks for Image Classification with Convolutional Neural Networks",
+     "text": "The idea of label smoothing was first proposed to train Inception-v2 [26]. It changes the construction of the true probability to\nqi = { 1 − ε if i = y, ε/(K − 1) otherwise,  (4)\nwhere ε is a small constant. Now the optimal solution becomes\nz ∗ i = { log((K − 1)(1 − ε)/ε) + α if i = y, α otherwise,  (5)\nwhere α can be an arbitrary real number. This encourages a finite output from the fully-connected layer and can generalize better.",
+     "papiers_url": "https://arxiv.org/abs/1812.01187"
+    }
+   ],
+   "summary": "Label smoothing can improve generalization"
+  },
+  {
+   "id": "hl_d9c72e849f79594e8a82f55f4f89c619",
+   "text": "Here we show empirically that in addition to improving generalization, label smoothing improves model calibration which can significantly improve beam-search.",
+   "doc_id": "doc_2e6fb3fbe41dbba1af2930ea4cba3c4a",
+   "doc_title": "When Does Label Smoothing Help?",
+   "annotation": null,
+   "weight": 2.0,
+   "rank": 10,
+   "conditions": "The page states only that the claim was demonstrated empirically using neural networks trained with and without label smoothing, with calibration evaluated in a beam-search setting; the dataset, model and scale, training duration, label-smoothing value, beam-search setup, and effect size are not stated on this page. The airbench94 testbed is a ~2M-parameter VGG-style CNN trained on CIFAR-10 for ~9.9 epochs with label smoothing 0.2, but the paper’s corresponding experimental conditions are not stated on this page, so a more specific match cannot be determined.",
+   "page": 1,
+   "provenance": [
+    {
+     "kind": "highlight",
+     "id": "hl_d9c72e849f79594e8a82f55f4f89c619",
+     "doc_id": "doc_2e6fb3fbe41dbba1af2930ea4cba3c4a",
+     "doc_title": "When Does Label Smoothing Help?",
+     "text": "Here we show empirically that in addition to improving generalization, label smoothing improves model calibration which can significantly improve beam-search.",
+     "papiers_url": "https://arxiv.org/abs/1906.02629"
+    }
+   ],
+   "summary": "Label smoothing improves calibration"
+  },
+  {
+   "id": "hl_7cc061c7463f10a7ec432d498aac2595",
+   "text": "Patch-whitening initialization is the single most impactful feature. Adding it to the baseline more than doubles training speed so that we reach 94% accuracy in 21 epochs taking 8.0 A100-seconds.",
+   "doc_id": "doc_5810f60816d3c54d55d3fa9fcfe4b5ae",
+   "doc_title": "94% on CIFAR-10 in 3.29 Seconds on a Single GPU",
+   "annotation": null,
+   "weight": 2.0,
+   "rank": 11,
+   "conditions": "On CIFAR-10, the 1.97M-parameter VGG-style CNN baseline uses batch size 1024, Nesterov SGD, label smoothing 0.2, triangular learning rate schedule, random horizontal flips, and 2-pixel reflection-padded translations; it reaches 94% mean accuracy in 45 epochs and 18.3 A100-seconds. Adding a frozen 2x2, 24-channel patch-whitening first convolution—12 filters initialized from the 2x2-patch covariance eigenvectors and 12 as their negations, with learnable biases trained for 3 epochs and then frozen—more than doubles training speed, reaching 94% in 21 epochs and 8.0 A100-seconds; exact learning-rate, momentum, weight-decay, and eigenvalue-regularization values are not stated on this page. The testbed matches the CIFAR-10, roughly 2M-parameter CNN, batch-1024 SGD/Nesterov, label-smoothing-0.2, flip/2-pixel-translation, patch-whitening, and roughly 94%-accuracy setup, but trains for about 10 epochs and 4 seconds rather than the paper's 21 epochs and 8.0 A100-seconds, and its stated test-time augmentation also includes translation.",
+   "page": 3,
+   "provenance": [
+    {
+     "kind": "highlight",
+     "id": "hl_7cc061c7463f10a7ec432d498aac2595",
+     "doc_id": "doc_5810f60816d3c54d55d3fa9fcfe4b5ae",
+     "doc_title": "94% on CIFAR-10 in 3.29 Seconds on a Single GPU",
+     "text": "Patch-whitening initialization is the single most impactful feature. Adding it to the baseline more than doubles training speed so that we reach 94% accuracy in 21 epochs taking 8.0 A100-seconds.",
+     "papiers_url": "https://arxiv.org/abs/2404.00498"
+    }
+   ],
+   "summary": "Patch whitening more than doubles training speed"
+  },
+  {
+   "id": "hl_62d0d70418d9076750cb2eada98e208e",
+   "text": "This method partially follows tysam-code (2023), which used a more complicated scheme where the identity weights are mixed in with the original initialization, which we did not find to be more performant. With this feature added, training attains 94% accuracy in 18 epochs taking 6.8 A100-seconds.",
+   "doc_id": "doc_5810f60816d3c54d55d3fa9fcfe4b5ae",
+   "doc_title": "94% on CIFAR-10 in 3.29 Seconds on a Single GPU",
+   "annotation": null,
+   "weight": 2.0,
+   "rank": 12,
+   "conditions": "On CIFAR-10, the method initializes every convolution after the first as a partial identity transform: for a layer with M input and N≥M output channels, the first M filters are initialized with an identity transform using `torch.nn.init.dirac(w[:w.size(1)])`, while the remaining filters retain default initialization. With this feature, training reaches 94% accuracy in 18 epochs and 6.8 A100-seconds; the model architecture and parameter scale are not stated on this page. Our testbed matches the CIFAR-10 setting and uses a similarly VGG-style CNN, but trains for about 9.9 epochs rather than 18; its batch size, optimizer, and other listed hyperparameters are not specified in the highlighted claim.",
+   "page": 4,
+   "provenance": [
+    {
+     "kind": "highlight",
+     "id": "hl_62d0d70418d9076750cb2eada98e208e",
+     "doc_id": "doc_5810f60816d3c54d55d3fa9fcfe4b5ae",
+     "doc_title": "94% on CIFAR-10 in 3.29 Seconds on a Single GPU",
+     "text": "This method partially follows tysam-code (2023), which used a more complicated scheme where the identity weights are mixed in with the original initialization, which we did not find to be more performant. With this feature added, training attains 94% accuracy in 18 epochs taking 6.8 A100-seconds.",
+     "papiers_url": "https://arxiv.org/abs/2404.00498"
+    }
+   ],
+   "summary": "Identity mixing does not improve performance"
+  }
+ ]
+}

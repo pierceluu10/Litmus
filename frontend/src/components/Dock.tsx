@@ -53,7 +53,6 @@ function Proposals({ starId, items, background }: { starId: string; items: Propo
           Dispatch {sel.length || ''} agent{sel.length === 1 ? '' : 's'}
         </button>
       </div>
-      <p className="label m-0 mt-2">Pick up to {MAX_AGENTS}.</p>
       </>}
     </section>
   )

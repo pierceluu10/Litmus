@@ -5,6 +5,8 @@ or remove fields, every change gets a Changelog line (newest first) and lands on
 `docs(contract): ...`.
 
 ## Changelog
+- 2026-10-17 — Additive: `Claim.summary?` (a 3–7 word AI title for the claim, cached per highlight + note);
+  `GET /api/library/stream` (server-sent events while Papiers is read live).
 - 2026-10-17 — Additive: `SessionState.wave`, `.agenda: AgendaItem[]`, `.finish_requested`, `.last_seq`;
   `Proposal.wave`, `.parent_star_id`; `Star.wave`; `Question.wave`; `QuestionOption.directive?`,
   `.parent_star_id?`, `.knob_changes?`; `RunResult.cached?`; `POST /api/sessions` body `fresh?`,
@@ -27,6 +29,7 @@ All JSON is snake_case. Timestamps are ISO 8601 UTC strings. IDs are stable stri
 | GET | `/api/health` | | `{ok, modal_warm, papiers_ok, openai_ok}` |
 | POST | `/api/warmup` | | `{ok}` (warms Modal container) |
 | GET | `/api/library` | | `{documents: Document[], claims: Claim[]}` ranked, with provenance |
+| GET | `/api/library/stream` | | `text/event-stream`: `{stage: "papers"\|"highlights"\|"notes"\|"summaries"}` as each stage starts, then `{stage: "done", documents, claims}` or `{stage: "error", message}` |
 | POST | `/api/sessions` | `{goal?, budget_gpu_seconds?, auto_mode?, auto_timeout_seconds?, max_waves?, fresh?}` | `{session_id}` |
 | GET | `/api/sessions` | | `{sessions: {id, goal, status, created_at, replay}[]}` newest first |
 | GET | `/api/sessions/{id}` | | full `SessionState` snapshot |
@@ -65,7 +68,8 @@ Claim = { id: string,                      // the highlight id (hl_...) or note/
           rank: number,                    // 1-based
           conditions?: string,             // experimental conditions behind the claim, from the paper text
           page?: number,                   // page of the highlight in its document
-          provenance: Provenance[] }
+          provenance: Provenance[],
+          summary?: string }               // 3-7 word title written by the LLM from the highlight and note
 
 Knobs = { label_smoothing:number, epochs:number, tta_level:0|1|2, flip:"random"|"alternating"|"none",
           mixup_alpha:number, cutout:number, lr_scale:number, whiten:boolean, dirac_init:boolean, translate:number }

@@ -111,6 +111,14 @@ uv run litmus --help
   12 highlights, 6 annotated, 0 standalone notes, 0 conversations (the code handles both).
 - Conditions behind each highlight: `papiers read doc --pages N` + LLM (`prompts/extract_conditions.txt`),
   extracted once and cached in `backend/data/library_cache.json`. If Papiers is down, the cache is served.
+- Summaries: one LLM call (`prompts/summarize_claims.txt`) titles every claim in 3–7 words (`Claim.summary`), cached
+  in `library_cache.json` and rewritten only when the highlight or its note changes.
+- `GET /api/library/stream` (SSE) reads Papiers live in stages (papers → highlights → notes → summaries) so the UI can
+  show progress; the frontend calls it on every workspace launch, in the demo too.
+- A `PAPIERS_TOKEN` in `.env` overrides `papiers auth login`; a revoked token fails every call with 401
+  `auth_invalid` (the library then falls back to the cache), so leave it unset if you are logged in.
+- Papiers.app registers `papiers://highlight/<uuid>` deep links, but the CLI only exposes public ids (`hl_…`), not
+  those uuids, so "Source" links to the paper's URL.
 - **No write-back via CLI**: v0.1.5 has no write command (`supports_write()` checks `papiers help --all`).
   Papiers is a desktop app with no web deep links, so `papiers_url` = the paper's source URL (arXiv).
 
@@ -224,7 +232,9 @@ npm test             # reducer, layout, simulator + grader-port tests
 ```
 **Demo backend is the default** (user decision, 2026-10-17): with no `frontend/.env`, the app runs the in-browser backend in `src/mock/` and shows no demo badge. `VITE_MOCK=0` switches to the real backend at `VITE_API_URL` (default `http://localhost:8000`).
 
-**The demo backend** (`src/mock/`): `sim.ts` is a simulated airbench94 whose knob effects are calibrated from the recorded real session (`shared/demo-session.json`: mixup α=1 −1.44, α=0.2 +0.22 at 30 epochs, no TTA −0.75, no whitening −1.48, …) with seed-paired noise, plus a port of the locked grader (paired t-interval, verdict relative to prediction). `server.ts` emits the contract's events: any star can be branched (a catalog of moves tied to library highlights), there is no agent's pick and no shadow runs, inconclusive results get 5 more seeds, the first mixup refutation triggers library search + a question, and the next wave is proposed from the best star. `library.ts` is the demo library with hand-written claim summaries (live sessions fall back to the claim's opening words).
+**The library is always real**: on launch the claims rail streams `GET /api/library/stream` from the backend (Getting papers… highlights… notes… Summarizing…), in the demo too, so run `uv run litmus serve`. If the backend is unreachable the demo falls back to `src/mock/library.json`, a snapshot of `backend/data/library_cache.json` with the same ids (refresh it by copying the cache).
+
+**The demo backend** (`src/mock/`): `sim.ts` is a simulated airbench94 whose knob effects are calibrated from the recorded real session (`shared/demo-session.json`: mixup α=1 −1.44, α=0.2 +0.22 at 30 epochs, no TTA −0.75, no whitening −1.48, …) with seed-paired noise, plus a port of the locked grader (paired t-interval, verdict relative to prediction). `server.ts` emits the contract's events: any star can be branched (a catalog of moves tied to library highlights), there is no agent's pick and no shadow runs, inconclusive results get 5 more seeds, the first mixup refutation triggers library search + a question, and the next wave is proposed from the best star. `library.ts` maps the demo's moves onto highlights in that snapshot by their real ids.
 
 **Folder map** (`frontend/src`)
 | Path | What |
@@ -237,10 +247,11 @@ npm test             # reducer, layout, simulator + grader-port tests
 | `App.tsx` | Hash router: home `Landing`, `#/login` and `#/signup` (`Auth`, demo account in `auth.ts`), then the workspace once a session exists |
 | `components/Landing.tsx`, `LowPolyScene.tsx`, `thinker*.ts` | The home page: intro animation; the statue and headline fade out on scroll; then a pinned horizontal walkthrough (vertical scroll drives `x`; slides dwell in the middle of their range, `dwell()`) of plain-language cards that copy the real workspace (claims, proposal dock, tree, leaderboard, question card, write-up). Below 860px or with reduced motion the slides stack vertically. SVG low-poly temple with the Thinker |
 | `components/Scene.tsx` | The 3D canvas: statue, blobs, edges, accuracy scale, follow camera |
-| `components/` | `TopBar` (status, GPU budget, Generate abstract), `Claims` (left rail), `Inspector` (right rail: results overview, one agent's detail, abstract), `PathChart`, `Dock` (proposals + questions), `Prov` |
+| `components/` | `TopBar` (GPU budget, Generate abstract), `Claims` (left rail: AI title, "Paper:", then your note, Basis (the highlight + paper setting) and Findings (once tested), cite · page · Source), `Inspector` (right rail: results, rankings, one agent's detail, abstract), `PathChart`, `Dock` (proposals + questions), `Prov`, `Icons` |
+| `components/LowPolyScene.tsx` `Facets` | The landing's faceted low-poly sky, reused as the rails' ground |
 | `public/litmus-statue.glb` | The agent: SMK's public-domain scan of the Artemision Bronze (KAS2100, api.smk.dk), decimated to 1,200 faces, fingertip at the origin |
 
-**The scene is a chart**: x = generations from the statue's fingertip (siblings take their own column), y = measured accuracy (22 units per point, baseline at the fingertip's height), z = a little depth per sibling. An ungraded star rides at its parent's height and glides to its accuracy when graded. Blob = experiment (graphite, distorts faster while training); ring = verdict colour (partial arc = training progress, amber = needs you); dashed edge = shadow branch or training. Scale labels are pinned to the canvas's right edge.
+**The scene is a chart**: x = generations from the statue's fingertip (siblings take their own column), y = measured accuracy (22 units per point, baseline at the fingertip's height), z = a little depth per sibling. An ungraded star rides at its parent's height and glides to its accuracy when graded. Blob = experiment (graphite, distorts faster while training); ring = verdict colour (partial arc = training progress, amber = needs you); dashed edge = shadow branch or training. Faint dashed lines mark the accuracy levels; the numbers live in the right rail.
 
 **Camera**: locked: no rotate or pan, zoom capped (170-480 units). At the start of a session it opens just behind the statue's head, looking over its shoulder along the arm, and glides once to the default view (`EAR_CAM`/`EAR_AIM`, `INTRO_SMOOTH` in `Scene.tsx`). The default view (`VIEW`) is swung a little toward the nodes' side so the tree is met head-on, aimed at the midpoint of the focused star and its parent. Focus = the newest star while following; dispatching, answering or branching turns following back on; clicking any star or claim re-centres on it and keeps your zoom. "Fit all" is a toggle (`fitAll` in the store): on frames every star, off returns to the default view. There is no pause button.
 

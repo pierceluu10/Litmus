@@ -5,6 +5,7 @@ import { useStore } from '../store'
 import type { Star } from '../types'
 
 const W = 328, H = 176, M = { l: 44, r: 16, t: 14, b: 24 }
+const FINE_SPAN = 0.005 // below half a point, ticks need two decimals to stay distinct
 
 const pathTo = (s: Star, byId: Map<string, Star>) => {
   const out: Star[] = []
@@ -13,12 +14,27 @@ const pathTo = (s: Star, byId: Map<string, Star>) => {
 }
 const band = (s: Star): [number, number] => { const g = s.grade!; return g.verdict === 'baseline' ? [g.ci_low, g.ci_high] : [g.mean_child + g.ci_low - g.delta, g.mean_child + g.ci_high - g.delta] }
 
+const EMPTY_TICKS = 4
+
+// Before the baseline is graded: the frame, so the panel keeps its shape.
+function EmptyChart() {
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="Accuracy chart, waiting for the baseline">
+      {Array.from({ length: EMPTY_TICKS }, (_, i) => {
+        const y = M.t + ((H - M.t - M.b) * i) / (EMPTY_TICKS - 1)
+        return <line key={i} x1={M.l} x2={W - M.r} y1={y} y2={y} stroke="var(--color-rule)" />
+      })}
+      <text x={M.l} y={H - 6} textAnchor="middle" fontSize={10} fill="var(--color-faint)" fontFamily="var(--font-mono)">base</text>
+    </svg>
+  )
+}
+
 // Accuracy along every root-to-leaf path. The highlighted path (the selected star's, else the best one)
 // gets its 95% band; dashed paths are the agent's own runs (shadow branches).
 export function PathChart({ stars, highlight }: { stars: Star[]; highlight: Star | null }) {
   const select = useStore((s) => s.select)
   const graded = stars.filter((s) => s.grade && s.status !== 'failed')
-  if (graded.length < 2) return <p className="m-0 text-muted">Paths appear once the first experiment is graded.</p>
+  if (!graded.length) return <EmptyChart />
   const byId = new Map(stars.map((s) => [s.id, s]))
   const hasGradedChild = new Set(graded.map((s) => s.parent_id))
   const leaves = graded.filter((s) => !hasGradedChild.has(s.id))
@@ -31,6 +47,7 @@ export function PathChart({ stars, highlight }: { stars: Star[]; highlight: Star
   const depth = Math.max(1, ...graded.map((s) => s.depth))
   const x = scaleLinear().domain([0, depth]).range([M.l, W - M.r])
   const y = scaleLinear().domain([lo - pad, hi + pad]).range([H - M.b, M.t])
+  const digits = hi - lo + 2 * pad < FINE_SPAN ? 2 : 1
   const trace = line<Star>().x((s) => x(s.depth)).y((s) => y(s.grade!.mean_child))
   const bandArea = area<Star>().x((s) => x(s.depth)).y0((s) => y(band(s)[0])).y1((s) => y(band(s)[1]))
   return (
@@ -38,7 +55,7 @@ export function PathChart({ stars, highlight }: { stars: Star[]; highlight: Star
       {y.ticks(4).map((t) => (
         <g key={t}>
           <line x1={M.l} x2={W - M.r} y1={y(t)} y2={y(t)} stroke="var(--color-rule)" />
-          <text x={M.l - 8} y={y(t)} dy="0.32em" textAnchor="end" fontSize={10} fill="var(--color-faint)" fontFamily="var(--font-mono)">{(t * 100).toFixed(1)}%</text>
+          <text x={M.l - 8} y={y(t)} dy="0.32em" textAnchor="end" fontSize={10} fill="var(--color-faint)" fontFamily="var(--font-mono)">{(t * 100).toFixed(digits)}%</text>
         </g>
       ))}
       {Array.from({ length: depth + 1 }, (_, d) => (
@@ -56,7 +73,7 @@ export function PathChart({ stars, highlight }: { stars: Star[]; highlight: Star
           <title>{`${agentName(s)}: ${(s.grade!.mean_child * 100).toFixed(2)}%`}</title>
         </circle>
       ))}
-      <text x={Math.min(x(focus.depth), W - M.r)} y={y(focus.grade!.mean_child) - 9} textAnchor={focus.depth === depth ? 'end' : 'middle'} fontSize={10.5} fontWeight={550} fill="var(--color-ink)">
+      <text x={focus.depth === 0 ? x(0) + 8 : Math.min(x(focus.depth), W - M.r)} y={y(focus.grade!.mean_child) - 9} textAnchor={focus.depth === 0 ? 'start' : focus.depth === depth ? 'end' : 'middle'} fontSize={10.5} fontWeight={550} fill="var(--color-ink)">
         {(focus.grade!.mean_child * 100).toFixed(2)}%
       </text>
     </svg>

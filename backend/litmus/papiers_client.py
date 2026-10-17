@@ -9,6 +9,7 @@ import asyncio
 import json
 import os
 import shutil
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 from litmus.models import Claim, Document, Provenance
@@ -25,6 +26,13 @@ WEIGHT_NOTE_OR_CONVERSATION = 2.5
 WEIGHT_HIGHLIGHT = 2.0
 WEIGHT_REFERENCED_BONUS = 0.25  # a highlight whose document a note/conversation also discusses
 WEIGHT_UNREAD_DOCUMENT = 0.5
+
+
+Progress = Callable[[str], Awaitable[None]]
+
+
+async def _quiet(stage: str) -> None:
+    return None
 
 
 class PapiersError(RuntimeError):
@@ -140,17 +148,22 @@ async def _read_all(listing: dict) -> dict:
     return await run_cli("read", "@-", stdin="\n".join(ids))
 
 
-async def fetch_library() -> tuple[list[Document], list[Claim]]:
-    """Load documents, highlights, notes, and conversations live from Papiers and rank the claims."""
-    doc_list, hl_list, note_list, cnv_list = await asyncio.gather(
-        run_cli("list", "--kind", "document", "--limit", str(LIST_LIMIT)),
-        run_cli("list", "--kind", "highlight", "--limit", str(LIST_LIMIT)),
+async def fetch_library(progress: Progress = _quiet) -> tuple[list[Document], list[Claim]]:
+    """Load documents, highlights, notes, and conversations live from Papiers and rank the claims.
+
+    Stages run one after another so `progress` reports what is actually being read.
+    """
+    await progress("papers")
+    documents = parse_documents(await run_cli("list", "--kind", "document", "--limit", str(LIST_LIMIT)))
+    by_id = {d.id: d for d in documents}
+    await progress("highlights")
+    hl_read = await _read_all(await run_cli("list", "--kind", "highlight", "--limit", str(LIST_LIMIT)))
+    await progress("notes")
+    note_list, cnv_list = await asyncio.gather(
         run_cli("list", "--kind", "note", "--limit", str(LIST_LIMIT)),
         run_cli("list", "--kind", "conversation", "--limit", str(LIST_LIMIT)),
     )
-    documents = parse_documents(doc_list)
-    by_id = {d.id: d for d in documents}
-    hl_read, note_read, cnv_read = await asyncio.gather(_read_all(hl_list), _read_all(note_list), _read_all(cnv_list))
+    note_read, cnv_read = await asyncio.gather(_read_all(note_list), _read_all(cnv_list))
     claims = (parse_highlights(hl_read, by_id)
               + parse_notes_or_conversations(note_read, "note", by_id)
               + parse_notes_or_conversations(cnv_read, "conversation", by_id))

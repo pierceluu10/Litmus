@@ -18,7 +18,8 @@ const facing = (c: P, center: P, r: () => number) => {
 }
 
 // a trapezoid cut into a jittered grid
-function gridMesh(top: [number, number, number], bottom: [number, number, number], cols: number, rows: number, seed: number, tint?: number[]): Tri[] {
+type Shading = (center: P, meshCenter: P, r: () => number) => number
+function gridMesh(top: [number, number, number], bottom: [number, number, number], cols: number, rows: number, seed: number, tint?: number[], light: Shading = facing): Tri[] {
   const r = seeded(seed), out: Tri[] = []
   const pt = (c: number, rw: number): P => {
     const f = rw / rows, y = top[2] + (bottom[2] - top[2]) * f
@@ -30,7 +31,7 @@ function gridMesh(top: [number, number, number], bottom: [number, number, number
   const cx = (top[0] + top[1]) / 2, cy = (top[2] + bottom[2]) / 2
   for (let rw = 0; rw < rows; rw++) for (let c = 0; c < cols; c++) {
     const a = pt(c, rw), b = pt(c + 1, rw), d = pt(c, rw + 1), e = pt(c + 1, rw + 1)
-    out.push(tri(a, b, d, facing(mid(a, b, d), [cx, cy], r), tint), tri(b, e, d, facing(mid(b, e, d), [cx, cy], r) - 0.04, tint))
+    out.push(tri(a, b, d, light(mid(a, b, d), [cx, cy], r), tint), tri(b, e, d, light(mid(b, e, d), [cx, cy], r) - 0.04, tint))
   }
   return out
 }
@@ -58,6 +59,22 @@ function column(cx: number, top: number, bottom: number, w: number, seed: number
 }
 
 const AEGEAN = [112, 146, 188]
+const FACET_TINT = [196, 210, 228]
+const FACET_CELL = 56
+const FACET_LIGHT = 0.7, FACET_SPREAD = 0.3
+// a rail is tall and narrow, so light it evenly with per-facet jitter instead of from the mesh's centre
+const evenLight: Shading = (_c, _m, r) => FACET_LIGHT + (r() - 0.5) * FACET_SPREAD
+
+// The landing's faceted sky, as a quiet ground behind the workspace rails. Sized in CSS pixels so facets
+// keep the same scale whatever the rail's height.
+export function Facets({ seed, width = 400, height = 1400 }: { seed: number; width?: number; height?: number }) {
+  const tris = gridMesh([0, width, 0], [0, width, height], Math.ceil(width / FACET_CELL), Math.ceil(height / FACET_CELL), seed, FACET_TINT, evenLight)
+  return (
+    <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMinYMin slice" aria-hidden="true">
+      {tris.map((t, i) => <polygon key={i} points={t.pts.map((p) => p.join(',')).join(' ')} fill={t.fill} stroke={t.fill} strokeWidth={0.6} strokeLinejoin="round" />)}
+    </svg>
+  )
+}
 export function LowPolyScene({ className, intro = false }: { className?: string; intro?: boolean }) {
   const sky = gridMesh([-700, 1600, -500], [-700, 1600, 504], 16, 6, 91, [214, 226, 240])
   const floor = gridMesh([-700, 1600, 504], [-700, 1600, 1000], 16, 3, 92, [196, 208, 224])

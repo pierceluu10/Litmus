@@ -1,4 +1,4 @@
-import type { Api } from './api'
+import { LibraryUnavailable, type Api, type Library, type LibraryStage } from './api'
 import type { LitmusEvent } from '../types'
 
 const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8000'
@@ -10,10 +10,29 @@ async function call<T>(method: string, path: string, body?: unknown, text = fals
 }
 const sp = (sid: string, p: string) => `/api/sessions/${sid}${p}`
 
+type LibraryMessage = { stage: LibraryStage } | ({ stage: 'done' } & Library) | { stage: 'error'; message: string }
+
+// Papiers is read live on the backend; each stage arrives as it starts, then the ranked, summarized library.
+export function streamLibrary(onStage: (stage: LibraryStage) => void, signal: AbortSignal): Promise<Library> {
+  return new Promise((resolve, reject) => {
+    const source = new EventSource(`${BASE}/api/library/stream`)
+    const close = () => { source.close(); signal.removeEventListener('abort', close) }
+    signal.addEventListener('abort', close)
+    source.onmessage = (m) => {
+      const e: LibraryMessage = JSON.parse(m.data)
+      if (e.stage === 'done') { close(); resolve({ documents: e.documents, claims: e.claims }) }
+      else if (e.stage === 'error') { close(); reject(new LibraryUnavailable(e.message)) }
+      else onStage(e.stage)
+    }
+    source.onerror = () => { close(); reject(new LibraryUnavailable(`Could not reach the Litmus backend at ${BASE}`)) }
+  })
+}
+
 export const realApi: Api = {
   mock: false,
   health: () => call('GET', '/api/health'),
   warmup: () => call('POST', '/api/warmup'),
+  library: streamLibrary,
   createSession: async (b) => (await call<{ session_id: string }>('POST', '/api/sessions', b)).session_id,
   replayDemo: async () => (await call<{ session_id: string }>('GET', '/api/replay/demo')).session_id,
   subscribe(sid, fromSeq, onEvent, onConn) {

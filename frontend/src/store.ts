@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { applyEvent, initialState, type AppState } from './reducer'
 import { mockApi } from './transport/mock'
 import { realApi } from './transport/real'
-import type { ConnState, Health } from './transport/api'
+import type { ConnState, Health, LibraryStage } from './transport/api'
 import type { Provenance, Selection } from './types'
 
 // The in-browser demo backend is the default; VITE_MOCK=0 talks to the real one.
@@ -12,6 +12,7 @@ type Store = {
   app: AppState
   sid: string | null
   conn: ConnState
+  libraryStage: LibraryStage | 'ready'
   health: Health | null
   error: string | null
   selectedId: string | null
@@ -37,6 +38,7 @@ type Store = {
 }
 
 let unsub: (() => void) | null = null
+let libraryLoad: AbortController | null = null
 
 export const useStore = create<Store>((set, get) => {
   // Wrap an action: surface failures in the UI instead of swallowing them.
@@ -46,17 +48,23 @@ export const useStore = create<Store>((set, get) => {
     try { await f(sid); set({ error: null }) } catch (e) { set({ error: (e as Error).message }) }
   }
   return {
-    app: initialState, sid: null, conn: 'closed', health: null, error: null, selectedId: null, hoveredClaim: null,
+    app: initialState, sid: null, conn: 'closed', libraryStage: 'papers', health: null, error: null, selectedId: null, hoveredClaim: null,
     follow: true, focusId: null, fitAll: false, abstractOpen: false, explainBusy: false, explained: {},
     set: (p) => set(p),
     select: (id) => set(id ? { selectedId: id, focusId: id, abstractOpen: false, fitAll: false } : { selectedId: null }),
     leave() {
       unsub?.(); unsub = null
+      libraryLoad?.abort(); libraryLoad = null
       set({ app: initialState, sid: null, conn: 'closed', selectedId: null, focusId: null, fitAll: false, abstractOpen: false, explained: {}, error: null })
     },
     async begin(replay, goal) {
       unsub?.()
-      set({ app: initialState, selectedId: null, focusId: null, fitAll: false, follow: true, error: null, abstractOpen: false, explained: {} })
+      set({ app: initialState, libraryStage: 'papers', selectedId: null, focusId: null, fitAll: false, follow: true, error: null, abstractOpen: false, explained: {} })
+      libraryLoad?.abort()
+      const load = libraryLoad = new AbortController()
+      api.library((libraryStage) => set({ libraryStage }), load.signal)
+        .then(({ documents, claims }) => { if (!load.signal.aborted) set((st) => ({ app: { ...st.app, documents, claims }, libraryStage: 'ready' })) })
+        .catch((e: Error) => set({ error: e.message }))
       try {
         const sid = replay ? await api.replayDemo() : await api.createSession({ goal })
         set({ sid })

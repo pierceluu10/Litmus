@@ -1,5 +1,7 @@
 import { MockServer } from '../mock/server'
-import { DEFAULT_GOAL, type Api } from './api'
+import { claims, documents } from '../mock/library'
+import { DEFAULT_GOAL, LibraryUnavailable, type Api } from './api'
+import { streamLibrary } from './real'
 
 let srv: MockServer | null = null
 const cur = () => { if (!srv) throw new Error('No mock session'); return srv }
@@ -9,6 +11,12 @@ export const mockApi: Api = {
   mock: true,
   health: () => wait({ ok: true, modal_warm: true, papiers_ok: true, openai_ok: true }),
   warmup: () => wait(undefined),
+  // The library is real even in the demo: read live through the backend, or its snapshot when the backend is off.
+  library: (onStage, signal) => streamLibrary(onStage, signal).catch((e) => {
+    if (!(e instanceof LibraryUnavailable)) throw e
+    console.warn(`${e.message}; using the library snapshot`)
+    return { documents, claims }
+  }),
   createSession: async (b) => { srv = new MockServer(b.goal || DEFAULT_GOAL, false); return srv.sid },
   replayDemo: async () => { srv = new MockServer(DEFAULT_GOAL, true); return srv.sid },
   subscribe(_sid, fromSeq, onEvent, onConn) {

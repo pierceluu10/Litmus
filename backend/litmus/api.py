@@ -1,6 +1,7 @@
 """FastAPI server: REST for snapshots and human actions, WebSocket for the event stream (contract: shared/contract.md)."""
 
 import asyncio
+import json
 import logging
 import time
 from contextlib import asynccontextmanager
@@ -9,7 +10,7 @@ from typing import Literal
 import modal.exception
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import PlainTextResponse, StreamingResponse
 from pydantic import BaseModel
 
 from litmus import llm, papiers_client, replay, store, writeback
@@ -124,6 +125,37 @@ async def library(refresh: bool = False):
     except papiers_client.PapiersError as error:
         raise HTTPException(503, str(error)) from error
     return {"documents": [d.model_dump() for d in documents], "claims": [c.model_dump() for c in claims]}
+
+
+def _sse(payload: dict) -> str:
+    return f"data: {json.dumps(payload)}\n\n"
+
+
+@app.get("/api/library/stream")
+async def library_stream():
+    """Server-sent events: each stage as Papiers is read live ({stage}), then {stage: "done", documents, claims}."""
+    stages: asyncio.Queue[str] = asyncio.Queue()
+    load = asyncio.create_task(get_library(refresh=True, progress=stages.put))
+
+    async def events():
+        try:
+            while not load.done() or not stages.empty():
+                waiter = asyncio.ensure_future(stages.get())
+                await asyncio.wait({waiter, load}, return_when=asyncio.FIRST_COMPLETED)
+                if waiter.done():
+                    yield _sse({"stage": waiter.result()})
+                else:
+                    waiter.cancel()
+            documents, claims = load.result()
+        except papiers_client.PapiersError as error:
+            yield _sse({"stage": "error", "message": str(error)})
+            return
+        finally:
+            load.cancel()  # the browser left mid-load
+        yield _sse({"stage": "done", "documents": [d.model_dump() for d in documents],
+                    "claims": [c.model_dump() for c in claims]})
+
+    return StreamingResponse(events(), media_type="text/event-stream")
 
 
 # ---------------------------------------------------------------- sessions

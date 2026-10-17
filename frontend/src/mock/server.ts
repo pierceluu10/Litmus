@@ -2,7 +2,7 @@ import { applyEvent, initialState, type AppState } from '../reducer'
 import type { Decision, Grade, Knobs, LitmusEvent, Predicted, Proposal, Provenance, Question, Selection, Star } from '../types'
 import { knobText, pts } from '../lib/format'
 import { BASELINE_KNOBS, baselineGrade, grade, progressAccuracy, simulateRun } from './sim'
-import { claims, documents, P } from './library'
+import { P } from './library'
 
 // In-browser stand-in for the backend: same events as shared/contract.md, numbers from the calibrated simulator.
 
@@ -88,8 +88,6 @@ export class MockServer {
   private start() {
     this.emit('session.started', { goal: this.goal, replay: this.replay })
     this.emit('budget.updated', { used: 0, total: BUDGET_GPU_SECONDS })
-    this.emit('library.loaded', { documents, claims })
-    this.think(`Read ${documents.length} papers and ${claims.length} highlights, ranked by your notes.`)
     this.later(() => {
       const base = this.newStar(null, 'Baseline', 'The reference configuration, about 94% accuracy.', {}, [], 'agent')
       this.run(base.id, SEEDS, () => this.propose(base.id, FIRST_WAVE.map((k) => MOVES.find((m) => m.key === k)!)))
