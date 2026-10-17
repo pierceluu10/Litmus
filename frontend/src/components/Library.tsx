@@ -21,7 +21,7 @@ export function Library() {
   return (
     <section aria-label="Your Papiers library" className="flex min-h-0 flex-1 flex-col">
       <h2 className="m-0 px-4 pb-1 pt-3 font-serif text-[16px] font-semibold">Your reading</h2>
-      <p className="m-0 px-4 pb-2 text-[12.5px] text-muted">Claims you highlighted, ranked by how much you engaged with them. Hover a claim to see the stars it produced.</p>
+      <p className="m-0 px-4 pb-2 text-[12.5px] text-muted">Your highlights, ranked by engagement. Hover one to light up its stars.</p>
       <ul className="m-0 min-h-0 flex-1 list-none space-y-2 overflow-y-auto px-3 pb-3">
         {!rows.length && <li className="px-1 text-muted">Loading your library…</li>}
         {rows.map(({ c, status, stars: ss }) => (

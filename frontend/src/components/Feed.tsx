@@ -10,7 +10,7 @@ const KIND: Record<string, { label: string; color: string }> = {
 
 export function Feed() {
   const { app, select } = useStore()
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
   const end = useRef<HTMLLIElement>(null)
   useEffect(() => { if (open) end.current?.scrollIntoView({ block: 'nearest' }) }, [app.feed.length, open])
   return (
@@ -18,6 +18,7 @@ export function Feed() {
       <button className="flex w-full items-center justify-between px-4 py-2 text-left font-serif text-[15px] font-semibold" aria-expanded={open} onClick={() => setOpen(!open)}>
         Activity <span className="num font-sans text-[12px] font-normal text-muted">{app.feed.length} · {open ? 'hide' : 'show'}</span>
       </button>
+      {!open && app.feed.length > 0 && <p className="m-0 truncate px-4 pb-2 text-[12.5px] text-muted">{app.feed[app.feed.length - 1].text}</p>}
       {open && (
         <ul className="m-0 max-h-[230px] list-none space-y-2 overflow-y-auto px-4 pb-3" aria-live="polite">
           {!app.feed.length && <li className="text-muted">Nothing yet.</li>}

@@ -75,7 +75,7 @@ function Edge({ star, from, to, docs, selected, dim }: { star: Star; from: Pos; 
       )}
       <g transform={`translate(${mx} ${(y1 + y2) / 2 - 8})`} textAnchor="middle" style={{ pointerEvents: 'none' }}>
         <text fontSize={11.5} fill="var(--color-ink)" stroke="var(--color-paper)" strokeWidth={4} paintOrder="stroke">{knobText(star.knob_changes)}</text>
-        {prov && <text y={13} fontSize={10.5} fill={color} stroke="var(--color-paper)" strokeWidth={4} paintOrder="stroke">{shadow ? 'agent alone would run this' : `from ${provLabel(prov, docs)}`}</text>}
+        {prov && (selected || shadow) && <text y={13} fontSize={10.5} fill={color} stroke="var(--color-paper)" strokeWidth={4} paintOrder="stroke">{shadow ? 'agent alone would run this' : `from ${provLabel(prov, docs)}`}</text>}
       </g>
     </g>
   )
@@ -166,16 +166,19 @@ export function StarMap() {
     return () => cancelAnimationFrame(raf)
   }, [])
 
+  // the proposals/question dock covers the lower map, so frame stars in the upper part while it is open
+  const dockOpen = !!app.session && (app.session.proposals.some((p) => p.status === 'open') || app.session.questions.some((q) => q.status === 'open'))
   const fit = (ids?: string[]) => {
     const pts = (ids?.length ? ids : stars.map((s) => s.id)).map((id) => target.get(id)).filter(Boolean) as Pos[]
     if (!pts.length) return
     const minX = Math.min(...pts.map((p) => p.x)) - 110, maxX = Math.max(...pts.map((p) => p.x)) + 150
     const minY = Math.min(...pts.map((p) => p.y)) - 80, maxY = Math.max(...pts.map((p) => p.y)) + 110
-    const k = Math.max(0.5, Math.min(1.15, (size.w - 40) / (maxX - minX), (size.h - 40) / (maxY - minY)))
-    camTarget.current = { k, x: size.w / 2 - ((minX + maxX) / 2) * k, y: size.h / 2 - ((minY + maxY) / 2) * k }
+    const h = dockOpen ? size.h * 0.4 : size.h
+    const k = Math.max(0.5, Math.min(1.15, (size.w - 40) / (maxX - minX), (h - 40) / (maxY - minY)))
+    camTarget.current = { k, x: size.w / 2 - ((minX + maxX) / 2) * k, y: h / 2 - ((minY + maxY) / 2) * k }
   }
   const activeIds = stars.filter((s) => s.status === 'running' || s.status === 'waiting' || s.status === 'queued').map((s) => s.id)
-  const activeKey = activeIds.join(',') + '|' + stars.length + '|' + size.w + 'x' + size.h
+  const activeKey = activeIds.join(',') + '|' + stars.length + '|' + size.w + 'x' + size.h + dockOpen
   useEffect(() => {
     if (!follow) return
     const withParents = new Set(activeIds)
