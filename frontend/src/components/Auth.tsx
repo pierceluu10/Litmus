@@ -10,7 +10,7 @@ function Shell({ children }: { children: ReactNode }) {
   return (
     <main className="grid h-full overflow-y-auto bg-surface lg:grid-cols-[minmax(380px,520px)_1fr]">
       <div className="flex flex-col p-[clamp(20px,4vw,56px)]">
-        <button className="self-start border-0 bg-transparent p-0 text-[20px] font-bold tracking-tight" onClick={() => nav('')}>Litmus</button>
+        <button className="inline-flex items-center gap-2 self-start border-0 bg-transparent p-0 text-[20px] font-bold tracking-tight" onClick={() => nav('')}><img src="/litmus-face.svg" alt="" width={28} height={28} />Litmus</button>
         <div className="m-auto w-full max-w-[380px] py-10">{children}</div>
       </div>
       <div className="relative bg-[#eef2f7] max-lg:hidden"><LowPolyScene className="absolute inset-0 h-full w-full" /></div>

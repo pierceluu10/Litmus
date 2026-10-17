@@ -48,7 +48,7 @@ export function Upload() {
           <Pillar seed={p.seed} className="h-full w-full" />
         </motion.div>
       ))}
-      <button className="absolute left-[clamp(20px,4vw,56px)] top-6 z-10 border-0 bg-transparent p-0 text-[20px] font-bold tracking-tight" onClick={() => nav('')}>Litmus</button>
+      <button className="absolute left-[clamp(20px,4vw,56px)] top-6 z-10 inline-flex items-center gap-2 border-0 bg-transparent p-0 text-[20px] font-bold tracking-tight" onClick={() => nav('')}><img src="/litmus-face.svg" alt="" width={28} height={28} />Litmus</button>
       <motion.div className="relative mx-auto flex min-h-full w-full max-w-[440px] flex-col items-center justify-center px-5 py-20 text-center"
         initial={reduce ? false : { opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.55, ease: [0.23, 1, 0.32, 1] }}>
         <h1 className="m-0 text-[clamp(28px,3.6vw,40px)] font-bold leading-[1.08] tracking-[-0.03em]">Connect your Papiers</h1>
