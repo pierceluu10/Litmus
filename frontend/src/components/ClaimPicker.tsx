@@ -45,9 +45,21 @@ function Findings({ stars }: { stars: Star[] }) {
 
 // One highlight: its status, its short title and paper; open it for your note, the passage, what the agents found,
 // open it for the paper, your note, the passage, what the agents found, and the source.
-function ClaimCard({ c, status, stars, doc, expanded, onToggle, onTest, busy, canTest }: { c: Claim; status: ClaimStatus; stars: Star[]; doc?: Document; expanded: boolean; onToggle: () => void; onTest: () => void; busy: boolean; canTest: boolean }) {
+// The paper's conditions run long: three lines, and the rest on request.
+function Setting({ text }: { text: string }) {
+  const [all, setAll] = useState(false)
+  return (
+    <div className="text-muted">
+      <span className="card-subtitle block">Paper setting</span>
+      <p className={`m-0 ${all ? '' : 'line-clamp-3'}`}>{text}</p>
+      <button className="label mt-0.5 hover:text-ink" onClick={() => setAll(!all)}>{all ? 'less' : 'more'}</button>
+    </div>
+  )
+}
+
+export function ClaimCard({ c, status, stars, doc, expanded, onToggle, onTest, busy, canTest, action = 'Test', showStatus = true }: { c: Claim; status: ClaimStatus; stars: Star[]; doc?: Document; expanded: boolean; onToggle: () => void; onTest: () => void; busy: boolean; canTest: boolean; action?: string; showStatus?: boolean }) {
   const { set } = useStore()
-  const [tab, setTab] = useState<Tab | null>(stars.length ? 'findings' : null)
+  const [tab, setTab] = useState<Tab | null>(stars.length ? 'findings' : 'basis')
   const tabs: Tab[] = stars.length ? ['findings', 'basis'] : ['basis']
   const source = doc?.url ?? doc?.papiers_url
   return (
@@ -56,28 +68,33 @@ function ClaimCard({ c, status, stars, doc, expanded, onToggle, onTest, busy, ca
       <button className="block min-w-0 flex-1 rounded-lg px-2 py-1.5 text-left hover:bg-paper" aria-expanded={expanded} onClick={onToggle}
         onMouseEnter={() => set({ hoveredClaim: c.id })} onMouseLeave={() => set({ hoveredClaim: null })}
         onFocus={() => set({ hoveredClaim: c.id })} onBlur={() => set({ hoveredClaim: null })}>
-        <span className="flex items-center gap-1.5 text-[11px] font-medium" style={{ color: COLOR[status] }}>
-          <span className={`dot ${status === 'testing' ? 'live-dot' : ''}`} style={{ background: COLOR[status] }} />{status}
-          {stars.length > 1 && <span className="font-normal text-faint">· {stars.length} agents</span>}
-        </span>
-        <span className="mt-0.5 block text-[13px] font-medium leading-snug tracking-[-0.01em] text-ink">{summarize(c)}</span>
+        {showStatus && (
+          <span className="mb-0.5 flex items-center gap-1.5 text-[11px] font-medium" style={{ color: COLOR[status] }}>
+            <span className={`dot ${status === 'testing' ? 'live-dot' : ''}`} style={{ background: COLOR[status] }} />{status}
+            {stars.length > 1 && <span className="font-normal text-faint">· {stars.length} agents</span>}
+          </span>
+        )}
+        <span className="block text-[13px] font-medium leading-snug tracking-[-0.01em] text-ink">{summarize(c)}</span>
         <span className={`mt-0.5 text-[11.5px] leading-snug text-muted ${expanded ? 'block' : 'line-clamp-1'}`}>Paper: {c.doc_title}</span>
       </button>
       {/* only an untested claim can start a new agent; the rest keep a greyed-out button so the list stays aligned */}
-      <button className="btn btn-primary mr-1.5 mt-2 h-7 shrink-0 px-2.5 text-[12px]" disabled={!canTest || busy} title={canTest ? 'Start an agent on this claim' : 'Already tested'} onClick={onTest}>{busy ? 'Starting…' : 'Test'}</button>
+      <button className={`btn ${expanded ? 'btn-primary' : ''} mr-1.5 mt-2 h-7 shrink-0 px-2.5 text-[12px]`} disabled={!canTest || busy} title={canTest ? 'Start an agent on this claim' : 'Already tested'} onClick={onTest}>{busy ? 'Starting…' : action}</button>
       </div>
       <AnimatePresence initial={false}>
         {expanded && (
           <motion.div key="body" initial={closed} animate={open} exit={closed} transition={reveal} className="overflow-hidden">
             <div className="flex flex-col gap-2.5 px-2 pb-2.5 pt-0.5 text-[12px]">
               {c.annotation && <p className="m-0 leading-snug text-human"><span className="font-medium">Your note:</span> {c.annotation}</p>}
-              <div role="tablist" aria-label="About this claim" className="tabs">
-                {tabs.map((x) => <button key={x} role="tab" aria-selected={tab === x} onClick={() => setTab(tab === x ? null : x)}>{x === 'basis' ? 'Basis' : 'Findings'}</button>)}
-              </div>
+              {/* one tab alone is not a choice: the passage just shows */}
+              {tabs.length > 1 && (
+                <div role="tablist" aria-label="About this claim" className="tabs">
+                  {tabs.map((x) => <button key={x} role="tab" aria-selected={tab === x} onClick={() => setTab(tab === x ? null : x)}>{x === 'basis' ? 'Basis' : 'Findings'}</button>)}
+                </div>
+              )}
               {tab === 'basis' && (
                 <div role="tabpanel" className="flex flex-col gap-1.5 leading-relaxed">
                   <blockquote className="m-0 border-l border-rule pl-2.5 text-ink">{c.text}</blockquote>
-                  {c.conditions && <p className="m-0 text-muted"><span className="block text-[11px] font-medium text-faint">Paper setting</span>{c.conditions}</p>}
+                  {c.conditions && <Setting text={c.conditions} />}
                 </div>
               )}
               {tab === 'findings' && stars.length > 0 && <div role="tabpanel"><Findings stars={stars} /></div>}

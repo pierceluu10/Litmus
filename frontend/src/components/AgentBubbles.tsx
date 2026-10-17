@@ -7,11 +7,9 @@ const SHOW_MS = 9000
 const MAX_QUEUED = 5
 type Bubble = { seq: number; text: string }
 
-// "Where should we start?" pops out over the scene, beside the results card, until the session has its first claim.
+// "Where should we start?" comes out of the statue's head until the session has its first claim.
 export function StartPrompt() {
-  const starting = useStarting()
-  if (!starting) return null
-  return <div className="pointer-events-none absolute right-3 top-3 z-30 lg:right-[calc(var(--panel)+0.75rem)]"><StartBubble /></div>
+  return useStarting() ? <StartBubble /> : null
 }
 
 // Litmus's face sits under the results card and opens the chat with it. Whenever the agents do something, Litmus says
@@ -41,7 +39,7 @@ export function AgentBubbles() {
     return () => clearTimeout(timer)
   }, [shown])
   return (
-    <div className="relative flex shrink-0 justify-end">
+    <div className="relative mt-auto flex shrink-0 justify-end">
       <ul aria-live="polite" className="pointer-events-none absolute bottom-[calc(100%+8px)] right-1 z-10 m-0 flex w-max max-w-[320px] list-none flex-col items-end gap-1.5 p-0">
         <AnimatePresence initial={false}>
           {!chatOpen && !starting && shown && [shown].map((b) => (

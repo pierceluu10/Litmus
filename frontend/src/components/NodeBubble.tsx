@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { agentDetail, agentName, knobText, pct, progressFraction, provMatches, pts, toneVar } from '../lib/format'
 import type { Proposal, Star } from '../types'
@@ -110,15 +110,50 @@ function Proceed({ star, items }: { star: Star; items: Proposal[] }) {
 }
 
 // The card that opens over a node when you click it: about the agent, and where it should proceed (when it has options).
-export function NodeCard({ star, items }: { star: Star; items: Proposal[] }) {
+export type Side = 'above' | 'below'
+const GAP = 10 // px between the node's ring and the card
+const LABEL_PX = 46 // the name-and-accuracy label under a node, which a card opening below must clear
+const MARGIN = 8 // px the card keeps from the bottom of the scene
+const TOP_CLEAR = 64 // px the card keeps from the top of the scene: the legend and the scene buttons live there
+
+// Keeps a node's card inside the scene: above the node when it fits there (or there is more room above), otherwise
+// below its label, and never taller than the room on that side (the card then scrolls). Re-measured every frame, so it
+// holds while the camera moves. `ringPx` is the node's on-screen radius, kept current by the scene.
+export function PlacedCard({ ringPx, children }: { ringPx: { current: number }; children: (side: Side) => React.ReactNode }) {
+  const box = useRef<HTMLDivElement>(null)
+  const [side, setSide] = useState<Side>('above')
+  useEffect(() => {
+    let frame = 0
+    const place = () => {
+      const el = box.current, scene = el?.closest('main')?.getBoundingClientRect()
+      if (el && scene) {
+        const y = el.parentElement!.getBoundingClientRect().top // the node's centre: the Html sits on it
+        const ring = ringPx.current
+        const above = y - ring - GAP - scene.top - TOP_CLEAR
+        const below = scene.bottom - MARGIN - (y + ring + LABEL_PX + GAP)
+        const need = el.querySelector<HTMLElement>('[data-card-body]')?.scrollHeight ?? 0
+        const next: Side = above >= need || above >= below ? 'above' : 'below'
+        el.style.transform = next === 'above' ? `translate(-50%, calc(-100% - ${ring + GAP}px))` : `translate(-50%, ${ring + LABEL_PX + GAP}px)`
+        el.style.setProperty('--card-max', `${Math.max(0, next === 'above' ? above : below)}px`)
+        setSide((s) => (s === next ? s : next))
+      }
+      frame = requestAnimationFrame(place)
+    }
+    place()
+    return () => cancelAnimationFrame(frame)
+  }, [ringPx])
+  return <div ref={box}>{children(side)}</div>
+}
+
+export function NodeCard({ star, items, side = 'above' }: { star: Star; items: Proposal[]; side?: Side }) {
   const set = useStore((s) => s.set)
   const [tab, setTab] = useState<Tab>(items.length ? 'proceed' : 'about')
   const shown = tab === 'proceed' && !items.length ? 'about' : tab
   return (
     <div className="relative w-[300px] rounded-2xl border border-rule bg-surface text-[12.5px] shadow-[0_16px_40px_-12px_rgba(43,58,82,0.35)]" role="dialog" aria-label={agentName(star)}>
-      <span aria-hidden className="absolute -bottom-[7px] left-1/2 h-3.5 w-3.5 -translate-x-1/2 rotate-45 border-b border-r border-rule bg-surface" />
-      {/* clipped separately so the pointer below the card is not cut off */}
-      <div className="relative isolate overflow-hidden rounded-2xl p-3">
+      <span aria-hidden className={`absolute left-1/2 h-3.5 w-3.5 -translate-x-1/2 rotate-45 border-rule bg-surface ${side === 'above' ? '-bottom-[7px] border-b border-r' : '-top-[7px] border-l border-t'}`} />
+      {/* clipped separately so the pointer is not cut off; scrolls when the scene leaves less room than the card needs */}
+      <div data-card-body className="relative isolate overflow-y-auto overflow-x-hidden rounded-2xl p-3" style={{ maxHeight: 'var(--card-max)' }}>
       <SceneBackdrop seed={CARD_FACETS} className="card-facets" />
       <div className="flex items-start justify-between gap-2">
         <h2 className="m-0 text-[13.5px] font-semibold">{agentName(star)}{star.parent_id && <span className="num ml-1.5 text-[11.5px] font-normal text-faint">{agentDetail(star)}</span>}</h2>

@@ -37,8 +37,8 @@ function QuestionCard({ q }: { q: Question }) {
         ))}
       </fieldset>
       <div className="mt-2.5 flex items-center gap-2">
-        <label className="sr-only" htmlFor={`qc-${q.id}`}>Why (optional)</label>
-        <input id={`qc-${q.id}`} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Why (optional)" className="field min-w-0 flex-1" />
+        <label className="sr-only" htmlFor={`qc-${q.id}`}>Additional info</label>
+        <input id={`qc-${q.id}`} value={comment} onChange={(e) => setComment(e.target.value)} placeholder="Additional info" className="field min-w-0 flex-1" />
         <button className="btn btn-primary" disabled={!opt || busy} onClick={async () => { setBusy(true); await answer(q.id, opt, comment.trim() || undefined); setBusy(false) }}>Answer</button>
       </div>
     </section>

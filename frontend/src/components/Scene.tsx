@@ -7,12 +7,13 @@ import { useStore } from '../store'
 import { FIRST_STEP, layoutStars, UNITS_PER_POINT, type Pos } from '../lib/layout'
 import { agentName, progressFraction, provMatches, starTone, type Tone } from '../lib/format'
 import type { Star } from '../types'
-import { NodeCard } from './NodeBubble'
+import { NodeCard, PlacedCard } from './NodeBubble'
 import { statueAnchor, type Point } from '../lib/statueAnchor'
 
 const STATUE_URL = '/litmus-statue.glb'
 const STATUE_COLOR = '#e3e8ef' // cool marble, close to the ground so the statue reads as a relief in the same material
 const BLOB_COLOR = '#2b2f34'
+const RING_OUTSET = 2.6 // scene units from a node's surface to the outside of its verdict ring
 const LEVEL_COLOR = '#c5cfdc'
 const LEVEL_BASE_COLOR = '#93a3b8'
 const NODE_FACE_COLOR = '#3b4048' // a touch lighter than the fingertip, so each flat facet catches the light
@@ -167,9 +168,11 @@ function StarBlob({ star, target, live, dim, selected }: { star: Star; target: P
   const running = star.status === 'running' || star.status === 'queued'
   const progress = running ? Math.max(0.04, progressFraction(star)) : 1
   const shadow = star.chosen_by === 'shadow'
-  useFrame((_, dt) => {
+  const ringPx = useRef(0) // the ring's on-screen radius, for placing this node's card
+  useFrame(({ camera, size }, dt) => {
     const g = group.current
     if (!g) return
+    ringPx.current = ((r + RING_OUTSET) * g.scale.x * size.height) / (2 * camera.position.distanceTo(g.position) * FOV_HALF_TAN)
     if (!live.has(star.id)) {
       // new stars are born at their parent and glide out
       const from = star.parent_id ? live.get(star.parent_id) : undefined
@@ -202,8 +205,8 @@ function StarBlob({ star, target, live, dim, selected }: { star: Star; target: P
       <Eyes r={r} running={running} waiting={star.status === 'waiting'} />
       {hasOptions && <Bulb r={r} onClick={openNode} />}
       {cardFor === star.id && !fitAll && (
-        <Html position={[0, r + 3, 0]} zIndexRange={[60, 40]}>
-          <div style={{ transform: 'translate(-50%, calc(-100% - 10px))' }}><NodeCard star={star} items={hasOptions ? options : []} /></div>
+        <Html position={[0, 0, 0]} zIndexRange={[60, 40]}>
+          <PlacedCard ringPx={ringPx}>{(side) => <NodeCard star={star} items={hasOptions ? options : []} side={side} />}</PlacedCard>
         </Html>
       )}
       <Billboard>

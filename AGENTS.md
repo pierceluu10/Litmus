@@ -286,11 +286,14 @@ npm test             # reducer, layout, simulator + grader-port tests
 **Upload page** (`#/upload`, `components/Upload.tsx`): Start research opens it first. One centred step: paste a Papiers token, Connect (`apiFor(demo).connectPapiers`, then the library streams in), see how many highlights and notes were found, Start research; Refresh reads again. Below it, "Try the demo highlights" (the recorded 12 claims) and "Use my saved login" (the Papiers login already on the server). The chosen library sits in `store.imported` and `begin()` sends it with `importLibrary` before creating the session. `lib/importLibrary.ts` (file/paste parsing) and `scripts/export-papiers.sh` are no longer wired into the page.
 
 **Workspace layout (user decisions, 2026-10-17)**: nodes show only the agent's name and its accuracy. Clicking a node (or a
-ranking row) opens its card above it (`NodeCard` in `NodeBubble.tsx`): **About** (the claim it tests, verdict, what it
+ranking row) opens its card above it, or below its label when there is not room above, never taller than the room
+(`PlacedCard` re-measures every frame; the card scrolls if it must) (`NodeCard` in `NodeBubble.tsx`): **About** (the claim it tests, verdict, what it
 found and suggests, Stop / Branch from here) and **Where should I proceed?** (its options). The right panel is for the
 whole research only: researching now, results, accuracy by path, rankings, where you steered, research log, and the
 **Litmus card** (opened by Litmus's face, which sits under the always-open results card and narrates what the agents do in speech bubbles above it; one conversation; Litmus answers about the open agent, shown as a removable chip, or the research as a
-whole). **Test another claim** (`ClaimPicker.tsx`) lists every highlight with its status; tested ones keep a greyed-out
+whole). "Where should we start?" is a speech bubble out of the statue's head (`StartBubble`, following `statueAnchor`), with the same
+expandable claim cards and a Start button each. The results card keeps one height (`RESULTS_HEIGHT`); the chat fills the room
+under it. **Test another claim** (`ClaimPicker.tsx`) lists every highlight with its status; tested ones keep a greyed-out
 Test button; open one for its card (paper, your note, Basis, Findings, source). Following new branches is always on;
 **Fit all** zooms out (padded clear of the results card) and closes node cards, **Default view** goes back to following.
 The camera centres the focused agent and its direct children in the space the results card leaves, the agent a little above the middle so its card fits above and its children stay clear of the bottom card (`PANEL_PX`, `ABOVE_MIDDLE`), zoom is
