@@ -1,12 +1,13 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Billboard, CameraControls, Html, Line, useGLTF } from '@react-three/drei'
-import { Box3, MathUtils, Vector3, type Mesh } from 'three'
+import { Box3, MathUtils, Vector3, type Group, type Mesh } from 'three'
 import type { Line2 } from 'three-stdlib'
 import { useStore } from '../store'
 import { FIRST_STEP, layoutStars, type Pos } from '../lib/layout'
 import { agentDetail, agentName, pts, progressFraction, provMatches, starTone, type Tone } from '../lib/format'
 import type { Star } from '../types'
+import { ProceedBubble } from './NodeBubble'
 import { statueAnchor, type Point } from '../lib/statueAnchor'
 
 const STATUE_URL = '/litmus-statue.glb'
@@ -82,11 +83,75 @@ function Statue() {
   )
 }
 
+// Low-poly eyes that sit on the front of a node (a billboard, so they always face you): flat-shaded white gems with dark
+// pupils. They blink every few seconds, look around while the experiment trains and glance up when the node needs you.
+function Eye({ r, side, running, waiting }: { r: number; side: number; running: boolean; waiting: boolean }) {
+  const pupil = useRef<Group>(null)
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime, g = pupil.current
+    if (!g) return
+    g.position.x = MathUtils.lerp(g.position.x, running ? Math.sin(t * 2 + side) * r * 0.06 : 0, 0.15)
+    g.position.y = MathUtils.lerp(g.position.y, waiting ? r * 0.06 : 0, 0.15)
+  })
+  return (
+    <group position={[side * r * 0.4, 0, 0]}>
+      <mesh scale={[1, 1.2, 0.55]}><icosahedronGeometry args={[r * 0.28, 0]} /><meshStandardMaterial color="#ffffff" emissive="#ffffff" emissiveIntensity={0.45} flatShading /></mesh>
+      <group ref={pupil} position={[0, 0, r * 0.1]}>
+        <mesh scale={[1, 1.15, 0.5]}><icosahedronGeometry args={[r * 0.15, 0]} /><meshStandardMaterial color="#15181c" flatShading /></mesh>
+        <mesh position={[r * 0.035, r * 0.05, r * 0.07]}><icosahedronGeometry args={[r * 0.04, 0]} /><meshBasicMaterial color="#ffffff" /></mesh>
+      </group>
+    </group>
+  )
+}
+
+function Eyes({ r, running, waiting }: { r: number; running: boolean; waiting: boolean }) {
+  const lids = useRef<Group>(null)
+  useFrame(({ clock }) => {
+    const g = lids.current
+    if (g) g.scale.y = MathUtils.lerp(g.scale.y, clock.elapsedTime % 4.3 < 0.14 && !reducedMotion() ? 0.1 : 1, 0.5)
+  })
+  return (
+    <Billboard>
+      <group ref={lids} position={[0, r * 0.1, r * 0.98]}>
+        <Eye r={r} side={-1} running={running} waiting={waiting} />
+        <Eye r={r} side={1} running={running} waiting={waiting} />
+      </group>
+    </Billboard>
+  )
+}
+
+// A low-poly light bulb at a finished node's top right: the agent has options for you. Click the node or the bulb.
+function Bulb({ r, onClick }: { r: number; onClick: () => void }) {
+  const bulb = useRef<Group>(null)
+  const glow = useRef<Mesh>(null)
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime
+    if (bulb.current && !reducedMotion()) bulb.current.position.y = r * 1.4 + Math.sin(t * 2.2) * r * 0.06
+    if (glow.current) glow.current.scale.setScalar(1.05 + Math.sin(t * 3) * 0.1)
+  })
+  return (
+    <Billboard>
+      <group ref={bulb} position={[r * 1.45, r * 1.4, 0]} rotation={[0, 0, -0.25]}
+        onClick={(e) => { e.stopPropagation(); onClick() }}
+        onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = 'pointer' }} onPointerOut={() => { document.body.style.cursor = '' }}>
+        <mesh ref={glow}><icosahedronGeometry args={[r * 0.9, 1]} /><meshBasicMaterial color="#f7d36b" transparent opacity={0.22} depthWrite={false} /></mesh>
+        <mesh scale={[1, 1.15, 1]}><icosahedronGeometry args={[r * 0.52, 1]} /><meshStandardMaterial color="#f9d76a" emissive="#f6b73c" emissiveIntensity={0.9} flatShading /></mesh>
+        <mesh position={[0, -r * 0.64, 0]}><cylinderGeometry args={[r * 0.23, r * 0.3, r * 0.27, 6]} /><meshStandardMaterial color="#d3d7de" metalness={0.3} roughness={0.5} flatShading /></mesh>
+        <mesh position={[0, -r * 0.85, 0]}><cylinderGeometry args={[r * 0.24, r * 0.18, r * 0.18, 6]} /><meshStandardMaterial color="#8d95a3" metalness={0.3} roughness={0.5} flatShading /></mesh>
+      </group>
+    </Billboard>
+  )
+}
+
 // Where every star currently is (eased), shared by blobs and the lines between them.
 type Live = Map<string, Vector3>
 
 function StarBlob({ star, target, live, dim, selected }: { star: Star; target: Pos; live: Live; dim: boolean; selected: boolean }) {
   const select = useStore((s) => s.select)
+  const proceedFor = useStore((s) => s.proceedFor)
+  const proposals = useStore((s) => s.app.session?.proposals) // the store's own array: filtering inside the selector would return a new one every render
+  const options = useMemo(() => (proposals ?? []).filter((p) => p.star_id === star.id && p.status === 'open'), [proposals, star.id])
+  const hasOptions = options.length > 0 && star.status === 'done'
   const group = useRef<import('three').Group>(null)
   const body = useRef<Mesh>(null)
   const [hover, setHover] = useState(false)
@@ -112,6 +177,8 @@ function StarBlob({ star, target, live, dim, selected }: { star: Star; target: P
     // the node turns slowly, and faster while its experiment trains, so the facets glint
     if (body.current && !reducedMotion()) { body.current.rotation.y += dt * (running ? SPIN_TRAINING : SPIN_IDLE); body.current.rotation.x += dt * 0.4 * (running ? SPIN_TRAINING : SPIN_IDLE) }
   })
+  // clicking a finished node with options for you opens its "where should I proceed?" bubble (its results are one click away in the bubble); any other node opens its results card
+  const openNode = () => { if (hasOptions) useStore.setState({ proceedFor: proceedFor === star.id ? null : star.id }); else { select(star.id); useStore.setState({ proceedFor: null }) } }
   const g = star.grade
   const value = !g ? (running ? 'training' : star.status === 'waiting' ? 'needs you' : star.status === 'failed' ? 'stopped' : '')
     : g.verdict === 'baseline' ? `${(g.mean_child * 100).toFixed(2)}%` : `${pts(g.delta)}`
@@ -119,24 +186,34 @@ function StarBlob({ star, target, live, dim, selected }: { star: Star; target: P
     <group ref={group}>
       <mesh
         ref={body}
-        onClick={(e) => { e.stopPropagation(); select(star.id) }}
+        onClick={(e) => { e.stopPropagation(); openNode() }}
         onPointerOver={(e) => { e.stopPropagation(); setHover(true); document.body.style.cursor = 'pointer' }}
         onPointerOut={() => { setHover(false); document.body.style.cursor = '' }}
       >
         <icosahedronGeometry args={[r, NODE_DETAIL]} />
         <meshStandardMaterial color={NODE_FACE_COLOR} roughness={0.5} metalness={0.15} flatShading transparent opacity={dim ? 0.18 : shadow ? 0.55 : 1} />
       </mesh>
+      <Eyes r={r} running={running} waiting={star.status === 'waiting'} />
+      {hasOptions && <Bulb r={r} onClick={openNode} />}
+      {hasOptions && proceedFor === star.id && (
+        <Html position={[r + 8, 0, 0]} zIndexRange={[60, 40]}>
+          <div style={{ transform: 'translate(8px, -31px)' }}><ProceedBubble star={star} items={options} /></div>
+        </Html>
+      )}
       <Billboard>
         <mesh>
           <torusGeometry args={[r + 2.1, star.status === 'waiting' ? 0.55 : 0.36, 10, 64, Math.PI * 2 * progress]} />
           <meshBasicMaterial color={toneColor(tone)} transparent opacity={dim ? 0.15 : 1} />
         </mesh>
       </Billboard>
-      <Html center position={[0, -r - 5.5, 0]} zIndexRange={[20, 0]} style={{ opacity: dim ? 0.25 : 1, transition: 'opacity 200ms' }}>
+      {/* anchored by its top edge, just under the ring, so the name never sits over the sphere */}
+      <Html position={[0, -r - 4, 0]} zIndexRange={[20, 0]} style={{ opacity: dim ? 0.25 : 1, transition: 'opacity 200ms' }}>
+        <div style={{ transform: 'translateX(-50%)', marginTop: 3 }}>
         <button type="button" className="star-label" data-selected={selected || undefined} onClick={() => select(star.id)} aria-label={`${agentName(star)}, ${star.title}`}>
           <span className="star-label-name">{agentName(star)}{shadow && <span className="text-muted"> · alone</span>}</span>
           <span className="star-label-value" style={{ color: toneColor(tone) }}>{[star.parent_id && agentDetail(star), value].filter(Boolean).join('  ')}</span>
         </button>
+        </div>
       </Html>
     </group>
   )

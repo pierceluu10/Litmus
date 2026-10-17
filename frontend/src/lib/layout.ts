@@ -7,8 +7,8 @@ import type { Star } from '../types'
 // Two stars of one generation never overlap: when their accuracies are too close they are nudged apart, keeping their
 // order, and the column is re-centred so it does not drift.
 export const FIRST_STEP = 18
-export const LAYER_GAP = 64
-export const MIN_GAP = 24 // the least vertical room two stars of one column get
+export const LAYER_GAP = 120 // wide enough that a star's label never reaches the next column
+export const MIN_GAP = 46 // the least vertical room two stars of one column get: the sphere plus its two-line label
 export const UNITS_PER_POINT = 30 // scene units per accuracy point (0.01)
 
 export type Pos = { x: number; y: number; z: number }

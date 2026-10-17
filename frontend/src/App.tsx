@@ -6,6 +6,7 @@ import { Upload } from './components/Upload'
 import { Landing } from './components/Landing'
 import { toneVar } from './lib/format'
 import { TopBar } from './components/TopBar'
+import { ClaimPicker } from './components/ClaimPicker'
 import { AgentBubbles } from './components/AgentBubbles'
 import { Scene } from './components/Scene'
 import { SceneBackdrop } from './components/LowPolyScene'
@@ -43,6 +44,7 @@ function SceneChrome() {
           {follow ? 'Following' : 'Follow'} new branches
         </button>
         <button className="btn h-7 px-2.5 text-[12px]" aria-pressed={fitAll} title={fitAll ? 'Go back to the default view' : 'Zoom out to see every experiment'} onClick={() => set({ follow: false, fitAll: !fitAll })} style={fitAll ? { borderColor: 'var(--color-ink)' } : undefined}>{fitAll ? 'Default view' : 'Fit all'}</button>
+        <ClaimPicker />
       </div>
     </>
   )

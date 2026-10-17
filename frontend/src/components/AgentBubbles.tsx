@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { useStore, usePanelOpen } from '../store'
+import { useStore, usePanelOpen, useStarting } from '../store'
+import { StartBubble } from './StartBubble'
 
 const SHOW_MS = 9000
 const MAX_QUEUED = 5
@@ -13,6 +14,7 @@ export function AgentBubbles() {
   const [queue, setQueue] = useState<Bubble[]>([])
   const [shown, setShown] = useState<Bubble | null>(null)
   const open = usePanelOpen()
+  const starting = useStarting()
   const set = useStore((s) => s.set)
   const seen = useRef(feed.length)
   useEffect(() => {
@@ -33,9 +35,10 @@ export function AgentBubbles() {
   }, [shown])
   return (
     <div className="pointer-events-none absolute right-3 top-3 z-30 flex items-start justify-end gap-2.5 lg:right-3">
+      {starting && <StartBubble />}
       <ul aria-live="polite" className="m-0 flex max-w-[min(360px,50vw)] list-none flex-col items-end gap-1.5 p-0 pt-1">
         <AnimatePresence initial={false}>
-          {!open && shown && [shown].map((b) => (
+          {!open && !starting && shown && [shown].map((b) => (
             <motion.li key={b.seq} initial={{ opacity: 0, scale: 0.9, x: 10 }} animate={{ opacity: 1, scale: 1, x: 0 }} exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.2 } }}
               transition={{ type: 'spring', duration: 0.4, bounce: 0.18 }} style={{ transformOrigin: 'right center' }}
               className="relative rounded-2xl rounded-tr-md border border-rule bg-surface px-3 py-2 text-[12.5px] leading-snug shadow-[0_8px_24px_-10px_rgba(43,58,82,0.3)]">
