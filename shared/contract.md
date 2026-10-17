@@ -5,6 +5,9 @@ or remove fields, every change gets a Changelog line (newest first) and lands on
 `docs(contract): ...`.
 
 ## Changelog
+- 2026-10-17 — Additive: `POST /api/sessions/{id}/pivot {claim_id}`: Litmus drafts the plain test of a claim no star has
+  tested yet and runs it as a new agent from the baseline (queued for the next wave if one is running; 409 if the
+  claim is already on the tree, the session has not started, or no waves are left).
 - 2026-10-17 — `POST /start` takes exactly one claim id (the session starts from one claim; auto mode uses the top one).
 - 2026-10-17 — Additive: `POST /api/sessions/{id}/start {claim_ids}` answers "Where should we start?" (the session
   waits at `waiting_human` with `wave: 0` until it arrives; auto mode picks the top claims) and event
@@ -45,6 +48,7 @@ All JSON is snake_case. Timestamps are ISO 8601 UTC strings. IDs are stable stri
 | GET | `/api/sessions/{id}` | | full `SessionState` snapshot |
 | POST | `/api/sessions/{id}/dispatch` | `{star_id, selections:[{proposal_id, knob_overrides?}], instruction?}` | `{ok}` |
 | POST | `/api/sessions/{id}/start` | `{claim_ids: string[]}` (exactly one library claim id) | `{ok}` (409 unknown id or already started) |
+| POST | `/api/sessions/{id}/pivot` | `{claim_id}` | `{ok}` (409 already tested / not started / no waves left) |
 | POST | `/api/sessions/{id}/answer` | `{question_id, option_id, comment?}` | `{ok}` |
 | POST | `/api/sessions/{id}/feedback` | `{star_id, kind:"challenge"\|"suggest"\|"prioritize", text}` | `{ok}` |
 | POST | `/api/sessions/{id}/explain` | `{star_id, question?, history?: ChatTurn[]}` | `{answer, provenance: Provenance[]}` |
