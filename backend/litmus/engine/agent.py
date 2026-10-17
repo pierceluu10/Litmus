@@ -7,7 +7,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ValidationError
 
-from litmus import papiers_client
+from litmus import papiers_client, store
 from litmus.engine import ops
 from litmus.experiments.knobs import BASELINE_KNOBS, config_hash
 from litmus.llm import structured
@@ -254,7 +254,7 @@ async def reflect(state: SessionState, s: Star, conditions: str, budget_left: fl
 
 async def detect_conflict(state: SessionState, s: Star, query: str, hits: list[Provenance], may_ask: bool) -> ConflictCheck:
     hit_lines = "\n".join(f"{h.id} ({h.doc_title}): {h.text[:400]}" for h in hits) or "(no hits)"
-    check = await structured("detect_conflict", ConflictCheck, star=star_summary(s), grade=grade_summary(s),
+    check = await structured("detect_conflict", ConflictCheck, knob_schema=KNOB_SCHEMA, star=star_summary(s), grade=grade_summary(s),
                              provenance=provenance_text(s.provenance), query=query, hits=hit_lines,
                              tree=tree(state), may_ask=str(may_ask).lower())
     if check.conflict and (not may_ask or not check.question or len(check.options) < 2):
@@ -314,7 +314,9 @@ async def write_abstract(state: SessionState) -> tuple[str, list[str], list[Prov
             evidence.setdefault(p.id, p)
     decisions = [d.model_dump(include={"kind", "star_id", "agent_recommendation", "human_choice", "changed_trajectory", "note"})
                  for d in state.decisions]
-    draft = await structured("write_abstract", AbstractDraft, goal=state.goal, tree=tree(state), decisions=decisions,
+    mode = ("AUTO MODE: no human made choices in this session; do not credit human judgment."
+            if store.config(state.id).get("auto_mode") else "Human-in-the-loop session.")
+    draft = await structured("write_abstract", AbstractDraft, goal=state.goal, mode=mode, tree=tree(state), decisions=decisions,
                              evidence="\n".join(f"{p.id} ({p.doc_title or p.kind}): {p.text[:300]}" for p in evidence.values()))
     known = {s.id for s in state.stars} | set(evidence)
 

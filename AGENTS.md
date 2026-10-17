@@ -138,6 +138,16 @@ branch subgraph: run → reflect → (run +5 seeds) | (ask ⟂) | END          �
   `GET /api/sessions/{id}/export`; event `papiers.export_ready` tells the UI to show "Add to Papiers" (paste into a
   Papiers note, which Papiers indexes, so later sessions' searches find it). Shadow branches get their own section.
 
+### Replay (`backend/litmus/replay.py`)
+- `uv run litmus record-demo <session_id>` writes `shared/demo-session.json` ({snapshot, events}).
+- `GET /api/replay/demo?speed=1` creates `rpl_…` and re-emits every recorded event through the same WS
+  (gaps capped at 1.5s ÷ speed; `session.started.replay = true`). Mid-replay the snapshot is empty with
+  `last_seq: 0` (clients build from events); at the end it becomes the recorded final snapshot. Needs no network.
+- Current recording: `ses_74aa24a8f2` — the canonical demo story (mixup refuted at ~10 epochs → library search →
+  question → human overrides 20→30 epochs → confirmed +0.22; shadow 20-epoch ghost +0.15).
+- `fresh: true` on session create offsets seeds so nothing comes from the cache: every star trains live with
+  epoch progress. Use it for live judging.
+
 ### Commands
 | Command | What |
 |---|---|
@@ -145,7 +155,8 @@ branch subgraph: run → reflect → (run +5 seeds) | (ask ⟂) | END          �
 | `uv run litmus smoke [--seeds 0 1]` | baseline on Modal, streams epochs |
 | `uv run litmus warmup` | start a warm container |
 | `uv run litmus library [--refresh]` | ranked claims with notes and conditions |
-| `uv run litmus run --auto [--waves N]` | headless end-to-end session, prints the tree |
+| `uv run litmus run --auto [--waves N] [--fresh]` | headless end-to-end session, prints the tree |
+| `uv run litmus record-demo <session_id>` | save a session to `shared/demo-session.json` |
 | `uv run pytest` | tests (CPU only) |
 
 ## Gotchas
@@ -180,6 +191,15 @@ branch subgraph: run → reflect → (run +5 seeds) | (ask ⟂) | END          �
 - 2026-10-17 abstract-and-writeback: `POST /api/sessions/ses_4a61ce2ffe/explain {"star_id":"S7"}` → 5.8s, answer
   quotes 94.79→95.05 (+0.26, CI 0.20–0.32) and cites hl_07db… (Bag of Tricks) + hl_50d0… (mixup).
   `GET …/export` → findings Markdown incl. shadow section.
+- 2026-10-17 replay + hardening (final code, 3 full runs, 0 server errors):
+  1. `ses_74aa24a8f2` (scripted human, fresh seeds): 11 stars, 3 waves; mixup α=1 −1.44 and α=0.2 −0.26 refuted
+     at ~10 ep → question → human chose 30 ep over the agent's 20 → **+0.22 [+0.07, +0.37] confirmed**; shadow
+     (agent's 20 ep) +0.15. No final-wave question. Recorded as the demo.
+  2. `ses_…` second scripted run: α=0.2 mixup @40 ep **+0.33 [+0.17, +0.50]** (replicates), alternating flip
+     confirmed without TTA (−0.20 for random).
+  3. `ses_065433f008` (auto, fresh): **`kill -9` of the server mid-wave-1 with 4 branches running → restart →
+     "recovering session" → finished**, 9 stars, no duplicates.
+  Replay: `GET /api/replay/demo?speed=4` re-streamed 1083 events in 14s; final snapshot 11 stars + abstract.
 
 ## Frontend
 Vite + React 19 + TypeScript (strict), Tailwind v4, `motion`, zustand, d3 (hierarchy/scale/shape). Lives in `frontend/`.

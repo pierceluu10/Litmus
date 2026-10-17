@@ -269,7 +269,8 @@ async def reflect(bs: BranchState) -> dict:
             hits = []
         store.emit(state.id, "library.search", {"star_id": s.id, "query": query, "hits": [h.model_dump() for h in hits]})
         if hits:
-            may_ask = not any(q.wave == state.wave for q in state.questions)
+            final_wave = state.wave >= session_config(state.id)["max_waves"] or state.finish_requested
+            may_ask = not final_wave and not any(q.wave == state.wave for q in state.questions)
             try:
                 check = await agent.detect_conflict(state, s, query, hits, may_ask)
             except LLMError as error:
@@ -279,7 +280,7 @@ async def reflect(bs: BranchState) -> dict:
                 s.reflection = f"{r.reflection} {check.explanation}"
                 cited = [h for h in hits if h.id in check.cited_hit_ids] or hits[:2]
                 # Re-check synchronously: a sibling branch may have asked while we awaited the LLM (one question per wave).
-                if check.conflict and not any(q.wave == state.wave for q in state.questions):
+                if check.conflict and not final_wave and not any(q.wave == state.wave for q in state.questions):
                     return _ask(state, s, check, cited)
                 if check.conflict:
                     agent.demote_to_follow_up(check)
