@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from litmus import api, store
 from litmus.models import (Abstract, Decision, Document, Claim, Event, Grade, Proposal, Provenance, Question, RunResult,
                            SessionState, Star)
-from tests.test_engine import engine  # noqa: F401  (fixture: fake trainer + fake LLM, temp DB)
+from tests.test_engine import engine, fake_library  # noqa: F401  (fixture: fake trainer + fake LLM, temp DB)
 
 PAYLOAD_MODELS = {
     "star.created": {"star": Star}, "star.updated": {"star": Star}, "shadow.created": {"star": Star},
@@ -24,7 +24,7 @@ REQUIRED_KEYS = {
     "feedback.received": {"star_id", "kind", "text"}, "agent.replanned": {"star_id", "because", "change"},
     "papiers.export_ready": {"path", "instructions"}, "budget.updated": {"used", "total"},
     "session.status": {"status"}, "error": {"message"}, "question.answered": {"question_id", "option_id"},
-    "library.loaded": {"documents", "claims"}, "proposals.ready": {"star_id", "proposals"},
+    "library.loaded": {"documents", "claims"}, "proposals.ready": {"star_id", "proposals"}, "start.chosen": {"claim_ids"},
 }
 
 
@@ -51,23 +51,27 @@ def wait(client, sid, predicate, timeout=20):
     raise AssertionError(snapshot["status"])
 
 
-def test_api_flow_and_every_event_matches_the_contract(engine):  # noqa: F811
+def test_api_flow_and_every_event_matches_the_contract(engine, monkeypatch):  # noqa: F811
+    monkeypatch.setattr(api, "get_library", fake_library)
     with TestClient(api.app) as client:
         sid = client.post("/api/sessions", json={"max_waves": 2}).json()["session_id"]
-        snap = wait(client, sid, lambda s: any(p["wave"] == 1 for p in s["proposals"]))
+        snap = wait(client, sid, lambda s: s["status"] == "waiting_human")
         SessionState.model_validate(snap)
         assert snap["last_seq"] == store.last_seq(sid)
-        proposals = [p for p in snap["proposals"] if p["wave"] == 1]
+        assert client.post(f"/api/sessions/{sid}/start", json={"claim_ids": ["hl_nope"]}).status_code == 409
+        assert client.post(f"/api/sessions/{sid}/start", json={"claim_ids": ["hl_tta"]}).json() == {"ok": True}
 
-        assert client.post(f"/api/sessions/{sid}/dispatch", json={"star_id": "S0", "selections": [
-            {"proposal_id": proposals[1]["id"], "knob_overrides": {"tta_level": 7}}]}).status_code == 409
+        # The agent's own card arrives once its experiment is graded.
+        snap = wait(client, sid, lambda s: any(p["status"] == "open" for p in s["proposals"]))
+        option = next(p for p in snap["proposals"] if p["status"] == "open")
+        assert client.post(f"/api/sessions/{sid}/dispatch", json={"star_id": option["star_id"], "selections": [
+            {"proposal_id": option["id"], "knob_overrides": {"tta_level": 7}}]}).status_code == 409
         assert client.post(f"/api/sessions/{sid}/dispatch", json={"star_id": "S99", "selections": [
-            {"proposal_id": proposals[1]["id"]}]}).status_code == 404
-        # Human skips the agent's pick: only what the human chose runs (no shadow branch).
-        ok = client.post(f"/api/sessions/{sid}/dispatch", json={"star_id": "S0", "selections": [
-            {"proposal_id": proposals[1]["id"]}], "instruction": "TTA first"})
+            {"proposal_id": option["id"]}]}).status_code == 404
+        ok = client.post(f"/api/sessions/{sid}/dispatch", json={"star_id": option["star_id"], "selections": [
+            {"proposal_id": option["id"]}], "instruction": "TTA first"})
         assert ok.json() == {"ok": True}
-        snap = wait(client, sid, lambda s: len(s["stars"]) > 1 and all(x["status"] in ("done", "waiting") for x in s["stars"]))
+        snap = wait(client, sid, lambda s: len(s["stars"]) > 2 and all(x["status"] in ("done", "waiting") for x in s["stars"]))
         assert not any(x["chosen_by"] == "shadow" for x in snap["stars"])
         assert client.post(f"/api/sessions/{sid}/feedback", json={"star_id": "S1", "kind": "challenge",
                                                                    "text": "I think this is noise"}).status_code == 200

@@ -1,7 +1,12 @@
-"""The LangGraph research loop.
+"""The LangGraph research loop. Litmus is the lead researcher; each star is run by its own agent.
 
-    intake → baseline → propose → select ⟂ → Send(branch) ×N → join → propose | abstract → END
-    branch: run → reflect → (run with 5 more seeds) | (ask ⟂) | END
+    intake → baseline → start ⟂ → select → Send(branch) ×N → join → propose → select ⟂ … | abstract → END
+    branch (one agent): run → reflect → (run with 5 more seeds) | (ask ⟂ → suggest) | suggest → END
+
+start: the human picks the claims to begin with ("Where should we start?"); Litmus drafts one plain test per claim.
+suggest: the agent reads its siblings' results and offers its own next steps ("Where should I proceed?"). The card
+appears as soon as that agent finishes; what the human picks starts with the next generation, at the join.
+propose: Litmus plans only what the agents left uncovered (no open options, or human feedback nobody implemented).
 
 ⟂ = interrupt(). Interrupts resume with values the driver derives from the session snapshot (the API records
 the human's action first), so every node is safe to re-run after a restart: runs come from the result cache and
@@ -28,6 +33,9 @@ log = logging.getLogger(__name__)
 MAX_WAVES = 3
 MAX_STARS = 12
 MAX_BRANCHES = 4
+AUTO_START_CLAIMS = 3
+START_INSTRUCTION = ("The human chose where to start. Propose exactly one plain test per library claim listed, as the "
+                     "human's note frames it, each with parent_star_id S0.")
 
 
 class EngineState(TypedDict):
@@ -85,18 +93,54 @@ async def baseline(es: EngineState) -> dict:
     return {}
 
 
+async def start(es: EngineState) -> dict:
+    state = store.get(es["session_id"])
+    if state.finish_requested or state.wave > 0:
+        return {}  # already started (re-run after a restart)
+    _, claims = await get_library()
+    if not state.start_claim_ids:
+        if session_config(state.id)["auto_mode"]:
+            state.start_claim_ids = [c.id for c in claims[:AUTO_START_CLAIMS]]
+            store.emit(state.id, "start.chosen", {"claim_ids": state.start_claim_ids})
+        else:
+            ops.refresh_status(state)
+            interrupt({"kind": "start"})
+            state = store.get(es["session_id"])
+    chosen = [c for c in claims if c.id in state.start_claim_ids]
+    await ops.gate(state.id).wait()
+    state.wave = 1
+    ops.think(state, f"Starting where you chose: drafting one test for each of your {len(chosen)} claims, one agent apiece.")
+    try:
+        proposals, _ = await agent.propose(state, chosen, START_INSTRUCTION, session_config(state.id)["max_waves"],
+                                           min(len(chosen), MAX_BRANCHES))
+    except (agent.ProposalError, LLMError) as error:
+        store.emit(state.id, "error", {"message": f"Could not draft the first tests: {error}"})
+        state.finish_requested = True
+        store.save(state)
+        return {}
+    state.proposals.extend(proposals)
+    ops.dispatch(state, [{"proposal_id": p.id} for p in proposals], "human")
+    return {}
+
+
 async def propose(es: EngineState) -> dict:
+    """The next generation. The agents already offered their options; Litmus plans only when nobody has an open option,
+    or when the human said something no agent picked up."""
     state = store.get(es["session_id"])
     if state.finish_requested:
         return {}
-    current = [p for p in state.proposals if p.wave == state.wave]
-    if current and all(p.status == "open" for p in current):
-        return {}  # re-run after a restart: these proposals are still waiting for the human
     await ops.gate(state.id).wait()
-    state.wave += 1
+    state.wave = ops.target_wave(state)  # +1 once the current wave launched; a re-run after a restart keeps it
+    open_now = [p for p in state.proposals if p.status == "open"]
+    queued = [s for s in state.stars if s.wave == state.wave and s.chosen_by in ("human", "auto")]
+    unheard = agent.human_agenda(state)
+    if queued or (open_now and not unheard):
+        agents = sorted({p.star_id for p in open_now})
+        ops.think(state, f"Wave {state.wave}: " + (f"starting the {len(queued)} experiments you picked." if queued else
+                  f"{len(agents)} agents are waiting for you to say where they should go next."))
+        return {}
     anchor = ops.best_star(state)
-    ops.think(state, f"Wave {state.wave}: choosing what to test next from your highlights and the results so far.",
-              anchor.id)
+    ops.think(state, f"Wave {state.wave}: no agent has an open option for this, so I'm planning from everything they found.", anchor.id)
     slots = min(MAX_BRANCHES, MAX_STARS - len(research_stars(state)))
     _, claims = await get_library()
     instruction = next((d.note for d in reversed(state.decisions) if "Instruction:" in d.note), None)
@@ -105,13 +149,13 @@ async def propose(es: EngineState) -> dict:
     except (agent.ProposalError, LLMError) as error:
         log.warning("propose failed: %s", error)
         proposals, thinking = _fallback_proposals(state), "I couldn't draft new proposals, so I'm re-offering the strongest ones you skipped earlier."
-        if not proposals:
+        if not proposals and not open_now:
             store.emit(state.id, "error", {"message": f"Could not propose a next wave: {error}"})
             state.finish_requested = True
             store.save(state)
             return {}
     state.proposals.extend(proposals)
-    for item in state.agenda:
+    for item in unheard:
         item.consumed = True
     ops.think(state, thinking, anchor.id)
     ops.proposals_ready(state, anchor.id)
@@ -129,7 +173,7 @@ def _fallback_proposals(state) -> list[Proposal]:
         if ops.existing_config(state, knobs) or len(out) == MAX_BRANCHES:
             continue
         out.append(p.model_copy(update={"id": f"P{len(state.proposals) + len(out) + 1}", "status": "open",
-                                        "wave": state.wave, "agent_recommended": not out}))
+                                        "star_id": ops.best_star(state).id, "wave": state.wave}))
     return out
 
 
@@ -139,8 +183,8 @@ async def select(es: EngineState) -> dict:
     if state.finish_requested or wave_stars:
         return {"wave_star_ids": [] if state.finish_requested and not wave_stars else wave_stars}
     if session_config(state.id)["auto_mode"]:
-        wave = [p for p in state.proposals if p.wave == state.wave and p.status == "open"][:MAX_BRANCHES]
-        ops.think(state, f"Auto mode: no human in the loop, so I'm running all {len(wave)} proposals.")
+        wave = list(ops.first_options(state).values())[:MAX_BRANCHES]
+        ops.think(state, f"Auto mode: no human in the loop, so I'm running each agent's first option ({len(wave)}).")
         return {"wave_star_ids": [s.id for s in ops.dispatch(state, [{"proposal_id": p.id} for p in wave], "auto")]}
     value = interrupt({"kind": "selection", "wave": state.wave})
     return {"wave_star_ids": value.get("star_ids", [])}
@@ -174,11 +218,17 @@ def after_join(es: EngineState) -> str:
 
 
 def after_baseline(es: EngineState) -> str:
-    return "abstract" if store.get(es["session_id"]).finish_requested else "propose"
+    return "abstract" if store.get(es["session_id"]).finish_requested else "start"
 
 
 async def abstract(es: EngineState) -> dict:
     state = store.get(es["session_id"])
+    leftover = {p.star_id for p in state.proposals if p.status == "open"}
+    for p in state.proposals:
+        if p.status == "open":
+            p.status = "skipped"
+    for anchor in leftover:
+        ops.proposals_ready(state, anchor)  # the research is over: close every agent's card
     if state.abstract is None:
         ops.think(state, "Writing up what we learned, citing every star and highlight it rests on.")
         try:
@@ -324,7 +374,31 @@ async def ask(bs: BranchState) -> dict:
 
 
 def after_reflect(bs: BranchState) -> str:
-    return {"more_seeds": "more_seeds", "ask": "ask"}.get(bs.get("next", "end"), END)
+    return {"more_seeds": "more_seeds", "ask": "ask"}.get(bs.get("next", "end"), "suggest")
+
+
+async def suggest(bs: BranchState) -> dict:
+    """The agent's own next steps, offered the moment its verdict is in."""
+    state = store.get(bs["session_id"])
+    s = ops.star(state, bs["star_id"])
+    final_wave = state.wave >= session_config(state.id)["max_waves"]
+    if (s.status != "done" or not s.grade or s.suggestion or state.finish_requested or final_wave
+            or len(research_stars(state)) >= MAX_STARS):
+        return {}
+    name = agent.agent_name(s)
+    ops.think(state, f"{name}: reading the other agents' results to decide where to go next.", s.id)
+    _, claims = await get_library()
+    try:
+        proposals, take = await agent.suggest(state, s, claims, _conditions(claims, s))
+    except LLMError as error:
+        log.warning("suggest failed for %s: %s", s.id, error)
+        return {}  # Litmus plans for the gap at the join
+    s.suggestion = take
+    state.proposals.extend(proposals)
+    ops.update_star(state, s)
+    if proposals:
+        ops.proposals_ready(state, s.id)
+    return {}
 
 
 async def more_seeds(bs: BranchState) -> dict:
@@ -337,11 +411,13 @@ def build_branch():
     g.add_node("reflect", reflect)
     g.add_node("more_seeds", more_seeds)
     g.add_node("ask", ask)
+    g.add_node("suggest", suggest)
     g.add_edge(START, "run")
     g.add_edge("run", "reflect")
-    g.add_conditional_edges("reflect", after_reflect, ["more_seeds", "ask", END])
+    g.add_conditional_edges("reflect", after_reflect, ["more_seeds", "ask", "suggest"])
     g.add_edge("more_seeds", "run")
-    g.add_edge("ask", END)
+    g.add_edge("ask", "suggest")
+    g.add_edge("suggest", END)
     return g.compile()
 
 
@@ -355,12 +431,13 @@ async def branch(bs: BranchState) -> dict:
 
 def build_graph(checkpointer):
     g = StateGraph(EngineState)
-    for name, fn in [("intake", intake), ("baseline", baseline), ("propose", propose), ("select", select),
+    for name, fn in [("intake", intake), ("baseline", baseline), ("start", start), ("propose", propose), ("select", select),
                      ("branch", branch), ("join", join), ("abstract", abstract)]:
         g.add_node(name, fn)
     g.add_edge(START, "intake")
     g.add_edge("intake", "baseline")
-    g.add_conditional_edges("baseline", after_baseline, ["propose", "abstract"])
+    g.add_conditional_edges("baseline", after_baseline, ["start", "abstract"])
+    g.add_edge("start", "select")
     g.add_edge("propose", "select")
     g.add_conditional_edges("select", fan_out, ["branch", "join"])
     g.add_edge("branch", "join")

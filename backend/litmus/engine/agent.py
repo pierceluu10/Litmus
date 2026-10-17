@@ -1,4 +1,7 @@
-"""The LLM side of the scientist. Every call is a structured output that code then validates: ids must exist,
+"""The LLM side of Litmus and its agents. Litmus is the lead researcher: it sees the whole tree, plans when no
+agent has a next step, answers the human's questions, and writes the abstract. Each star has its own agent, named
+for the idea it tests; when its experiment is graded, the agent reflects and suggests where to go next, reading its
+siblings' results so the agents build on each other. Every call is a structured output that code then validates: ids must exist,
 knob changes must pass the knob schema, and numbers always come from the grader, never from the model.
 """
 
@@ -16,7 +19,13 @@ from litmus.models import ChatTurn, Claim, Proposal, Provenance, SessionState, S
 MAX_PROPOSALS = 4
 MAX_SEEDS = 10
 MIN_EPOCH_CHANGE = 2
+MAX_SUGGESTIONS = 3
 POINTS = 100  # grader works in fractions; prompts and prose use accuracy points
+
+# An agent is named for the idea its star tests (mirrors the frontend's agentName).
+AGENT_NAMES = {"label_smoothing": "Smoothing", "epochs": "Long training", "tta_level": "TTA", "flip": "Flip",
+               "mixup_alpha": "Mixup", "cutout": "Cutout", "lr_scale": "Learning rate", "whiten": "Whitening",
+               "dirac_init": "Identity init", "translate": "Translate"}
 
 KNOB_SCHEMA = {
     "label_smoothing": f"float 0..0.5 (baseline {BASELINE_KNOBS['label_smoothing']})",
@@ -57,12 +66,15 @@ class ProposalDraft(BaseModel):
     condition_notes: str
     claim_ids: list[str]
     agenda_ids: list[str]
-    agent_recommended: bool
 
 
 class ProposalSet(BaseModel):
     thinking: str
-    recommendation_reason: str
+    proposals: list[ProposalDraft]
+
+
+class AgentSuggestions(BaseModel):
+    take: str
     proposals: list[ProposalDraft]
 
 
@@ -144,10 +156,17 @@ def grade_summary(s: Star) -> dict | None:
             "p_value": round(g.p_value, 4), "n": g.n, "practical": g.practical}
 
 
+def agent_name(s: Star) -> str:
+    if not s.parent_id:
+        return "Baseline"
+    method = next((k for k in s.knob_changes if k != "epochs"), "epochs")
+    return f"{AGENT_NAMES[method]} agent"
+
+
 def star_summary(s: Star) -> dict:
-    return {"id": s.id, "parent": s.parent_id, "title": s.title, "status": s.status, "chosen_by": s.chosen_by,
-            "knob_changes": s.knob_changes, "predicted": s.predicted, "grade": grade_summary(s),
-            "reflection": s.reflection, "error": s.error}
+    return {"id": s.id, "agent": agent_name(s), "parent": s.parent_id, "title": s.title, "status": s.status,
+            "chosen_by": s.chosen_by, "knob_changes": s.knob_changes, "predicted": s.predicted, "grade": grade_summary(s),
+            "reflection": s.reflection, "suggestion": s.suggestion, "error": s.error}
 
 
 def tree(state: SessionState) -> list[dict]:
@@ -169,13 +188,19 @@ def _changes(knob_changes: KnobChanges | None) -> dict:
 
 # ---------------------------------------------------------------- propose
 
-def _validate_proposals(drafts: ProposalSet, state: SessionState, claims: dict[str, Claim], slots: int) -> tuple[list[Proposal], list[str]]:
-    """Valid proposals and the problems found (unknown ids, invalid knobs, duplicates, no-op changes)."""
-    problems, proposals, seen = [], [], set()
+def _validate_proposals(drafts: ProposalSet | AgentSuggestions, state: SessionState, claims: dict[str, Claim], slots: int,
+                        required: set[str], anchor: str | None = None) -> tuple[list[Proposal], list[str]]:
+    """Valid proposals and the problems found (unknown ids, invalid knobs, duplicates, no-op changes, required
+    agenda items left out). An agent's proposals are anchored on its own star, whatever parent they change."""
+    problems, proposals = [], []
+    seen = {config_hash(apply_changes(ops.star(state, p.parent_star_id or p.star_id).knobs.model_dump(), p.knob_changes))
+            for p in state.proposals if p.status == "open"}
     agenda = {a.id: a for a in state.agenda}
     star_ids = {s.id for s in state.stars if s.status == "done"}
     base = len(state.proposals)
-    for draft in drafts.proposals[:MAX_PROPOSALS]:
+    for draft in drafts.proposals:
+        if len(proposals) == slots:
+            break
         if draft.parent_star_id not in star_ids:
             problems.append(f"'{draft.title}': parent_star_id {draft.parent_star_id} is not a finished star")
             continue
@@ -206,41 +231,71 @@ def _validate_proposals(drafts: ProposalSet, state: SessionState, claims: dict[s
             problems.append(f"'{draft.title}': cites no known claim_ids or agenda_ids")
             continue
         proposals.append(Proposal(
-            id=f"P{base + len(proposals) + 1}", star_id=parent.id, parent_star_id=parent.id, title=draft.title,
+            id=f"P{base + len(proposals) + 1}", star_id=anchor or parent.id, parent_star_id=parent.id, title=draft.title,
             hypothesis=draft.hypothesis, predicted=draft.predicted, knob_changes=changes,
-            condition_notes=draft.condition_notes, provenance=provenance, agent_recommended=draft.agent_recommended,
-            wave=state.wave,
+            condition_notes=draft.condition_notes, provenance=provenance, agent_recommended=False, wave=state.wave,
         ))
-    required = {a.id for a in state.agenda if not a.consumed and a.source in ("answer", "feedback")}
     implemented = {aid for d in drafts.proposals for aid in d.agenda_ids}
     for aid in required - implemented:
         problems.append(f"agenda item {aid} ({agenda[aid].text[:80]}) from the human is not implemented by any proposal")
-    proposals = proposals[:max(slots, 2)]
-    if sum(p.agent_recommended for p in proposals) != 1 and proposals:
-        first = next((p for p in proposals if p.agent_recommended), proposals[0])
-        for p in proposals:
-            p.agent_recommended = p is first
     return proposals, problems
 
 
+def human_agenda(state: SessionState, star_id: str | None = None) -> list:
+    """Unconsumed answers and feedback from the human, optionally only those about one star."""
+    return [a for a in state.agenda if not a.consumed and a.source in ("answer", "feedback")
+            and (star_id is None or a.star_id == star_id)]
+
+
+def _agenda_view(items) -> list[dict]:
+    return [a.model_dump(include={"id", "source", "star_id", "text", "knob_changes", "parent_star_id"}) for a in items]
+
+
+def _repair(values: dict, problems: list[str], fewest: int) -> dict:
+    return dict(values, instruction=(values["instruction"] + "\n\nYOUR PREVIOUS PROPOSALS HAD PROBLEMS, FIX THEM:\n- "
+                                     + "\n- ".join(problems or [f"fewer than {fewest} valid proposals"])))
+
+
 async def propose(state: SessionState, claims: list[Claim], instruction: str | None, max_waves: int, slots: int) -> tuple[list[Proposal], str]:
-    """2-4 validated proposals grounded in the library and agenda. Repairs once with the problems listed."""
+    """Litmus plans: up to `slots` validated proposals grounded in the library and agenda. Repairs once."""
     by_id = {c.id: c for c in claims}
-    open_agenda = [a.model_dump(include={"id", "source", "star_id", "text", "knob_changes", "parent_star_id"})
-                   for a in state.agenda if not a.consumed]
-    values = dict(goal=state.goal, wave=str(state.wave), max_waves=str(max_waves), slots=str(slots),
+    fewest = min(2, slots)
+    required = {a.id for a in human_agenda(state)}
+    values = dict(goal=state.goal, wave=str(state.wave), max_waves=str(max_waves), fewest=str(fewest), slots=str(slots),
                   knob_schema=KNOB_SCHEMA, claims=[claim_summary(c) for c in claims], tree=tree(state),
-                  agenda=open_agenda or "(empty)", instruction=instruction or "(none)", max_proposals=str(MAX_PROPOSALS))
+                  agenda=_agenda_view(a for a in state.agenda if not a.consumed) or "(empty)", instruction=instruction or "(none)")
     drafts = await structured("propose", ProposalSet, **values)
-    proposals, problems = _validate_proposals(drafts, state, by_id, slots)
-    if problems or len(proposals) < 2:
-        repair = dict(values, instruction=(values["instruction"] + "\n\nYOUR PREVIOUS PROPOSALS HAD PROBLEMS, FIX THEM:\n- "
-                                          + "\n- ".join(problems or ["fewer than 2 valid proposals"])))
-        drafts = await structured("propose", ProposalSet, **repair)
-        proposals, problems = _validate_proposals(drafts, state, by_id, slots)
-    if len(proposals) < 1:
+    proposals, problems = _validate_proposals(drafts, state, by_id, slots, required)
+    if problems or len(proposals) < fewest:
+        drafts = await structured("propose", ProposalSet, **_repair(values, problems, fewest))
+        proposals, problems = _validate_proposals(drafts, state, by_id, slots, required)
+    if not proposals:
         raise ProposalError("; ".join(problems) or "no valid proposals")
     return proposals, drafts.thinking
+
+
+async def suggest(state: SessionState, s: Star, claims: list[Claim], conditions: str) -> tuple[list[Proposal], str]:
+    """The star's agent, right after its verdict: its take and up to 3 next steps, reading its siblings' results and
+    the other agents' open suggestions so they build on each other instead of repeating. Repairs once."""
+    by_id = {c.id: c for c in claims}
+    mine = human_agenda(state, s.id)
+    siblings = [star_summary(x) for x in state.stars if x.id != s.id and x.wave == s.wave and x.parent_id]
+    others = [{"agent": agent_name(ops.star(state, p.star_id)), "title": p.title, "knob_changes": p.knob_changes}
+              for p in state.proposals if p.status == "open"]
+    values = dict(agent=agent_name(s), goal=state.goal, star=star_summary(s), grade=grade_summary(s),
+                  provenance=provenance_text(s.provenance), conditions=conditions or "(unknown)", siblings=siblings or "(none yet)",
+                  others=others or "(none)", tree=tree(state), claims=[claim_summary(c) for c in claims],
+                  knob_schema=KNOB_SCHEMA, agenda=_agenda_view(mine) or "(empty)", most=str(MAX_SUGGESTIONS),
+                  instruction="(none)")
+    drafts = await structured("suggest", AgentSuggestions, **values)
+    proposals, problems = _validate_proposals(drafts, state, by_id, MAX_SUGGESTIONS, {a.id for a in mine}, anchor=s.id)
+    if problems or not proposals:
+        drafts = await structured("suggest", AgentSuggestions, **_repair(values, problems, 1))
+        proposals, problems = _validate_proposals(drafts, state, by_id, MAX_SUGGESTIONS, {a.id for a in mine}, anchor=s.id)
+    if proposals:
+        for a in mine:
+            a.consumed = True
+    return proposals, drafts.take
 
 
 # ---------------------------------------------------------------- reflect / conflicts

@@ -45,6 +45,7 @@ export function applyEvent(state: AppState, ev: LitmusEvent): AppState {
 
   switch (ev.type) {
     case 'session.started': s = { ...s, goal: p.goal ?? s.goal, replay: p.replay, created_at: ev.ts }; break
+    case 'start.chosen': s = { ...s, start_claim_ids: p.claim_ids ?? [] }; break
     case 'library.loaded': next.documents = p.documents ?? []; next.claims = p.claims ?? []; break
     case 'agent.thinking': addFeed({ kind: 'thinking', star_id: p.star_id, text: p.text }); break
     case 'proposals.ready':
@@ -53,10 +54,13 @@ export function applyEvent(state: AppState, ev: LitmusEvent): AppState {
     case 'human.dispatched': {
       const d: Decision = p.decision
       const chosen = new Set<string>((p.selections ?? []).map((x: any) => x.proposal_id))
+      // choosing from an agent's card closes that card; other agents' cards stay open
+      const cards = new Set<string>([p.star_id, ...s.proposals.filter((x) => chosen.has(x.id)).map((x) => x.star_id)])
       s = {
         ...s,
         decisions: upsert(s.decisions, d),
-        proposals: s.proposals.map((x) => x.star_id !== p.star_id ? x : { ...x, status: chosen.has(x.id) ? 'dispatched' : 'skipped' }),
+        proposals: s.proposals.map((x) => chosen.has(x.id) ? { ...x, status: 'dispatched' }
+          : cards.has(x.star_id) && x.status === 'open' ? { ...x, status: 'skipped' } : x),
       }
       addFeed({ kind: 'decision', star_id: p.star_id, text: `You chose: ${d.human_choice}` }); break
     }

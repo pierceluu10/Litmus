@@ -132,6 +132,7 @@ class Star(BaseModel):
     proposal_id: str | None = None
     shadow_of: str | None = None
     wave: int = 0
+    suggestion: str | None = None  # this star's agent, in its own words: where it would go next and why
     progress: list[Progress] = []
     runs: list[RunResult] = []
     parent_runs: list[RunResult] = []
@@ -215,6 +216,7 @@ class SessionState(BaseModel):
     wave: int = 0
     agenda: list[AgendaItem] = []
     finish_requested: bool = False
+    start_claim_ids: list[str] = []  # the claims the human chose to start from ("Where should we start?")
     last_seq: int = 0  # seq of the last event this snapshot reflects; open the WS with from_seq=last_seq
 
 
@@ -223,7 +225,7 @@ EventType = Literal[
     "star.created", "experiment.started", "experiment.progress", "experiment.run_done", "star.graded",
     "star.updated", "star.failed", "library.search", "question.asked", "question.answered",
     "feedback.received", "agent.replanned", "shadow.created", "abstract.ready", "papiers.written",
-    "papiers.export_ready", "budget.updated", "session.status", "error",
+    "papiers.export_ready", "budget.updated", "session.status", "error", "start.chosen",
 ]
 
 

@@ -17,10 +17,10 @@ Autoresearch Challenge, Hack the Valley 11.
 Papiers CLI ──read──▶ papiers_client ──▶ library context (judgment-weighted claims)
                                               │
 FastAPI (REST + WS) ◀──events── LangGraph engine (SQLite checkpoints, thread = session)
-   ▲    │                           │  intake → baseline → propose → [interrupt: human selects]
-   │    └── human actions ──────────┘    → fan-out → branch ×N: run (+fair parent re-run) → grade → reflect
-   │        dispatch/answer/feedback        (reflect: library search, question, follow-ups)
-   │                                     → join → budget → loop | abstract → write-back
+   ▲    │                           │  intake → baseline → [interrupt: human picks claims] → Litmus drafts tests
+   │    └── human actions ──────────┘    → fan-out → agent ×N: run (+fair parent re-run) → grade → reflect
+   │   start/dispatch/answer/feedback       (reflect: library search, question) → suggest (its own card)
+   │                                     → join → Litmus fills gaps → loop | Litmus writes abstract → write-back
 Frontend (React)                 Modal app "litmus": train(knobs, seed) on A100, streams epochs
 Grader (pure stats) ◀── seeds ── results (cached by config hash in SQLite)
 ```
@@ -124,9 +124,17 @@ uv run litmus --help
 
 ### Engine (`backend/litmus/engine/`)
 ```
-intake → baseline → propose → select ⟂ → Send(branch)×N → join → propose | abstract
-branch subgraph: run → reflect → (run +5 seeds) | (ask ⟂) | END          ⟂ = interrupt()
+intake → baseline → start ⟂ → select → Send(branch)×N → join → propose → select ⟂ … | abstract
+branch subgraph (one agent): run → reflect → (run +5 seeds) | (ask ⟂ → suggest) | suggest → END     ⟂ = interrupt()
 ```
+- **Litmus vs agents** (user decision, 2026-10-17): Litmus is the lead researcher. It drafts the first tests from the
+  claims the human picked ("Where should we start?", `POST /start`), plans only when no agent left an open option or a
+  human answer/feedback went unimplemented (`propose`), answers the chat, and writes the abstract, always from the
+  whole tree. Each star has its own agent (`agent.agent_name`: "Smoothing agent", …). After its verdict the agent
+  `suggest`s 1–3 next steps and a first-person `Star.suggestion`, reading its generation's siblings and the options
+  other agents already offered, and must implement any human answer about its star. Its card ("Where should I
+  proceed?") appears at once; a pick made mid-wave queues for the next wave (`ops.target_wave`), because LangGraph
+  supersteps are a barrier anyway. Choosing from a card skips that card's other options only; finishing closes all cards.
 - `graph.py` nodes, `ops.py` every state mutation (+ its event, same sync step), `agent.py` LLM calls with
   validation, `driver.py` runs the graph and applies human actions.
 - **Source of truth for data = `store` snapshot** (SQLite `sessions` table). LangGraph state only carries control
@@ -138,9 +146,10 @@ branch subgraph: run → reflect → (run +5 seeds) | (ask ⟂) | END          �
 - Fair comparison: `ops.comparison_knobs` = parent at the child's epochs, unless the change is epochs alone.
 - Adaptive seeds: inconclusive + |delta| ≥ 0.05 pts + n < 10 → 5 more paired seeds automatically, explained.
 - Refuted → always searches the library; conflicts → one question per wave; answers/feedback land on the
-  session `agenda`, and the next `propose` must implement every human agenda item (validated, repaired once).
-- No shadow branches (user decision, 2026-10-17): skipping the agent's pick runs only what the human chose. `chosen_by:"shadow"` and `shadow.created` stay in the contract (additive only) but are no longer emitted.
-- Auto mode dispatches all proposals (≤4) and answers questions with the agent's leaning.
+  session `agenda`; the agent whose star it is implements them in its card, and Litmus's `propose` implements any
+  left over (validated, repaired once).
+- No agent's pick and no shadow branches (user decision, 2026-10-17): only what the human chose runs. `chosen_by:"shadow"`, `shadow.created` and `Proposal.agent_recommended` stay in the contract (additive only) but are never emitted or true.
+- Auto mode starts from the top 3 claims, runs each agent's first option (≤4), and answers questions with the agent's leaning.
 - Limits: 4 branches per wave, 12 research stars, 3 waves (configurable), per-session GPU budget.
 - Deviation from the original plan: events are emitted straight to the store (persist + broadcast) instead of
   LangGraph's stream writer, because feedback, shadows, and explain run outside the graph and need the same path.
@@ -158,7 +167,7 @@ branch subgraph: run → reflect → (run +5 seeds) | (ask ⟂) | END          �
   `low`, planning and abstract at the model default); every call logs latency, input, cached, output and reasoning
   tokens (`llm <prompt> …` in the server log). Automatic prompt caching only hit on byte-identical prompts on
   gpt-5.6-luna (2026-10-17), not on a shared prefix with a different ending, so no `prompt_cache_key` is set.
-- Abstract agent: ~150 words, every sentence cites `[S#][hl_…]`; citations to ids we never gave it are stripped.
+- Abstract (Litmus, `write_abstract.txt`): ~150 words, every sentence cites `[S#][hl_…]`; citations to ids we never gave it are stripped.
 - `POST /explain`: star evidence + per-seed numbers + a fresh library search → plain-language answer with provenance.
 - Write-back = **export** (CLI is read-only): `backend/exports/<session>/findings.md` + `abstract.md`, also served by
   `GET /api/sessions/{id}/export`; event `papiers.export_ready` tells the UI to show "Add to Papiers" (paste into a
@@ -240,7 +249,7 @@ npm test             # reducer, layout, simulator + grader-port tests
 
 **The library is always real**: on launch the claims rail streams `GET /api/library/stream` from the backend (Getting papers… highlights… notes… Summarizing…), in the demo too, so run `uv run litmus serve`. If the backend is unreachable the demo falls back to `src/mock/library.json`, a snapshot of `backend/data/library_cache.json` with the same ids (refresh it by copying the cache).
 
-**The demo backend** (`src/mock/`): `sim.ts` is a simulated airbench94 whose knob effects are calibrated from the recorded real session (`shared/demo-session.json`: mixup α=1 −1.44, α=0.2 +0.22 at 30 epochs, no TTA −0.75, no whitening −1.48, …) with seed-paired noise, plus a port of the locked grader (paired t-interval, verdict relative to prediction). `server.ts` emits the contract's events: any star can be branched (a catalog of moves tied to library highlights), there is no agent's pick and no shadow runs, inconclusive results get 5 more seeds, the first mixup refutation triggers library search + a question, and the next wave is proposed from the best star. `library.ts` maps the demo's moves onto highlights in that snapshot by their real ids.
+**The demo backend** (`src/mock/`): `sim.ts` is a simulated airbench94 whose knob effects are calibrated from the recorded real session (`shared/demo-session.json`: mixup α=1 −1.44, α=0.2 +0.22 at 30 epochs, no TTA −0.75, no whitening −1.48, …) with seed-paired noise, plus a port of the locked grader (paired t-interval, verdict relative to prediction). `server.ts` emits the contract's events: any star can be branched (a catalog of moves tied to library highlights), there is no agent's pick and no shadow runs, inconclusive results get 5 more seeds, the first mixup refutation triggers library search + a question, the session waits for "Where should we start?" (one agent per chosen claim), each agent offers its own card with a short take when its verdict lands, and Litmus plans from the best star only when no card is open. `library.ts` maps the demo's moves onto highlights in that snapshot by their real ids.
 
 **Folder map** (`frontend/src`)
 | Path | What |
@@ -253,7 +262,7 @@ npm test             # reducer, layout, simulator + grader-port tests
 | `App.tsx` | Hash router: home `Landing`, `#/login` and `#/signup` (`Auth`, demo account in `auth.ts`), then the workspace once a session exists |
 | `components/Landing.tsx`, `LowPolyScene.tsx`, `thinker*.ts` | The home page is one pinned horizontal scene: the hero is panel 0, vertical scroll drives `x` (slides dwell in the middle of their range, `dwell()`), and as the first slide comes in from the right the temple plays its intro backwards (`LowPolyScene` `exit`: roof lifts, columns sink, the Thinker and sky settle into a faint backdrop that drifts behind the slides). The slides are plain-language cards that copy the real workspace (claims, proposal dock, tree, leaderboard, question card, write-up). Below 860px or with reduced motion the slides stack vertically. SVG low-poly temple with the Thinker |
 | `components/Scene.tsx` | The 3D canvas: statue, blobs, edges, accuracy scale, follow camera |
-| `components/` | `TopBar` (GPU budget, Generate abstract), `Researching` (a card over the scene: the library loading stages, then the claim each running agent is testing), `Inspector` (a rounded results card that floats over the scene on the right, and sits below it on narrow screens; the question bar is pinned to its bottom: results, rankings, one agent's detail with its tested claims and an Ask Litmus chat that opens with the agent's conclusion, abstract), `PathChart`, `Dock` (everything waiting on you: one tab per open question and per star with proposals, so you can branch from several agents at once), `Prov`, `Icons` |
+| `components/` | `TopBar` (GPU budget, Generate abstract), `Researching` (a card over the scene: the library loading stages, then the claim each running agent is testing), `Inspector` (a rounded results card that floats over the scene on the right, and sits below it on narrow screens; the question bar is pinned to its bottom: results, rankings, "Where should we start?" before the first agents, one agent's detail with what its agent found and suggests, its tested claims and an Ask Litmus chat, abstract), `PathChart`, `Dock` (everything waiting on you: one tab per open question and per agent card, "Where should I proceed? — Flip agent", so you can branch from several agents at once), `Prov`, `Icons` |
 | `components/LowPolyScene.tsx` `Facets` | The landing's faceted low-poly sky, reused as the rails' ground |
 | `public/litmus-statue.glb` | The agent: SMK's public-domain scan of the Artemision Bronze (KAS2100, api.smk.dk), decimated to 1,200 faces, fingertip at the origin |
 
@@ -261,7 +270,7 @@ npm test             # reducer, layout, simulator + grader-port tests
 
 **Camera**: locked: no rotate or pan, zoom capped (170-480 units). At the start of a session it opens just behind the statue's head, looking over its shoulder along the arm, and glides once to the default view (`EAR_CAM`/`EAR_AIM`, `INTRO_SMOOTH` in `Scene.tsx`). The default view (`VIEW`) is swung a little toward the nodes' side so the tree is met head-on, aimed at the midpoint of the focused star and its parent. The camera frames the whole column of the focused star and zooms out (up to 760 units) when a generation gets tall. Focus = the newest star while following; dispatching, answering or branching turns following back on; clicking any star or claim re-centres on it and keeps your zoom. "Fit all" is a toggle (`fitAll` in the store): on frames every star, off returns to the default view. There is no pause button.
 
-**Asking Litmus** (`ThoughtFlight.tsx`): the thread reads as a conversation (your words in graphite bubbles, Litmus's in marble with its facet mark, replans as notes between them). Sending a question collapses the typed words into a graphite mote (`.mote`) that arcs to the statue's head while the camera turns to it (`consulting` in `CameraRig`); a "Thinking" pill rides above the head (`statueAnchor`, projected every frame by `HeadTracker` in `Scene.tsx`) until the backend answers, then the mote flies back and the answer opens from where it lands (`data-answer-slot`). Pure presentation: the request starts at once and the backend is unchanged. Reduced motion, a scene off screen, or a failed request skip or shorten the trip.
+**Asking Litmus**: the thread reads as a conversation (your words in graphite bubbles, Litmus's in marble with its facet mark, replans as notes between them). Litmus answers about one star but sees the whole tree. Answers appear in place (the flight to the statue was removed).
 
 **Branch from anywhere**: "Branch from here" sends `feedback(kind: "suggest")` for that star, so it works against the real backend too (the agent replans from it); the demo backend answers with proposals from that star.
 

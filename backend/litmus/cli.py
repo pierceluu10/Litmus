@@ -88,7 +88,7 @@ async def _run(auto: bool, waves: int, goal: str | None, fresh: bool) -> None:
             break
         if event.type == "error" and event.payload["message"].startswith("Engine error"):
             break
-        if not auto and event.type in ("proposals.ready", "question.asked"):
+        if not auto and event.type == "session.status" and event.payload["status"] == "waiting_human":
             print("(waiting for a human: use the API, or run with --auto)")
             break
     print()

@@ -35,6 +35,8 @@ CLAIMS = [
           provenance=[Provenance(kind="highlight", id="hl_mixup", doc_id="doc_m", doc_title="mixup", text="mixup wins")]),
     Claim(id="hl_tta", text="more crops improve performance", doc_id="doc_a", doc_title="airbench", weight=2, rank=2,
           provenance=[Provenance(kind="highlight", id="hl_tta", doc_id="doc_a", doc_title="airbench", text="TTA helps")]),
+    Claim(id="hl_mix_strong", text="alpha=1 works best", doc_id="doc_m", doc_title="mixup", weight=2, rank=3,
+          provenance=[Provenance(kind="highlight", id="hl_mix_strong", doc_id="doc_m", doc_title="mixup", text="alpha 1")]),
 ]
 EFFECTS = {"mixup_alpha": -0.004, "tta_level": -0.008}  # fake ground truth, accuracy fraction per changed knob
 
@@ -48,27 +50,28 @@ async def fake_stream_runs(knobs, seeds):
         yield {"type": "run", "seed": seed, "val_acc": acc - 0.005, "tta_val_acc": acc, "time_seconds": 4.2}
 
 
-def draft(title, parent, predicted, claim_ids=(), agenda_ids=(), recommended=False, **changes):
+def draft(title, parent, predicted, claim_ids=(), agenda_ids=(), **changes):
     return agent.ProposalDraft(title=title, hypothesis=title, predicted=predicted, parent_star_id=parent,
                                knob_changes=agent.KnobChanges(**changes), condition_notes="", claim_ids=list(claim_ids),
-                               agenda_ids=list(agenda_ids), agent_recommended=recommended)
+                               agenda_ids=list(agenda_ids))
 
 
 async def fake_structured(prompt_name, schema, **values):
-    state = next(store.get(s["id"]) for s in store.list_sessions())
-    if prompt_name == "propose":
-        if state.wave == 1:
-            return agent.ProposalSet(thinking="Testing your doubts.", recommendation_reason="biggest doubt", proposals=[
-                draft("Mixup", "S0", "improves", ["hl_mixup"], recommended=True, mixup_alpha=0.2),
-                draft("No TTA", "S0", "hurts", ["hl_tta"], tta_level=0),
-                draft("Mixup strong", "S0", "improves", ["hl_mixup"], mixup_alpha=1.0),
-                draft("Bad", "S9", "improves", ["hl_tta"], cutout=4),  # unknown parent: must be dropped
-            ])
-        agenda = [a.id for a in state.agenda if a.source == "answer"]
-        return agent.ProposalSet(thinking="Following your answer.", recommendation_reason="you asked", proposals=[
-            draft("Mixup + longer", "S0", "improves", ["hl_mixup"], agenda, recommended=True, mixup_alpha=0.2, epochs=20),
-            draft("Cutout", "S0", "improves", ["hl_tta"], cutout=8),
+    if prompt_name == "propose":  # Litmus drafting the first tests from the claims the human chose
+        PROPOSE_PROMPTS.append(values)
+        return agent.ProposalSet(thinking="Testing your doubts.", proposals=[
+            draft("Bad", "S9", "improves", ["hl_tta"], cutout=4),  # unknown parent: must be dropped
+            draft("Mixup", "S0", "improves", ["hl_mixup"], mixup_alpha=0.2),
+            draft("No TTA", "S0", "hurts", ["hl_tta"], tta_level=0),
+            draft("Mixup strong", "S0", "improves", ["hl_mix_strong"], mixup_alpha=1.0),
         ])
+    if prompt_name == "suggest":  # each agent's own next steps; a human answer about its star must be implemented
+        SUGGEST_PROMPTS.append(values)
+        star, agenda = values["star"], [a["id"] for a in values["agenda"]] if values["agenda"] != "(empty)" else []
+        options = {"Mixup": [draft("Mixup + longer", "S0", "improves", ["hl_mixup"], agenda, mixup_alpha=0.2, epochs=20)],
+                   "Mixup strong": [draft("Mixup strong + longer", "S0", "improves", ["hl_mix_strong"], agenda, mixup_alpha=1.0, epochs=20)]}
+        return agent.AgentSuggestions(take=f"{values['agent']} would go on.", proposals=options.get(
+            star["title"], [draft("Cutout", star["id"], "improves", ["hl_tta"], agenda, cutout=8)]))
     if prompt_name == "reflect":
         return agent.Reflection(reflection="Measured.", surprising=False, action="accept", reason="clear", search_query=None)
     if prompt_name == "detect_conflict":
@@ -89,6 +92,8 @@ async def fake_structured(prompt_name, schema, **values):
 
 
 CHAT_PROMPTS: list[dict] = []
+PROPOSE_PROMPTS: list[dict] = []
+SUGGEST_PROMPTS: list[dict] = []
 
 
 SEARCHES: list[str] = []
@@ -129,59 +134,66 @@ async def wait_for(session_id, predicate, timeout=20):
     raise AssertionError(f"timed out; last events: {events[-15:]}")
 
 
-async def test_full_session_with_question_mid_branch(engine):
+async def test_full_session_starts_where_the_human_chose_and_agents_suggest_their_own_next_steps(engine):
     await driver.startup()
     try:
         state = driver.create_session(None, 1800, auto_mode=False, auto_timeout_seconds=None, max_waves=2)
         sid = state.id
-        state = await wait_for(sid, lambda s: any(p.wave == 1 for p in s.proposals))
-        wave1 = [p for p in state.proposals if p.wave == 1]
-        assert [p.title for p in wave1] == ["Mixup", "No TTA", "Mixup strong"]  # invalid parent dropped
-        assert sum(p.agent_recommended for p in wave1) == 1
-        assert state.status == "waiting_human"
+        state = await wait_for(sid, lambda s: s.status == "waiting_human" and s.stars[0].status == "done")
+        assert state.wave == 0 and not state.proposals, "nothing runs until the human says where to start"
+        known = {c.id for c in CLAIMS}
+        with pytest.raises(driver.ActionError):
+            driver.start(sid, ["hl_nope"], known)
 
-        # Human skips the agent's pick (Mixup)? No: picks both, so no shadow. Then a question arrives mid-branch.
-        everything = [{"proposal_id": p.id} for p in wave1]
-        driver.dispatch(sid, "S0", everything, "focus on doubts")
-        driver.dispatch(sid, "S0", everything, None)  # idempotent
-        state = await wait_for(sid, lambda s: any(q.status == "open" for q in s.questions))
-        assert len([s for s in state.stars if s.wave == 1]) == 3
-        state = await wait_for(sid, lambda s: all(x.status in ("done", "waiting") for x in s.stars))
+        # "Where should we start?" → Litmus drafts one plain test per chosen claim, and they run at once.
+        PROPOSE_PROMPTS.clear()
+        SUGGEST_PROMPTS.clear()
+        driver.start(sid, ["hl_mixup", "hl_tta", "hl_mix_strong"], known)
+        state = await wait_for(sid, lambda s: len([x for x in s.stars if x.wave == 1]) == 3)
+        assert [x.title for x in state.stars if x.wave == 1] == ["Mixup", "No TTA", "Mixup strong"]  # invalid parent dropped
+        assert {c["id"] for c in PROPOSE_PROMPTS[0]["claims"]} == known and PROPOSE_PROMPTS[0]["slots"] == "3"
+
+        # The No TTA agent finishes and offers its own card while the mixup line waits on a question.
+        state = await wait_for(sid, lambda s: any(q.status == "open" for q in s.questions)
+                               and any(p.title == "Cutout" for p in s.proposals))
+        no_tta = next(x for x in state.stars if x.title == "No TTA")
+        cutout = next(p for p in state.proposals if p.title == "Cutout")
+        assert cutout.star_id == no_tta.id and no_tta.suggestion == "TTA agent would go on."
         assert len(state.questions) == 1  # two refuted mixup branches raced; only one may ask per wave
         q = state.questions[0]
         mixup = ops.star(state, q.star_id)
-        assert mixup.grade.verdict == "refuted" and mixup.status == "waiting"
-        other = next(s for s in state.stars if s.title.startswith("Mixup") and s.id != mixup.id)
-        state = await wait_for(sid, lambda s: any(a.star_id == other.id for a in s.agenda))  # its idea is kept, not asked
-        assert q.star_id == mixup.id and q.agent_leaning == "O2" and any(e.id == "hl_bot" for e in q.evidence)
+        assert mixup.grade.verdict == "refuted" and mixup.status == "waiting" and q.agent_leaning == "O2"
 
-        # The other branch kept running and finished while the mixup line waited.
-        state = await wait_for(sid, lambda s: next(x for x in s.stars if x.title == "No TTA").status == "done")
-        assert next(x for x in state.stars if x.title == "No TTA").grade.verdict == "confirmed"
+        # Picking from one agent's card mid-wave queues it for the next generation; the card closes.
+        driver.dispatch(sid, no_tta.id, [{"proposal_id": cutout.id}], None)
+        state = store.get(sid)
+        queued = next(x for x in state.stars if x.proposal_id == cutout.id)
+        assert queued.wave == 2 and queued.status == "queued" and queued.parent_id == no_tta.id
 
-        # Human overrides the agent's leaning: the next wave must implement the answer.
+        # The human overrides the agent's leaning; that agent's own next step must implement the answer.
         driver.answer(sid, q.id, "O1", "BoT says so")
-        state = await wait_for(sid, lambda s: any(p.wave == 2 for p in s.proposals))
+        state = await wait_for(sid, lambda s: any(p.star_id == mixup.id for p in s.proposals))
         answer_decision = next(d for d in state.decisions if d.kind == "answer")
         assert answer_decision.changed_trajectory and answer_decision.agent_recommendation == "Drop mixup"
-        wave2 = [p for p in state.proposals if p.wave == 2]
-        longer = next(p for p in wave2 if p.title == "Mixup + longer")
-        assert any(p.kind == "human" for p in longer.provenance)
+        mine = next(p for p in state.proposals if p.star_id == mixup.id)
+        assert any(p.kind == "human" for p in mine.provenance)
+        siblings = next(v for v in SUGGEST_PROMPTS if v["star"]["id"] == mixup.id)["siblings"]
+        assert no_tta.id in {x["id"] for x in siblings}, "an agent reads the other agents of its generation"
 
-        # Human skips the agent's pick (Mixup + longer is recommended): only Cutout runs, no shadow branch.
-        cutout = next(p for p in wave2 if p.title == "Cutout")
-        driver.dispatch(sid, "S0", [{"proposal_id": cutout.id}], None)
+        # Wave 2 launches what was picked (the last wave, so the session then finishes).
         state = await wait_for(sid, lambda s: s.status == "done")
+        assert ops.star(state, queued.id).grade is not None
+        assert all(p.status != "open" for p in state.proposals), "finishing closes every agent's card"
+        with pytest.raises(driver.ActionError):
+            driver.dispatch(sid, mixup.id, [{"proposal_id": next(p for p in state.proposals if p.star_id == mixup.id).id}], None)
         assert not any(s.chosen_by == "shadow" for s in state.stars)
-        assert not any(s.title == "Mixup + longer" for s in state.stars)
         assert "[bogus_id]" not in state.abstract.text and "[S1]" in state.abstract.text
         assert {c.id for c in state.abstract.citations} == {"hl_mixup"}
 
-        # Snapshot and event log agree; seqs are gapless.
         events = store.events_after(sid, 0)
         assert [e.seq for e in events] == list(range(1, len(events) + 1))
-        assert {"question.asked", "question.answered", "library.search", "abstract.ready",
-                "papiers.export_ready", "agent.replanned"} <= {e.type for e in events}
+        assert {"start.chosen", "question.asked", "question.answered", "library.search", "abstract.ready",
+                "papiers.export_ready"} <= {e.type for e in events}
     finally:
         await driver.shutdown()
 

@@ -2,12 +2,14 @@ import { useState, type ReactNode } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useStore } from '../store'
 import { agentName, knobText } from '../lib/format'
-import type { Proposal, Question } from '../types'
+import type { Proposal, Question, Star } from '../types'
 import { ProvChip, ProvList } from './Prov'
 
 const MAX_AGENTS = 4
 const spring = { type: 'spring' as const, duration: 0.45, bounce: 0.1 }
 const EXPECTS = { improves: 'expects a gain', hurts: 'expects a loss', no_effect: 'expects no change' }
+// The baseline has no agent of its own: options planned from it come from Litmus.
+const speaker = (s: Star | undefined) => (!s || !s.parent_id ? 'Litmus' : agentName(s))
 const panel = 'mx-auto w-full max-w-[920px] rounded-xl border border-rule bg-surface p-3 shadow-[0_1px_2px_rgb(21_24_28/0.06),0_12px_32px_rgb(21_24_28/0.10)]'
 
 function Proposals({ starId, items }: { starId: string; items: Proposal[] }) {
@@ -19,12 +21,13 @@ function Proposals({ starId, items }: { starId: string; items: Proposal[] }) {
   const [collapsed, setCollapsed] = useState(false)
   const toggle = (id: string) => setSel((s) => (s.includes(id) ? s.filter((x) => x !== id) : s.length < MAX_AGENTS ? [...s, id] : s))
   return (
-    <section aria-label="Proposed experiments" className={panel}>
+    <section aria-label={`Where should I proceed? ${speaker(from)}`} className={panel}>
       <div className="flex items-baseline justify-between gap-3">
-        <h2 className="m-0 text-[13.5px] font-semibold">{items.length} experiments ready from <button className="underline decoration-rule underline-offset-4 hover:decoration-ink" onClick={() => from && select(from.id)}>{from ? agentName(from) : starId}</button></h2>
+        <h2 className="m-0 text-[13.5px] font-semibold">Where should I proceed? <span className="font-normal text-muted">— <button className="underline decoration-rule underline-offset-4 hover:text-ink hover:decoration-ink" onClick={() => from && select(from.id)}>{speaker(from)}</button></span></h2>
         <button className="label hover:text-ink" aria-expanded={!collapsed} onClick={() => setCollapsed(!collapsed)}>{collapsed ? 'review' : 'hide'}</button>
       </div>
       {!collapsed && <>
+      {from?.suggestion && <p className="m-0 mt-1 max-w-[80ch] text-[12.5px] leading-snug text-muted">{from.suggestion}</p>}
       <ul className="m-0 mt-2.5 grid list-none gap-2 p-0" style={{ gridTemplateColumns: `repeat(auto-fit, minmax(150px, 1fr))` }}>
         {items.map((p) => {
           const on = sel.includes(p.id)
@@ -46,8 +49,8 @@ function Proposals({ starId, items }: { starId: string; items: Proposal[] }) {
         })}
       </ul>
       <div className="mt-2.5 flex items-center gap-2">
-        <label className="sr-only" htmlFor={`instr-${starId}`}>Instruction for the agents</label>
-        <input id={`instr-${starId}`} value={instr} onChange={(e) => setInstr(e.target.value)} placeholder="Instruction for the agents (optional)" className="field min-w-0 flex-1" />
+        <label className="sr-only" htmlFor={`instr-${starId}`}>Instruction for the new agents</label>
+        <input id={`instr-${starId}`} value={instr} onChange={(e) => setInstr(e.target.value)} placeholder="Steer the new agents (optional)" className="field min-w-0 flex-1" />
         <button className="btn btn-primary" disabled={!sel.length || busy} onClick={async () => { setBusy(true); await dispatch(starId, sel.map((proposal_id) => ({ proposal_id })), instr.trim() || undefined); setBusy(false) }}>
           Dispatch {sel.length || ''} agent{sel.length === 1 ? '' : 's'}
         </button>
@@ -64,7 +67,7 @@ function QuestionCard({ q }: { q: Question }) {
   const [busy, setBusy] = useState(false)
   const star = app.session!.stars.find((s) => s.id === q.star_id)
   return (
-    <section aria-label="The agent needs your call" className={panel} style={{ borderColor: 'color-mix(in srgb, var(--color-waiting) 55%, var(--color-rule))' }}>
+    <section aria-label={`${star ? agentName(star) : 'An agent'} needs your call`} className={panel} style={{ borderColor: 'color-mix(in srgb, var(--color-waiting) 55%, var(--color-rule))' }}>
       <div className="flex items-baseline gap-2">
         <span className="dot live-dot" style={{ background: 'var(--color-waiting)' }} />
         <h2 className="m-0 text-[13.5px] font-semibold">Your call{star ? ` on ${agentName(star)}` : ''}</h2>
@@ -77,7 +80,7 @@ function QuestionCard({ q }: { q: Question }) {
           <label key={o.id} className="cursor-pointer rounded-lg border p-2.5 transition-colors" style={{ borderColor: opt === o.id ? 'var(--color-ink)' : 'var(--color-rule)', background: opt === o.id ? 'var(--color-marble)' : undefined }}>
             <span className="flex items-start gap-2"><input type="radio" name={q.id} className="mt-0.5 accent-[var(--color-ink)]" checked={opt === o.id} onChange={() => setOpt(o.id)} /><span className="text-[13px] font-medium leading-snug">{o.label}</span></span>
             <span className="mt-1 block pl-5 text-[12px] text-muted">{o.consequence}</span>
-            {o.id === q.agent_leaning && <span className="mt-1 block pl-5 text-[11px] font-medium text-agent">agent leans this way</span>}
+            {o.id === q.agent_leaning && <span className="mt-1 block pl-5 text-[11px] font-medium text-agent">{star ? agentName(star) : 'The agent'} leans this way</span>}
           </label>
         ))}
       </fieldset>
@@ -100,12 +103,12 @@ export function Dock() {
   const questions = (s?.questions ?? []).filter((q) => q.status === 'open')
   const open = (s?.proposals ?? []).filter((p) => p.status === 'open')
   const starIds = [...new Set(open.map((p) => p.star_id))]
-  const name = (id: string) => { const star = s?.stars.find((x) => x.id === id); return star ? agentName(star) : id }
+  const name = (id: string) => speaker(s?.stars.find((x) => x.id === id))
   const pending: Pending[] = [
     ...questions.map((q) => ({ key: q.id, label: `Your call on ${name(q.star_id)}`, waiting: true, node: <QuestionCard q={q} /> })),
     ...starIds.map((id) => {
       const items = open.filter((p) => p.star_id === id)
-      return { key: id, label: `${name(id)} · ${items.length} ready`, waiting: false, node: <Proposals starId={id} items={items} /> }
+      return { key: id, label: `${name(id)} · ${items.length} option${items.length === 1 ? '' : 's'}`, waiting: false, node: <Proposals starId={id} items={items} /> }
     }),
   ]
   const newest = pending[pending.length - 1]?.key

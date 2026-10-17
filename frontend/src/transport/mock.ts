@@ -23,6 +23,7 @@ export const mockApi: Api = {
     onConn('live')
     return cur().subscribe(fromSeq, onEvent)
   },
+  start: async (_s, ids) => cur().begin(ids),
   dispatch: async (_s, b) => cur().dispatch(b.star_id, b.selections, b.instruction),
   answer: async (_s, b) => cur().answer(b.question_id, b.option_id, b.comment),
   feedback: async (_s, b) => cur().feedback(b.star_id, b.kind, b.text),

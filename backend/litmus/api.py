@@ -75,6 +75,10 @@ class ExplainBody(BaseModel):
     history: list[ChatTurn] = []  # earlier turns of this star's chat, oldest first
 
 
+class StartBody(BaseModel):
+    claim_ids: list[str]
+
+
 class StarRef(BaseModel):
     star_id: str
 
@@ -185,6 +189,13 @@ async def get_session(session_id: str):
 async def dispatch(session_id: str, body: Dispatch):
     _session(session_id)
     return _act(driver.dispatch, session_id, body.star_id, [s.model_dump() for s in body.selections], body.instruction)
+
+
+@app.post("/api/sessions/{session_id}/start")
+async def start(session_id: str, body: StartBody):
+    _session(session_id)
+    _, claims = await get_library()
+    return _act(driver.start, session_id, body.claim_ids, {c.id for c in claims})
 
 
 @app.post("/api/sessions/{session_id}/answer")

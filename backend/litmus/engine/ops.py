@@ -74,8 +74,8 @@ def think(state: SessionState, text: str, star_id: str | None = None) -> None:
 def refresh_status(state: SessionState) -> None:
     if state.status in ("done", "paused"):
         return
-    waiting = any(q.status == "open" for q in state.questions) or any(
-        p.status == "open" and p.wave == state.wave for p in state.proposals)
+    waiting = (any(q.status == "open" for q in state.questions) or any(p.status == "open" for p in state.proposals)
+               or (state.wave == 0 and not state.start_claim_ids))
     busy = any(s.status in ("queued", "running") for s in state.stars)
     status = "waiting_human" if waiting and not busy else "running"
     if status != state.status:
@@ -120,11 +120,11 @@ def spawn(coro) -> asyncio.Task:
 
 def new_star(state: SessionState, *, parent: Star | None, title: str, hypothesis: str, knobs: dict,
              knob_changes: dict, provenance: list[Provenance], chosen_by: str, predicted: str | None,
-             proposal_id: str | None = None, shadow_of: str | None = None) -> Star:
+             proposal_id: str | None = None, shadow_of: str | None = None, wave: int | None = None) -> Star:
     s = Star(id=next_id("S", state.stars), parent_id=parent.id if parent else None,
              depth=parent.depth + 1 if parent else 0, title=title, hypothesis=hypothesis, knobs=knobs,
              knob_changes=knob_changes, provenance=provenance, chosen_by=chosen_by, predicted=predicted,
-             proposal_id=proposal_id, shadow_of=shadow_of, wave=state.wave)
+             proposal_id=proposal_id, shadow_of=shadow_of, wave=state.wave if wave is None else wave)
     state.stars.append(s)
     emit(state, "shadow.created" if chosen_by == "shadow" else "star.created", {"star": s.model_dump()})
     return s
@@ -293,18 +293,34 @@ def apply_answer(state: SessionState, q: Question, option_id: str, comment: str 
 
 
 def proposals_ready(state: SessionState, anchor_id: str) -> None:
-    current = [p.model_dump() for p in state.proposals if p.wave == state.wave]
-    emit(state, "proposals.ready", {"star_id": anchor_id, "proposals": current})
+    """One agent's card: the open proposals anchored on its star ("Where should I proceed?")."""
+    mine = [p.model_dump() for p in state.proposals if p.star_id == anchor_id and p.status == "open"]
+    emit(state, "proposals.ready", {"star_id": anchor_id, "proposals": mine})
     refresh_status(state)
 
 
+def target_wave(state: SessionState) -> int:
+    """The generation a dispatch joins: the current one until it launches, then the next (it starts at the join)."""
+    launched = any(s.wave == state.wave and s.chosen_by in ("human", "auto") for s in state.stars)
+    return state.wave + 1 if launched else state.wave
+
+
+def first_options(state: SessionState) -> dict[str, Proposal]:
+    """Each agent's first open option, by the star it is anchored on (what auto mode runs)."""
+    out: dict[str, Proposal] = {}
+    for p in state.proposals:
+        if p.status == "open":
+            out.setdefault(p.star_id, p)
+    return out
+
+
 def dispatch(state: SessionState, selections: list[dict], chosen_by: str, instruction: str | None = None) -> list[Star]:
-    """Turn selected proposals into queued stars and record what the agent would have done alone.
+    """Turn selected proposals into queued stars. Choosing from an agent's card closes that card: its other
+    proposals are skipped. Other agents' cards stay open.
 
     Idempotent: already-dispatched proposals return their existing star.
     """
-    wave_proposals = [p for p in state.proposals if p.wave == state.wave]
-    recommended = next((p for p in wave_proposals if p.agent_recommended), None)
+    wave = target_wave(state)
     stars = []
     for selection in selections:
         p = proposal(state, selection["proposal_id"])
@@ -323,24 +339,21 @@ def dispatch(state: SessionState, selections: list[dict], chosen_by: str, instru
         p.status = "dispatched"
         stars.append(new_star(state, parent=parent, title=p.title, hypothesis=p.hypothesis, knobs=knobs,
                               knob_changes=changes, provenance=provenance, chosen_by=chosen_by,
-                              predicted=p.predicted, proposal_id=p.id))
+                              predicted=p.predicted, proposal_id=p.id, wave=wave))
     if not stars:
         return stars
-    for p in wave_proposals:
+    chosen_ids = {selection["proposal_id"] for selection in selections}
+    anchors = {proposal(state, i).star_id for i in chosen_ids}
+    offered = [p for p in state.proposals if p.star_id in anchors and (p.status == "open" or p.id in chosen_ids)]
+    for p in offered:
         if p.status == "open":
             p.status = "skipped"
-    chosen = [p for p in wave_proposals if p.status == "dispatched"]
-    agent_choice = recommended.title if recommended else "(no recommendation)"
-    changed = bool(recommended) and recommended.status != "dispatched"
+    chosen = [p for p in offered if p.id in chosen_ids]
     decision = add_decision(
-        state, star_id=chosen[0].star_id, kind="dispatch", agent_recommendation=agent_choice,
-        human_choice=", ".join(p.title for p in chosen),
-        agent_recommendation_ids=[recommended.id] if recommended else [], human_choice_ids=[p.id for p in chosen],
-        changed_trajectory=changed,
-        note=("Auto mode: the agent ran its own recommendation." if chosen_by == "auto" else
-              f"The human dispatched {len(chosen)} of {len(wave_proposals)} proposals"
-              + (f" and skipped the agent's pick ({agent_choice})." if changed else ", including the agent's pick.")
-              + (f" Instruction: {instruction}" if instruction else "")),
+        state, star_id=chosen[0].star_id, kind="dispatch", agent_recommendation="(the agents offered options; no pick)",
+        human_choice=", ".join(p.title for p in chosen), human_choice_ids=[p.id for p in chosen], changed_trajectory=False,
+        note=("Auto mode: Litmus ran each agent's first option." if chosen_by == "auto" else
+              f"The human chose {len(chosen)} of {len(offered)} options." + (f" Instruction: {instruction}" if instruction else "")),
     )
     emit(state, "human.dispatched", {"star_id": decision.star_id, "selections": selections,
                                      "decision": decision.model_dump()})

@@ -24,6 +24,16 @@ describe('applyEvent', () => {
     s = applyEvent(s, ev(3, 'question.asked', { question: { id: 'q', star_id: 'S1', options: [], evidence: [], status: 'open' } }))
     expect(s.session?.stars.map((x) => x.status)).toEqual(['waiting', 'queued'])
   })
+  it('choosing from one agent’s card closes only that card', () => {
+    const prop = (id: string, star_id: string) => ({ id, star_id, title: id, knob_changes: {}, provenance: [] })
+    let s = applyEvent(initialState, ev(1, 'proposals.ready', { star_id: 'S1', proposals: [prop('P1', 'S1'), prop('P2', 'S1')] }))
+    s = applyEvent(s, ev(2, 'proposals.ready', { star_id: 'S2', proposals: [prop('P3', 'S2')] }))
+    s = applyEvent(s, ev(3, 'human.dispatched', { star_id: 'S1', selections: [{ proposal_id: 'P1' }], decision: { id: 'D1' } }))
+    expect(s.session?.proposals.map((x) => [x.id, x.status])).toEqual([['P1', 'dispatched'], ['P2', 'skipped'], ['P3', 'open']])
+  })
+  it('records where the session starts', () => {
+    expect(applyEvent(initialState, ev(1, 'start.chosen', { claim_ids: ['hl_a'] })).session?.start_claim_ids).toEqual(['hl_a'])
+  })
   it('ignores unknown events', () => {
     expect(applyEvent(initialState, ev(1, 'future.thing', {})).lastSeq).toBe(1)
   })

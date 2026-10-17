@@ -54,6 +54,7 @@ export const realApi: Api = {
     open()
     return () => { closed = true; ws?.close(); onConn('closed') }
   },
+  start: (sid, claim_ids) => call('POST', sp(sid, '/start'), { claim_ids }),
   dispatch: (sid, b) => call('POST', sp(sid, '/dispatch'), b),
   answer: (sid, b) => call('POST', sp(sid, '/answer'), b),
   feedback: (sid, b) => call('POST', sp(sid, '/feedback'), b),

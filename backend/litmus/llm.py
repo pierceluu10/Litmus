@@ -20,7 +20,8 @@ SDK_RETRIES = 3  # the SDK retries rate limits and 5xx with exponential backoff
 # Reasoning effort per prompt. Measured on gpt-5.6-luna (2026-10-17): titling 12 claims took 7.4s at the default
 # effort and 4.1s at "none" with the same quality, so lookups and plain-language answers skip reasoning; planning,
 # grading follow-ups and the abstract keep the model default. Prompts not listed use the default.
-EFFORT = {"summarize_claims": "none", "extract_conditions": "none", "chat_star": "low", "detect_conflict": "low"}
+EFFORT = {"summarize_claims": "none", "extract_conditions": "none", "chat_star": "low", "detect_conflict": "low",
+          "suggest": "low"}
 
 log = logging.getLogger(__name__)
 

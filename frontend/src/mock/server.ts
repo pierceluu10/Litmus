@@ -1,10 +1,12 @@
 import { applyEvent, initialState, type AppState } from '../reducer'
 import type { Decision, Grade, Knobs, LitmusEvent, Predicted, Proposal, Provenance, Question, Selection, Star } from '../types'
-import { knobText, pts } from '../lib/format'
+import { agentName, knobText, pts } from '../lib/format'
 import { BASELINE_KNOBS, baselineGrade, grade, progressAccuracy, simulateRun } from './sim'
 import { P } from './library'
 
 // In-browser stand-in for the backend: same events as shared/contract.md, numbers from the calibrated simulator.
+// Same shape as the real engine: the human picks where to start, each agent offers its own next steps when its verdict
+// lands ("Where should I proceed?"), and Litmus plans from the best star only when no agent has an open option.
 
 const BUDGET_GPU_SECONDS = 1800
 const SEEDS = [0, 1, 2, 3, 4]
@@ -37,7 +39,6 @@ const MOVES: Move[] = [
   { key: 'dirac', title: () => 'Remove identity init', hypothesis: 'Identity initialisation helps the deeper convolutions.', predicted: 'hurts',
     changes: (k) => (k.dirac_init ? { dirac_init: false } : null), prov: [P.dirac], note: 'Default PyTorch init instead.' },
 ]
-const FIRST_WAVE = ['mixup', 'tta', 'flip', 'smoothing']
 
 function nextEpochs(e: number) { return Math.min(MAX_EPOCHS, e < 20 ? 20 : e + 10) }
 const uid = (() => { let n = 0; return (p: string) => `${p}_${++n}` })()
@@ -90,8 +91,24 @@ export class MockServer {
     this.emit('budget.updated', { used: 0, total: BUDGET_GPU_SECONDS })
     this.later(() => {
       const base = this.newStar(null, 'Baseline', 'The reference configuration, about 94% accuracy.', {}, [], 'agent')
-      this.run(base.id, SEEDS, () => this.propose(base.id, FIRST_WAVE.map((k) => MOVES.find((m) => m.key === k)!)))
+      this.run(base.id, SEEDS, () => { if (!this.session.start_claim_ids) this.emit('session.status', { status: 'waiting_human' }) })
     }, 700)
+  }
+
+  // "Where should we start?": one agent per chosen claim, each running the move tied to that highlight.
+  begin(claim_ids: string[]) {
+    if (this.session.start_claim_ids) return
+    this.emit('start.chosen', { claim_ids })
+    // one agent per claim: the first move whose leading provenance is that claim
+    const moves = claim_ids.flatMap((id) => MOVES.find((m) => m.prov[0].id === id) ?? [])
+    this.think(`Starting where you chose: one agent for each of your ${claim_ids.length} claim${claim_ids.length === 1 ? '' : 's'}.`)
+    this.emit('session.status', { status: 'running' })
+    const base = this.star('S0')
+    ;(moves.length ? moves : MOVES.slice(0, 1)).forEach((m, i) => this.later(() => {
+      const changes = m.changes(base.knobs)!
+      const st = this.newStar('S0', m.title(base.knobs), m.hypothesis, changes, m.prov, 'human', m.predicted)
+      this.later(() => this.run(st.id, SEEDS), 500)
+    }, 400 + i * 350))
   }
 
   private newStar(parent: string | null, title: string, hypothesis: string, changes: Partial<Knobs>, prov: Provenance[], by: Star['chosen_by'], predicted?: Predicted, extra: Partial<Star> = {}): Star {
@@ -105,20 +122,32 @@ export class MockServer {
     return star
   }
 
-  private propose(starId: string, moves: Move[], because?: string) {
+  private propose(starId: string, moves: Move[], because?: string): Proposal[] {
     const s = this.star(starId)
     const taken = this.stars.filter((c) => c.parent_id === starId).map((c) => c.knob_changes)
     const options = moves.flatMap((m) => { const changes = m.changes(s.knobs); return changes && !taken.some((t) => sameChanges(t, changes)) ? [{ m, changes }] : [] })
-    if (!options.length) { this.think(`Nothing left to test from ${s.title} with the claims in your library.`, starId); return }
-    // after a loss, more training is the cheapest way to tell "wrong" from "not converged"
-    if (s.grade && s.grade.delta < 0) options.sort((a, b) => Number(b.m.key === 'longer') - Number(a.m.key === 'longer'))
-    const proposals: Proposal[] = options.slice(0, starId === 'S0' && !because ? FIRST_WAVE.length : MAX_PROPOSALS).map(({ m, changes }) => ({
+    if (!options.length) { this.think(`Nothing left to test from ${s.title} with the claims in your library.`, starId); return [] }
+    // an agent's first follow-up is its own idea at longer training: the cheapest way to tell "wrong" from "not converged"
+    if (s.parent_id) options.sort((a, b) => Number(b.m.key === 'longer') - Number(a.m.key === 'longer'))
+    const proposals: Proposal[] = options.slice(0, MAX_PROPOSALS).map(({ m, changes }) => ({
       id: uid('prop'), star_id: starId, title: m.title(s.knobs), hypothesis: m.hypothesis, predicted: m.predicted, knob_changes: changes,
       condition_notes: m.note, provenance: because ? [...m.prov, { kind: 'human', id: uid('hum'), text: because }] : m.prov, agent_recommended: false, status: 'open',
     }))
-    this.think(because ? `Planning from ${s.title}, as you asked.` : `${proposals.length} experiments to run from ${s.title}.`, starId)
+    this.think(because ? `Planning from ${s.title}, as you asked.` : `${agentName(s)}: ${proposals.length} ways to go on.`, starId)
     this.emit('proposals.ready', { star_id: starId, proposals })
-    this.emit('session.status', { status: 'waiting_human' })
+    if (!this.stars.some((x) => x.status === 'running' || x.status === 'queued')) this.emit('session.status', { status: 'waiting_human' })
+    return proposals
+  }
+
+  // The agent's own card, written in its voice and aware of its siblings' verdicts.
+  private suggest(id: string) {
+    const s = this.star(id), g = s.grade!
+    const first = this.propose(id, MOVES)[0]
+    const sibling = this.stars.find((x) => x.id !== id && x.depth === s.depth && x.grade?.verdict === 'confirmed')
+    const lead = g.verdict === 'confirmed' ? 'This held up here' : g.verdict === 'refuted' ? 'This went against the paper here' : 'This stayed inside the noise'
+    const also = sibling ? `, and the ${agentName(sibling)} confirmed its claim` : ''
+    const suggestion = first ? `${lead}${also}. Next I'd run “${first.title}”.` : `${lead}${also}. I have nothing left to test from here.`
+    this.emit('star.updated', { star: { ...this.star(id), suggestion } })
   }
 
   dispatch(star_id: string, selections: Selection[], instruction?: string) {
@@ -146,7 +175,7 @@ export class MockServer {
     const changed = option_id !== q.agent_leaning
     const decision: Decision = {
       id: uid('dec'), star_id: q.star_id, kind: 'answer', agent_recommendation: lean.label, human_choice: chosen.label + (comment ? ` (“${comment}”)` : ''),
-      changed_trajectory: changed, note: changed ? `The agent would have chosen “${lean.label}”.` : 'You agreed with the agent.', created_at: new Date().toISOString(),
+      changed_trajectory: changed, note: changed ? `The ${agentName(this.star(q.star_id))} would have chosen “${lean.label}”.` : `You agreed with the ${agentName(this.star(q.star_id))}.`, created_at: new Date().toISOString(),
     }
     this.emit('question.answered', { question_id, option_id, decision })
     this.emit('session.status', { status: 'running' })
@@ -228,6 +257,7 @@ export class MockServer {
       return
     }
     if (g.verdict === 'refuted' && s.knob_changes.mixup_alpha && !this.asked) { this.askAboutMixup(s); return }
+    this.suggest(id)
     this.settle()
   }
 
@@ -255,7 +285,7 @@ export class MockServer {
     }, 1200)
   }
 
-  // When every branch has settled and nothing waits on the human, plan the next wave from the best star.
+  // When every branch has settled and nothing waits on the human, Litmus plans from the best star.
   private settle() {
     const s = this.session
     if (this.asking || s.stars.some((x) => x.status === 'running' || x.status === 'queued')) return
@@ -265,6 +295,7 @@ export class MockServer {
     }
     if (s.stars.length >= MAX_STARS || s.budget_used >= s.budget_total) { this.emit('session.status', { status: 'done' }); return }
     const best = s.stars.filter((x) => x.chosen_by !== 'shadow' && x.grade).sort((a, b) => b.grade!.mean_child - a.grade!.mean_child)[0]
+    this.think('No agent has an open option, so I’m planning from the best result so far.', best.id)
     this.propose(best.id, MOVES)
   }
 
@@ -299,7 +330,7 @@ export class MockServer {
       by('refuted').length ? `${by('refuted').length} went against the paper under short training: ${by('refuted').map((s) => `${s.title.toLowerCase()} ${cite(s)}`).join('; ')}.` : '',
       by('inconclusive').length ? `${by('inconclusive').length} stayed inside the noise even with extra seeds ${by('inconclusive').map(cite).join('')}.` : '',
       best ? `The most accurate configuration was ${best.title.toLowerCase()} at ${(best.grade!.mean_child * 100).toFixed(2)}% ${cite(best)}.` : '',
-      steered ? `You changed the agent's course ${steered} time${steered === 1 ? '' : 's'}.` : '',
+      steered ? `You overruled the agents ${steered} time${steered === 1 ? '' : 's'}.` : '',
     ].filter(Boolean).join(' ')
     const citations = [...new Map(graded.flatMap((s) => s.provenance.filter((p) => p.kind === 'highlight')).map((p) => [p.id, p])).values()]
     this.emit('abstract.ready', { abstract: { text, findings: graded.map(line), citations } })

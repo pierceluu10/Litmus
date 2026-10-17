@@ -92,6 +92,9 @@ def _resume_values(state: SessionState, interrupts) -> dict:
             stars = [s.id for s in state.stars if s.wave == item.value["wave"] and s.chosen_by in ("human", "auto")]
             if stars or state.finish_requested:
                 values[item.id] = {"star_ids": stars}
+        elif kind == "start":
+            if state.start_claim_ids:
+                values[item.id] = {"claim_ids": state.start_claim_ids}
         elif kind == "question":
             if ops.question(state, item.value["question_id"]).status == "answered":
                 values[item.id] = {"answered": True}
@@ -135,11 +138,10 @@ def _schedule_auto(session_id: str, interrupts) -> None:
         state = store.get(session_id)
         for item in interrupts:
             if item.value.get("kind") == "selection":
-                recommended = next((p for p in state.proposals if p.wave == item.value["wave"] and p.agent_recommended
-                                    and p.status == "open"), None)
-                if recommended:
-                    ops.think(state, f"No response in {seconds:g}s, so I'm proceeding with my recommendation, \"{recommended.title}\".")
-                    ops.dispatch(state, [{"proposal_id": recommended.id}], "auto")
+                firsts = list(ops.first_options(state).values())[:graph.MAX_BRANCHES]
+                if firsts:
+                    ops.think(state, f"No response in {seconds:g}s, so I'm running each agent's first option.")
+                    ops.dispatch(state, [{"proposal_id": p.id} for p in firsts], "auto")
             elif item.value.get("kind") == "question":
                 q = ops.question(state, item.value["question_id"])
                 if q.status == "open":
@@ -161,6 +163,8 @@ def _cancel_timer(session_id: str) -> None:
 def dispatch(session_id: str, star_id: str, selections: list[dict], instruction: str | None) -> None:
     state = store.get(session_id)
     ops.star(state, star_id)
+    if state.finish_requested or state.status == "done":
+        raise ActionError("this session is finishing; nothing new will run")
     if not selections:
         raise ActionError("select at least one proposal")
     if len(selections) > graph.MAX_BRANCHES:
@@ -168,10 +172,8 @@ def dispatch(session_id: str, star_id: str, selections: list[dict], instruction:
     estimate = 0.0
     for selection in selections:
         p = ops.proposal(state, selection["proposal_id"])
-        if p.wave != state.wave:
-            raise ActionError(f"{p.id} belongs to wave {p.wave}, the current wave is {state.wave}")
         if p.status == "skipped":
-            raise ActionError(f"{p.id} was skipped when this wave was dispatched")
+            raise ActionError(f"{p.id} was passed over when another option on its card was chosen")
         parent = ops.star(state, p.parent_star_id or p.star_id)
         try:
             knobs = apply_changes(parent.knobs.model_dump(), {**p.knob_changes, **(selection.get("knob_overrides") or {})})
@@ -191,6 +193,24 @@ def dispatch(session_id: str, star_id: str, selections: list[dict], instruction:
     if instruction:
         ops.think(state, f"Noted your instruction: \"{instruction}\".")
     ops.dispatch(state, selections, "human", instruction)
+    kick(session_id)
+
+
+def start(session_id: str, claim_ids: list[str], known: set[str]) -> None:
+    """The human's answer to "Where should we start?": the claims the first agents test."""
+    state = store.get(session_id)
+    if state.start_claim_ids:
+        if state.start_claim_ids == claim_ids:
+            return
+        raise ActionError("this session already started")
+    if not claim_ids or len(claim_ids) > graph.MAX_BRANCHES:
+        raise ActionError(f"choose 1 to {graph.MAX_BRANCHES} claims")
+    unknown = [c for c in claim_ids if c not in known]
+    if unknown:
+        raise ActionError(f"unknown claims: {', '.join(unknown)}")
+    state.start_claim_ids = claim_ids
+    ops.emit(state, "start.chosen", {"claim_ids": claim_ids})
+    ops.refresh_status(state)
     kick(session_id)
 
 
@@ -216,10 +236,10 @@ def feedback(session_id: str, star_id: str, kind: str, text: str) -> None:
 
 
 def _current_plan(state: SessionState) -> str:
-    open_props = [p.title for p in state.proposals if p.status == "open" and p.wave == state.wave]
+    open_props = [p.title for p in state.proposals if p.status == "open"]
     if open_props:
         return f"wait for you to choose among: {', '.join(open_props)}"
-    return f"propose wave {state.wave + 1} building on {ops.best_star(state).id}"
+    return f"plan wave {state.wave + 1} building on {ops.best_star(state).id}"
 
 
 async def _handle_feedback(session_id: str, star_id: str, kind: str, text: str) -> None:
@@ -260,7 +280,7 @@ async def _handle_feedback(session_id: str, star_id: str, kind: str, text: str) 
 
 
 def _add_feedback_proposal(state: SessionState, draft, human: Provenance) -> bool:
-    """A human-suggested experiment joins the open proposals now, or the next wave's agenda if none are open."""
+    """A human-suggested experiment becomes an option on the card of the agent it builds on."""
     try:
         parent = ops.star(state, draft.parent_star_id)
         changes = agent._changes(draft.knob_changes)
@@ -270,16 +290,12 @@ def _add_feedback_proposal(state: SessionState, draft, human: Provenance) -> boo
         return False
     if not changes or ops.existing_config(state, knobs):
         return False
-    open_now = [p for p in state.proposals if p.status == "open" and p.wave == state.wave]
-    if not open_now:
-        ops.add_agenda(state, source="feedback", star_id=parent.id, text=f"{draft.title}: {draft.hypothesis}",
-                       knob_changes=changes, parent_star_id=parent.id, provenance=[human])
-        return True
     state.proposals.append(Proposal(id=f"P{len(state.proposals) + 1}", star_id=parent.id, parent_star_id=parent.id,
                                     title=draft.title, hypothesis=draft.hypothesis, predicted=draft.predicted,
                                     knob_changes=changes, condition_notes=draft.condition_notes,
                                     provenance=[human], agent_recommended=False, wave=state.wave))
-    ops.proposals_ready(state, open_now[0].star_id)
+    ops.proposals_ready(state, parent.id)
+    kick(state.id)  # the graph may be idle at a selection with nothing else open
     return True
 
 

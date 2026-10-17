@@ -70,13 +70,13 @@ function ClaimsMock() {
 }
 
 const PICKS = [
-  ["Mixup at the paper's setting", 'agent’s pick', 'Zhang et al.'],
-  ['Turn off test-time augmentation', '', 'Jordan'],
-  ['Random flips instead of alternating', '', 'Jordan'],
-  ['Remove label smoothing', '', 'Szegedy et al.'],
+  ['Mixup beats plain training', 'your note: 200 epochs. Does it hold at 10?', 'Zhang et al.'],
+  ['Test-time crops add accuracy', '', 'Jordan'],
+  ['Alternating flips beat random', '', 'Jordan'],
+  ['Label smoothing still helps', 'your note: ImageNet only?', 'Szegedy et al.'],
 ]
 
-// The proposal dock: small tests, each tied to a sentence you highlighted
+// Litmus's first question: where to start, answered with the claims you highlighted
 function DockMock() {
   const [ticked, setTicked] = useState<number[]>([0])
   const ref = useRef<HTMLDivElement>(null)
@@ -88,7 +88,7 @@ function DockMock() {
   }, [seen])
   return (
     <div ref={ref} className={`${card} p-5`}>
-      <p className="m-0 text-[14px] font-semibold">4 experiments ready</p>
+      <p className="m-0 text-[14px] font-semibold">Litmus: Where should we start?</p>
       <div className="mt-3 grid grid-cols-2 gap-2.5">
         {PICKS.map(([t, tag, src], i) => {
           const on = ticked.includes(i)
@@ -98,15 +98,15 @@ function DockMock() {
                 <span className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-[4px] border border-ink text-[11px] leading-none" style={{ background: on ? 'var(--color-ink)' : 'transparent', color: 'var(--color-surface)', transition: 'background 160ms' }}>{on ? '✓' : ''}</span>
                 <span className="text-[14px] font-medium leading-snug">{t}</span>
               </div>
-              {tag && <span className="mt-1.5 block pl-6 text-[12px] font-medium text-agent">{tag}</span>}
+              {tag && <span className="mt-1.5 block pl-6 text-[12px] text-human">{tag}</span>}
               <span className="chip mt-2 ml-6 truncate">highlight · {src}</span>
             </motion.div>
           )
         })}
       </div>
       <div className="mt-3 flex items-center justify-between gap-3">
-        <span className="text-[12.5px] text-muted">Pick up to 4. If you skip the assistant’s pick, it still runs on its own.</span>
-        <span className="btn btn-primary shrink-0">Run {ticked.length} {ticked.length === 1 ? 'agent' : 'agents'}</span>
+        <span className="text-[12.5px] text-muted">Each claim you pick gets its own agent.</span>
+        <span className="btn btn-primary shrink-0">Start with {ticked.length} {ticked.length === 1 ? 'claim' : 'claims'}</span>
       </div>
     </div>
   )
@@ -195,7 +195,7 @@ function BoardMock() {
   )
 }
 
-// The question card: the assistant asks, you decide, and the app remembers where you changed course
+// The question card: an agent asks, you decide, and Litmus remembers where you changed course
 function CallMock() {
   return (
     <div className={`${card} p-5`}>
@@ -211,13 +211,13 @@ function CallMock() {
         <div className="rounded-lg border border-rule p-3">
           <span className="block text-[14px] font-medium">Drop mixup</span>
           <span className="mt-0.5 block text-[12.5px] text-muted">Cheap, but leaves the claim untested.</span>
-          <span className="mt-1 block text-[12px] font-medium text-agent">assistant leans this way</span>
+          <span className="mt-1 block text-[12px] font-medium text-agent">Mixup agent leans this way</span>
         </div>
       </div>
       <motion.div className="mt-4 border-t border-rule pt-3" initial={{ opacity: 0, y: 8 }} whileInView={{ opacity: 1, y: 0 }} viewport={inView} transition={{ delay: 1.8, duration: 0.5, ease }}>
         <p className="m-0 label">Where you changed course</p>
         <p className="m-0 mt-1 text-[13.5px] text-human">You: test mixup for longer</p>
-        <p className="m-0 text-[13.5px] text-muted">Assistant on its own: drop mixup</p>
+        <p className="m-0 text-[13.5px] text-muted">Mixup agent: drop mixup</p>
       </motion.div>
     </div>
   )
@@ -227,7 +227,7 @@ function CallMock() {
 function WriteupMock() {
   return (
     <div className={`${card} p-6`}>
-      <p className="m-0 text-[14px] font-semibold">What the agents found</p>
+      <p className="m-0 text-[14px] font-semibold">What Litmus found</p>
       <p className="m-0 mt-2 text-[15px] leading-relaxed">
         Mixup lost accuracy in a short test, but recovered when it was trained for longer, as your note on the Bag of Tricks paper suggested. Switching off test-time augmentation cost about 0.7 points.
       </p>
@@ -246,11 +246,11 @@ function WriteupMock() {
 type Slide = { key: string; title: string; body: string; mock?: ReactNode }
 const SLIDES: Slide[] = [
   { key: 'read', title: 'Start with what you’ve read', body: 'Litmus reads the highlights and notes you saved in Papiers. Each highlight is a claim from a paper, and your notes are where you doubted it.', mock: <ClaimsMock /> },
-  { key: 'suggest', title: 'It suggests small tests', body: 'For each claim, the assistant proposes quick experiments. Every one is tied to a sentence you highlighted, and you choose which to run.', mock: <DockMock /> },
-  { key: 'run', title: 'AI agents run them', body: 'Each agent runs one experiment, repeated several times so one lucky result can’t fool you. The higher it lands, the more accurate it was.', mock: <TreeMock /> },
+  { key: 'suggest', title: 'You choose where to start', body: 'Litmus asks where to start, and you pick the claims you doubt most. Each one gets its own agent, with a quick experiment tied to the sentence you highlighted.', mock: <DockMock /> },
+  { key: 'run', title: 'Agents run them side by side', body: 'Each agent runs one experiment, repeated several times so one lucky result can’t fool you. When it finishes, it reads what the other agents found and asks you: where should I proceed?', mock: <TreeMock /> },
   { key: 'compare', title: 'Everything comes from your reading', body: 'Every agent’s experiment starts from something you read, and they’re all measured against each other on the same scale, so you can see which ideas actually helped.', mock: <BoardMock /> },
-  { key: 'call', title: 'You make the calls that matter', body: 'When a result surprises the assistant, it asks you. If you overrule it, its own pick still runs, so you can see whether your judgment paid off.', mock: <CallMock /> },
-  { key: 'write', title: 'A write-up you can check', body: 'At the end you get a short summary. Every line points back to the experiment behind it and the sentence you read.', mock: <WriteupMock /> },
+  { key: 'call', title: 'You make the calls that matter', body: 'When a result surprises an agent, it stops and asks you, with the evidence attached. Litmus keeps a record of every time you overruled one, so you can see whether your judgment paid off.', mock: <CallMock /> },
+  { key: 'write', title: 'A write-up you can check', body: 'Litmus has followed every agent, so at the end it writes one short summary. Every line points back to the experiment behind it and the sentence you read.', mock: <WriteupMock /> },
   { key: 'cta', title: 'Ready to test your claims?', body: '' },
 ]
 

@@ -18,7 +18,7 @@ export type Star = {
   knobs: Knobs; knob_changes: Partial<Knobs>; provenance: Provenance[]; chosen_by: ChosenBy
   status: StarStatus; predicted?: Predicted; proposal_id?: string; shadow_of?: string
   progress?: Progress[]; runs: RunResult[]; parent_runs: RunResult[]; grade?: Grade
-  reflection?: string; error?: string; created_at: string; finished_at?: string
+  reflection?: string; suggestion?: string; error?: string; created_at: string; finished_at?: string
 }
 export type QuestionOption = { id: string; label: string; consequence: string }
 export type Question = { id: string; star_id: string; text: string; evidence: Provenance[]; options: QuestionOption[]; agent_leaning?: string; status: 'open' | 'answered'; answer?: { option_id: string; comment?: string } }
@@ -26,7 +26,7 @@ export type Decision = { id: string; star_id: string; kind: 'dispatch' | 'answer
 export type ChatTurn = { role: 'human' | 'litmus'; text: string }
 export type Abstract = { text: string; findings: string[]; citations: Provenance[] }
 export type SessionStatus = 'running' | 'paused' | 'waiting_human' | 'done'
-export type SessionState = { id: string; goal: string; status: SessionStatus; stars: Star[]; proposals: Proposal[]; questions: Question[]; decisions: Decision[]; abstract?: Abstract; budget_used: number; budget_total: number; replay?: boolean; created_at?: string }
+export type SessionState = { id: string; goal: string; status: SessionStatus; stars: Star[]; proposals: Proposal[]; questions: Question[]; decisions: Decision[]; abstract?: Abstract; budget_used: number; budget_total: number; replay?: boolean; created_at?: string; start_claim_ids?: string[] }
 export type Selection = { proposal_id: string; knob_overrides?: Partial<Knobs> }
 
 export type LitmusEvent = { seq: number; ts: string; session_id: string; type: string; payload: any }

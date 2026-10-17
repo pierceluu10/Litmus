@@ -2,7 +2,7 @@ import { Fragment, useState } from 'react'
 import { motion } from 'motion/react'
 import { sessionApi, useStore } from '../store'
 import { agentDetail, agentName, pct, progressFraction, pts, starTone, toneVar } from '../lib/format'
-import type { Provenance, Star } from '../types'
+import type { Claim, Provenance, Star } from '../types'
 import { PathChart } from './PathChart'
 import { ProvChip } from './Prov'
 
@@ -10,6 +10,7 @@ const H = ({ children, aside }: { children: React.ReactNode; aside?: React.React
   <div className="mb-2 flex items-baseline justify-between"><h3 className="m-0 text-[12px] font-semibold text-muted">{children}</h3>{aside}</div>
 )
 const VERDICT_TEXT = { confirmed: 'Confirmed', refuted: 'Refuted', inconclusive: 'Inconclusive', baseline: 'Baseline' }
+const MAX_START = 4 // first agents at once (the backend's MAX_BRANCHES)
 
 // ---------------------------------------------------------------- overview
 
@@ -20,8 +21,11 @@ function Overview() {
   const ranked = s.stars.filter((x) => x.grade && x.status !== 'failed').sort((a, b) => b.grade!.mean_child - a.grade!.mean_child)
   const count = (v: string) => graded.filter((x) => x.grade!.verdict === v).length
   const steered = s.decisions.filter((d) => d.kind === 'answer' && d.changed_trajectory)
+  const starting = !s.start_claim_ids?.length && s.stars.every((x) => !x.parent_id)
+  const asker = (id: string) => { const star = s.stars.find((x) => x.id === id); return star ? agentName(star) : 'Agent' }
   return (
     <div className="space-y-6 p-4">
+      {starting && <StartPicker />}
       <section>
         <h2 className="m-0 text-[15px] font-semibold tracking-[-0.01em]">Results</h2>
         {graded.length > 0 && (
@@ -57,7 +61,7 @@ function Overview() {
               <li key={d.id}>
                 <button className="block w-full rounded-md border border-rule px-3 py-2 text-left text-[12.5px] leading-snug hover:border-faint" onClick={() => select(d.star_id)}>
                   <span className="block text-human">You: {d.human_choice}</span>
-                  <span className="block text-muted">Agent: {d.agent_recommendation || 'nothing'}</span>
+                  <span className="block text-muted">{asker(d.star_id)}: {d.agent_recommendation || 'nothing'}</span>
                 </button>
               </li>
             ))}
@@ -76,7 +80,7 @@ function Activity() {
   return (
     <section>
       <button className="flex w-full items-baseline justify-between text-left" aria-expanded={open} onClick={() => setOpen(!open)}>
-        <h3 className="m-0 text-[12px] font-semibold text-muted">Agent log</h3><span className="label">{open ? 'hide' : `${app.feed.length} ${app.feed.length === 1 ? 'entry' : 'entries'}`}</span>
+        <h3 className="m-0 text-[12px] font-semibold text-muted">Research log</h3><span className="label">{open ? 'hide' : `${app.feed.length} ${app.feed.length === 1 ? 'entry' : 'entries'}`}</span>
       </button>
       {open && (
         <ol className="m-0 mt-2 list-none space-y-1.5 p-0 text-[12.5px] leading-snug" aria-live="polite">
@@ -156,9 +160,6 @@ function TestedClaims({ s }: { s: Star }) {
   )
 }
 
-// The answer opens out from where the mote lands on its first line.
-const HIDDEN_ANSWER = { clipPath: 'circle(0px at 12px 11px)', opacity: 0, filter: 'blur(4px)' }
-const SHOWN_ANSWER = { clipPath: 'circle(150% at 12px 11px)', opacity: 1, filter: 'blur(0px)' }
 const MAX_CITED = 3
 const OPENERS = ['What did you run?', 'Is this result real?', 'What should I try next?']
 const firstSentence = (t: string) => t.match(/^.*?[.!?](\s|$)/)?.[0].trim() ?? t
@@ -174,44 +175,90 @@ function FacetMark() {
   )
 }
 
-function LitmusMessage({ text, provenance, pending, clamp }: { text: string; provenance?: Provenance[]; pending?: boolean; clamp?: boolean }) {
+function LitmusMessage({ text, provenance }: { text: string; provenance?: Provenance[] }) {
   const claims = useStore((st) => st.app.claims)
-  const [full, setFull] = useState(false)
   const cited = (provenance ?? []).filter((p, i, all) => p.kind === 'highlight' && all.findIndex((q) => q.id === p.id) === i).slice(0, MAX_CITED)
   return (
     <div className="flex items-start gap-2">
       <FacetMark />
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <motion.div className="msg-litmus" data-answer-slot={pending ? 'pending' : undefined} initial={false}
-          animate={pending ? HIDDEN_ANSWER : SHOWN_ANSWER} transition={{ duration: 0.6, ease: [0.23, 1, 0.32, 1] }}>
-          {clamp
-            ? <button className={`block text-left ${full ? '' : 'line-clamp-4'}`} aria-expanded={full} onClick={() => setFull(!full)} title={full ? undefined : 'Show all'}>{text}</button>
-            : text}
+        <motion.div className="msg-litmus" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}>
+          {text}
         </motion.div>
-        {!pending && cited.length > 0 && <div className="flex flex-wrap gap-1">{cited.map((p) => <ProvChip key={p.id} p={p} label={claims.find((c) => c.id === p.id)?.summary} />)}</div>}
+        {cited.length > 0 && <div className="flex flex-wrap gap-1">{cited.map((p) => <ProvChip key={p.id} p={p} label={claims.find((c) => c.id === p.id)?.summary} />)}</div>}
       </div>
     </div>
   )
 }
 
-// The conversation with Litmus: its conclusion opens it, replans read as notes between messages, then your questions.
+// "Where should we start?": Litmus's first line, and the human's claims as the answers.
+function StartPicker() {
+  const { app, libraryStage, start } = useStore()
+  const [chosen, setChosen] = useState<string[]>([])
+  const [busy, setBusy] = useState(false)
+  const claims = app.claims.slice().sort((a, b) => a.rank - b.rank)
+  const toggle = (c: Claim) => setChosen((x) => x.includes(c.id) ? x.filter((i) => i !== c.id) : x.length < MAX_START ? [...x, c.id] : x)
+  const go = async () => { setBusy(true); await start(chosen); setBusy(false) }
+  return (
+    <section aria-label="Where should we start?" className="flex flex-col gap-2.5">
+      <LitmusMessage text="Where should we start?" />
+      {libraryStage !== 'ready'
+        ? <p className="m-0 pl-[26px] text-[12px] text-muted">Reading your highlights and notes…</p>
+        : (
+          <>
+            <ul className="m-0 flex list-none flex-col gap-1.5 p-0 pl-[26px]">
+              {claims.map((c) => {
+                const on = chosen.includes(c.id)
+                return (
+                  <li key={c.id}>
+                    <button aria-pressed={on} disabled={!on && chosen.length >= MAX_START} onClick={() => toggle(c)}
+                      className="block w-full rounded-lg border px-2.5 py-2 text-left transition-colors disabled:opacity-50"
+                      style={{ borderColor: on ? 'var(--color-ink)' : 'var(--color-rule)', background: on ? 'var(--color-marble)' : undefined }}>
+                      <span className="block text-[12.5px] font-medium leading-snug">{c.summary ?? c.text}</span>
+                      {c.annotation && <span className="mt-0.5 block line-clamp-2 text-[11.5px] leading-snug text-human">Your note: {c.annotation}</span>}
+                      <span className="mt-0.5 block truncate text-[11px] text-faint">{c.doc_title}</span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+            {/* the list is long; the answer stays in reach at the bottom of the panel */}
+            <div className="sticky bottom-0 -mx-4 border-t border-rule bg-surface px-4 py-3 pl-[42px]">
+              <button className="btn btn-primary" disabled={!chosen.length || busy} onClick={go}>
+                {chosen.length ? `Start with ${chosen.length} claim${chosen.length === 1 ? '' : 's'}` : 'Pick up to 4 claims'}
+              </button>
+            </div>
+          </>
+        )}
+    </section>
+  )
+}
+
+// What this star's agent found and where it would go next, in its own words.
+function AgentReport({ s }: { s: Star }) {
+  if (!s.parent_id || (!s.reflection && !s.suggestion)) return null
+  return (
+    <section aria-label={`${agentName(s)} report`} className="plate flex flex-col gap-2 p-3 text-[12.5px] leading-snug">
+      {s.reflection && <div><p className="label m-0 mb-0.5">{agentName(s)} found</p><p className="m-0">{s.reflection}</p></div>}
+      {s.suggestion && <div><p className="label m-0 mb-0.5">{agentName(s)} suggests</p><p className="m-0">{s.suggestion}</p></div>}
+    </section>
+  )
+}
+
+// The conversation with Litmus about this star: replans read as notes between messages, then your questions.
 function Story({ s }: { s: Star }) {
-  const { chats, thinking, thought, app } = useStore()
+  const { chats, thinking, app } = useStore()
   const turns = chats[s.id] ?? []
   const replans = app.replans.filter((r) => r.star_id === s.id)
   const busy = thinking === s.id
-  const flying = thought?.starId === s.id
-  const pending = flying && !thought.landed // the newest answer waits for the mote to land on it
-  const opener = s.parent_id ? s.reflection : null // the baseline's note only repeats its result card
-  if (!opener && !replans.length && !turns.length && !busy) return null
+  if (!replans.length && !turns.length && !busy) return null
   return (
     <section aria-label="Conversation with Litmus" className="flex flex-col gap-3">
-      {opener && <LitmusMessage text={opener} clamp />}
       {replans.map((r) => <p key={r.seq} className="thread-note" title={r.because}>{firstSentence(r.change)}</p>)}
       {turns.map((t, i) => t.role === 'human'
         ? <p key={i} className="msg-human">{t.text}</p>
-        : <LitmusMessage key={i} text={t.text} provenance={t.provenance} pending={pending && i === turns.length - 1} />)}
-      {busy && !flying && (
+        : <LitmusMessage key={i} text={t.text} provenance={t.provenance} />)}
+      {busy && (
         <div className="flex items-start gap-2" aria-live="polite" aria-label="Litmus is thinking">
           <FacetMark /><div className="msg-litmus typing"><span /><span /><span /></div>
         </div>
@@ -252,7 +299,7 @@ function Detail({ s }: { s: Star }) {
         <button className="btn btn-quiet -ml-2 h-7 px-2" onClick={() => select(null)}>← All results</button>
         <div className="flex gap-1.5">
           {live && <StopButton id={s.id} />}
-          <button className="btn h-7 px-2.5 text-[12.5px]" disabled={live || pending} aria-expanded={branching} onClick={() => setBranching(!branching)}>{pending ? 'Proposals ready' : 'Branch from here'}</button>
+          <button className="btn h-7 px-2.5 text-[12.5px]" disabled={live || pending} aria-expanded={branching} onClick={() => setBranching(!branching)}>{pending ? 'Options below' : 'Branch from here'}</button>
         </div>
       </div>
       {branching && <BranchForm s={s} done={() => setBranching(false)} />}
@@ -269,6 +316,7 @@ function Detail({ s }: { s: Star }) {
         <p className="label m-0 mb-1">Accuracy along this path</p>
         <PathChart stars={stars} highlight={s} />
       </div>
+      <AgentReport s={s} />
       <TestedClaims s={s} />
       <Story s={s} />
     </div>
