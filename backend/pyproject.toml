@@ -7,6 +7,7 @@ dependencies = [
     "modal>=1.6.2",
     "pydantic>=2.14.1",
     "python-dotenv>=1.2.4",
+    "scipy>=1.17.1",
 ]
 
 [project.scripts]
