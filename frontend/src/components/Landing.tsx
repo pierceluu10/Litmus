@@ -208,13 +208,9 @@ export function Landing() {
     <main className={`h-full overflow-y-auto bg-surface`} onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 40)}>
       <nav className={`sticky top-0 z-30 flex items-center justify-between px-[clamp(20px,4vw,56px)] py-3.5 transition-colors ${scrolled ? 'border-b border-rule bg-surface/95' : 'border-b border-transparent'}`}>
         <button className="border-0 bg-transparent p-0 text-[20px] font-bold tracking-tight" onClick={() => document.querySelector('main')?.scrollTo({ top: 0, behavior: 'smooth' })}>Litmus</button>
-        <div className="flex gap-7 text-[14px] max-md:hidden">
-          {[['read', 'Read'], ['test', 'Test'], ['steer', 'Steer'], ['trace', 'Trace']].map(([id, l]) => <button key={id} className="border-0 bg-transparent p-0 text-muted transition-colors hover:text-ink" onClick={() => go(id)}>{l}</button>)}
-        </div>
         <div className="flex items-center gap-2">
           {user ? (
             <>
-              <span className="mr-1 text-[14px] text-muted max-sm:hidden">{user.name}</span>
               <button className="btn" onClick={logout}>Log out</button>
               <button className="btn btn-primary" onClick={() => begin(false, goal)}>Start research</button>
             </>
