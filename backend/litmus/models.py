@@ -77,6 +77,8 @@ class Proposal(BaseModel):
     provenance: list[Provenance]
     agent_recommended: bool
     status: Literal["open", "dispatched", "skipped"] = "open"
+    wave: int = 1
+    parent_star_id: str | None = None  # the star this proposal changes (defaults to star_id)
 
 
 class RunResult(BaseModel):
@@ -84,6 +86,7 @@ class RunResult(BaseModel):
     val_acc: float
     tta_val_acc: float | None = None
     time_seconds: float
+    cached: bool | None = None  # served from the (config, seed) cache, not re-trained
 
 
 class Grade(BaseModel):
@@ -122,6 +125,7 @@ class Star(BaseModel):
     predicted: Prediction | None = None
     proposal_id: str | None = None
     shadow_of: str | None = None
+    wave: int = 0
     progress: list[Progress] = []
     runs: list[RunResult] = []
     parent_runs: list[RunResult] = []
@@ -136,6 +140,9 @@ class QuestionOption(BaseModel):
     id: str
     label: str
     consequence: str
+    directive: str | None = None  # what the agent will do next wave if this is chosen
+    parent_star_id: str | None = None
+    knob_changes: dict[str, Any] | None = None
 
 
 class Answer(BaseModel):
@@ -152,6 +159,7 @@ class Question(BaseModel):
     agent_leaning: str | None = None
     status: Literal["open", "answered"] = "open"
     answer: Answer | None = None
+    wave: int = 1
 
 
 class Decision(BaseModel):
@@ -173,6 +181,18 @@ class Abstract(BaseModel):
     citations: list[Provenance]
 
 
+class AgendaItem(BaseModel):
+    """Something the agent has committed to consider in the next wave, and why."""
+    id: str
+    source: Literal["reflection", "answer", "feedback"]
+    star_id: str | None = None
+    text: str
+    knob_changes: dict[str, Any] = {}
+    parent_star_id: str | None = None
+    provenance: list[Provenance] = []
+    consumed: bool = False
+
+
 class SessionState(BaseModel):
     id: str
     goal: str
@@ -186,6 +206,10 @@ class SessionState(BaseModel):
     budget_total: float
     replay: bool = False
     created_at: str = Field(default_factory=now_iso)
+    wave: int = 0
+    agenda: list[AgendaItem] = []
+    finish_requested: bool = False
+    last_seq: int = 0  # seq of the last event this snapshot reflects; open the WS with from_seq=last_seq
 
 
 EventType = Literal[
