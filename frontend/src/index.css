@@ -66,7 +66,11 @@ svg text { font-family: var(--font-sans); }
 .line-draw { stroke-dasharray: 1; stroke-dashoffset: 0; animation: drawin 700ms var(--ease-out) 1; }
 .agent-dot { animation: fadeout 1.4s linear 1 forwards; }
 
+@keyframes introIn { from { opacity: 0; transform: translateY(var(--dy, 12px)) scale(0.94); } to { opacity: 1; transform: none; } }
+.intro-in { opacity: 0; transform-box: fill-box; transform-origin: center; animation: introIn 800ms var(--ease-out) forwards; }
+
 @media (prefers-reduced-motion: reduce) {
+  .intro-in { animation: none; opacity: 1; }
   .star-pulse, .star-breathe, .star-bloom, .line-draw, .agent-dot { animation: none; }
   .agent-dot { display: none; }
 }

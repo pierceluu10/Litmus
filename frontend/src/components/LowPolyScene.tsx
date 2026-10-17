@@ -58,7 +58,7 @@ function column(cx: number, top: number, bottom: number, w: number, seed: number
 }
 
 const AEGEAN = [112, 146, 188]
-export function LowPolyScene({ className }: { className?: string }) {
+export function LowPolyScene({ className, intro = false }: { className?: string; intro?: boolean }) {
   const sky = gridMesh([-700, 1600, -500], [-700, 1600, 504], 16, 6, 91, [214, 226, 240])
   const floor = gridMesh([-700, 1600, 504], [-700, 1600, 1000], 16, 3, 92, [196, 208, 224])
   const behind = [...column(262, 150, 462, 40, 11, AEGEAN), ...column(638, 150, 462, 40, 12, AEGEAN)]
@@ -77,12 +77,30 @@ export function LowPolyScene({ className }: { className?: string }) {
     return tri([450, 290], [450 + Math.cos(a0) * 175, 290 + Math.sin(a0) * 175], [450 + Math.cos(a1) * 175, 290 + Math.sin(a1) * 175], 0.62 + 0.22 * Math.cos(a0 - 3.9) * (i % 2 ? 1 : 0.7), [200, 214, 234])
   })
   const statue = thinkerPolys(450, 466, 2.5)
-  const marble = [...sky, ...floor, ...halo, ...behind, ...pediment, ...front, ...steps]
-  const poly = (t: Tri, i: number) => <polygon key={i} points={t.pts.map((p) => p.join(',')).join(' ')} fill={t.fill} stroke={t.fill} strokeWidth={0.6} strokeLinejoin="round" />
+  const cen = (pts: number[][]) => [pts.reduce((a, p) => a + p[0], 0) / pts.length, pts.reduce((a, p) => a + p[1], 0) / pts.length]
+  type Anim = [number, number] | null // [delay in s, start offset in px]
+  // The intro assembles the scene: sky fades in from the middle, columns rise, the roof drops, the statue builds bottom to top.
+  const layer = (tris: Tri[], key: string, when: (c: number[], i: number) => Anim) => tris.map((t, i) => {
+    const a = intro ? when(cen(t.pts), i) : null
+    return <polygon key={key + i} points={t.pts.map((p) => p.join(',')).join(' ')} fill={t.fill} stroke={t.fill} strokeWidth={0.6} strokeLinejoin="round"
+      className={a ? 'intro-in' : undefined} style={a ? ({ animationDelay: `${a[0].toFixed(2)}s`, '--dy': `${a[1]}px` } as React.CSSProperties) : undefined} />
+  })
+  const rise = (c: number[]): Anim => [0.45 + ((462 - c[1]) / 372) * 0.6, 34]
   return (
     <svg viewBox="-240 -60 1380 700" className={className} preserveAspectRatio="xMidYMid meet" role="img" aria-label="A low-poly Greek temple with a metal statue of a seated thinker between two columns">
-      {marble.map(poly)}
-      {statue.map((p, i) => <polygon key={`s${i}`} points={p.points} fill={p.fill} stroke={p.fill} strokeWidth={0.6} strokeLinejoin="round" />)}
+      {layer(sky, 'sky', (c) => [Math.abs(c[0] - 450) / 1500 * 0.8, 0])}
+      {layer(floor, 'fl', (c) => [Math.abs(c[0] - 450) / 1500 * 0.8, 0])}
+      {layer(halo, 'ha', (_, i) => [0.5 + i * 0.03, 0])}
+      {layer(behind, 'bc', rise)}
+      {layer(front, 'fc', rise)}
+      {layer(steps, 'st', (_, i) => [0.35 + i * 0.1, 18])}
+      {layer(pediment, 'pe', (c) => [1.15 + (c[0] / 900) * 0.3, -44])}
+      {statue.map((p, i) => {
+        const pts = p.points.split(' ').map((q) => q.split(',').map(Number))
+        const a = intro ? [1.3 + ((466 - cen(pts)[1]) / 340) * 1.0 + (i % 7) * 0.012, 10] : null
+        return <polygon key={`s${i}`} points={p.points} fill={p.fill} stroke={p.fill} strokeWidth={0.6} strokeLinejoin="round"
+          className={a ? 'intro-in' : undefined} style={a ? ({ animationDelay: `${a[0].toFixed(2)}s`, '--dy': `${a[1]}px` } as React.CSSProperties) : undefined} />
+      })}
     </svg>
   )
 }
