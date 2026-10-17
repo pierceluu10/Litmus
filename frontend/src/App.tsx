@@ -27,7 +27,6 @@ function SceneChrome() {
         {latest && <p className="m-0 truncate text-[12.5px] text-muted" aria-live="polite">{latest.kind === 'search' ? `Searching your library: ${latest.text}` : latest.text}</p>}
         <p className="m-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-faint">
           {LEGEND.map(([tone, label]) => <span key={tone} className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full border-[1.5px]" style={{ borderColor: toneVar(tone) }} />{label}</span>)}
-          <span>· higher is more accurate</span>
         </p>
       </div>
       <div className="absolute right-3 top-3 z-30 flex gap-1.5">

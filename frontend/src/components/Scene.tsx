@@ -22,7 +22,10 @@ const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').match
 
 // Camera framing: a fixed offset from the focused star, slightly from the right so sibling depth reads,
 // aimed left of and below the star so the statue stays in frame and the star clears the proposal dock.
-const VIEW = new Vector3(40, 30, 350)
+// a fixed three-quarter view of the accuracy plane; the user can zoom within limits but never rotate or pan
+const VIEW = new Vector3(150, 36, 310)
+const MIN_DISTANCE = 170
+const MAX_DISTANCE = 480
 const AIM = new Vector3(-14, -18, 0)
 const PORTRAIT_ASPECT = 0.9
 const PORTRAIT_PULLBACK = 1.7
@@ -155,15 +158,18 @@ function Fingertip() {
 
 function CameraRig({ positions, parents }: { positions: Map<string, Pos>; parents: Map<string, string | null> }) {
   const controls = useRef<CameraControls>(null)
-  const { focusId, fitRequest, set } = useStore()
+  const { focusId, fitRequest } = useStore()
   // frame the branch, not just the star: halfway between the focused star and the one it grew from
   const star = focusId ? positions.get(focusId) : undefined
   const from = focusId ? positions.get(parents.get(focusId) ?? '') ?? star : undefined
   const focus = star && from ? { x: (star.x + from.x) / 2, y: (star.y + from.y) / 2, z: (star.z + from.z) / 2 } : { x: FIRST_STEP, y: 0, z: 0 }
   const portrait = useThree((s) => s.size.width / s.size.height) < PORTRAIT_ASPECT // narrow screens see less width: pull back
   useEffect(() => {
-    const t = new Vector3(focus.x, focus.y, focus.z).add(AIM), view = VIEW.clone().multiplyScalar(portrait ? PORTRAIT_PULLBACK : 1)
-    controls.current?.setLookAt(t.x + view.x, t.y + view.y, t.z + view.z, t.x, t.y, t.z, !reducedMotion())
+    const c = controls.current
+    if (!c) return
+    // keep whatever zoom the user chose; only the target moves
+    const t = new Vector3(focus.x, focus.y, focus.z).add(AIM), view = VIEW.clone().setLength(Math.min(MAX_DISTANCE, (c.distance || VIEW.length()) * (portrait ? PORTRAIT_PULLBACK : 1)))
+    c.setLookAt(t.x + view.x, t.y + view.y, t.z + view.z, t.x, t.y, t.z, !reducedMotion())
   }, [focus.x, focus.y, focus.z, portrait])
   useEffect(() => {
     if (!fitRequest || !controls.current) return
@@ -171,7 +177,7 @@ function CameraRig({ positions, parents }: { positions: Map<string, Pos>; parent
     box.expandByScalar(16)
     controls.current.fitToBox(box, !reducedMotion(), { paddingLeft: 10, paddingRight: 40, paddingTop: 30, paddingBottom: 30 })
   }, [fitRequest]) // eslint-disable-line react-hooks/exhaustive-deps
-  return <CameraControls ref={controls} makeDefault minDistance={60} maxDistance={900} smoothTime={0.6} onControl={() => set({ follow: false })} />
+  return <CameraControls ref={controls} makeDefault minDistance={MIN_DISTANCE} maxDistance={MAX_DISTANCE} smoothTime={0.6} azimuthRotateSpeed={0} polarRotateSpeed={0} truckSpeed={0} />
 }
 
 function Stars({ stars }: { stars: Star[] }) {

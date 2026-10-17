@@ -45,8 +45,8 @@ export function shortCite(d: Document | undefined): string {
 export function provLabel(p: Provenance, docs: Document[]): string {
   const doc = docs.find((d) => d.id === p.doc_id)
   const who = doc?.authors[0]?.split(' ').slice(-1)[0] ?? ''
-  const what = p.kind === 'note' ? 'your note' : p.kind === 'human' ? 'your decision' : p.kind === 'search' ? 'library search' : p.kind
-  return who ? `${what} · ${who}${doc && doc.authors.length > 1 ? ' et al.' : ''}` : what
+  const what = p.kind === 'note' ? 'Your note on' : p.kind === 'human' ? 'Your decision' : p.kind === 'search' ? 'Library search' : `${p.kind[0].toUpperCase()}${p.kind.slice(1)} from`
+  return who ? `${what} ${who}${doc && doc.authors.length > 1 ? ' et al.' : ''}` : what.replace(/ (from|on)$/, '')
 }
 export const provMatches = (p: Provenance, claimId: string) => p.id === claimId || p.id.startsWith(`${claimId}#`)
 

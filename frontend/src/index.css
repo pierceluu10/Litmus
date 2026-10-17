@@ -39,10 +39,13 @@ body {
 ::selection { background: color-mix(in srgb, var(--color-graphite) 18%, transparent); }
 :focus-visible { outline: 2px solid var(--color-ink); outline-offset: 2px; border-radius: 4px; }
 * { scrollbar-width: thin; scrollbar-color: var(--color-rule) transparent; }
-button { cursor: pointer; font: inherit; color: inherit; background: none; border: 0; padding: 0; }
-button:disabled { cursor: not-allowed; opacity: 0.4; }
-input, textarea { font: inherit; color: inherit; caret-color: var(--color-ink); }
-input::placeholder, textarea::placeholder { color: var(--color-faint); }
+/* in the base layer so Tailwind utilities (px-4, bg-…) can override them */
+@layer base {
+  button { cursor: pointer; font: inherit; color: inherit; background: none; border: 0; padding: 0; }
+  button:disabled { cursor: not-allowed; opacity: 0.4; }
+  input, textarea { font: inherit; color: inherit; caret-color: var(--color-ink); }
+  input::placeholder, textarea::placeholder { color: var(--color-faint); }
+}
 
 .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
 .label { font-size: 11px; font-weight: 500; letter-spacing: 0.02em; color: var(--color-muted); }

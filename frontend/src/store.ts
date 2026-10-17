@@ -69,8 +69,8 @@ export const useStore = create<Store>((set, get) => {
         }, (conn) => set({ conn }))
       } catch (e) { set({ error: (e as Error).message }) }
     },
-    dispatch: (star_id, selections, instruction) => act((sid) => api.dispatch(sid, { star_id, selections, instruction })),
-    answer: (question_id, option_id, comment) => act((sid) => api.answer(sid, { question_id, option_id, comment })),
+    dispatch: (star_id, selections, instruction) => { set({ follow: true }); return act((sid) => api.dispatch(sid, { star_id, selections, instruction })) },
+    answer: (question_id, option_id, comment) => { set({ follow: true }); return act((sid) => api.answer(sid, { question_id, option_id, comment })) },
     feedback: (star_id, kind, text) => act((sid) => api.feedback(sid, { star_id, kind, text })),
     async explain(star_id, question) {
       set({ explainBusy: true })
@@ -83,7 +83,7 @@ export const useStore = create<Store>((set, get) => {
     togglePause: () => act((sid) => (get().app.session?.status === 'paused' ? api.resume(sid) : api.pause(sid))),
     stopBranch: (star_id) => act((sid) => api.stopBranch(sid, star_id)),
     // Branching from any star, refuted ones included, goes through feedback "suggest": the agent replans from it.
-    branch: (star_id, text) => act((sid) => api.feedback(sid, { star_id, kind: 'suggest', text: text?.trim() || 'Branch from here.' })),
+    branch: (star_id, text) => { set({ follow: true }); return act((sid) => api.feedback(sid, { star_id, kind: 'suggest', text: text?.trim() || 'Branch from here.' })) },
     generateAbstract: async () => { await act((sid) => api.abstract(sid)); if (get().app.session?.abstract) set({ abstractOpen: true, selectedId: null }) },
   }
 })

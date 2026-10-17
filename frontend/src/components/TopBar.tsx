@@ -1,25 +1,13 @@
 import { useStore } from '../store'
-import type { SessionStatus } from '../types'
-
-const STATUS: Record<SessionStatus, { label: string; color: string }> = {
-  running: { label: 'Agents running', color: 'var(--color-running)' },
-  paused: { label: 'Paused', color: 'var(--color-faint)' },
-  waiting_human: { label: 'Waiting for you', color: 'var(--color-waiting)' },
-  done: { label: 'Done', color: 'var(--color-confirmed)' },
-}
 
 export function TopBar() {
   const { app, conn, togglePause, generateAbstract, error, set, leave } = useStore()
   const s = app.session!
-  const st = STATUS[s.status]
   const graded = s.stars.filter((x) => x.grade && x.grade.verdict !== 'baseline').length
   const share = s.budget_total ? Math.min(1, s.budget_used / s.budget_total) : 0
   return (
     <header className="flex h-12 items-center gap-5 border-b border-rule bg-surface px-4">
       <button className="text-[15px] font-semibold tracking-[-0.02em]" aria-label="Litmus, back to the home page" onClick={leave}>Litmus</button>
-      <span className="inline-flex items-center gap-2 text-muted" aria-live="polite">
-        <span className={`dot ${s.status === 'running' || s.status === 'waiting_human' ? 'live-dot' : ''}`} style={{ background: st.color }} />{st.label}
-      </span>
       {conn === 'reconnecting' && <span className="text-waiting">Reconnecting…</span>}
       {error && <span role="alert" className="min-w-0 truncate text-refuted">{error}</span>}
       <div className="ml-auto flex items-center gap-4">

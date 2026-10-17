@@ -91,7 +91,7 @@ export class MockServer {
     this.emit('library.loaded', { documents, claims })
     this.think(`Read ${documents.length} papers and ${claims.length} highlights, ranked by your notes.`)
     this.later(() => {
-      const base = this.newStar(null, 'Baseline (airbench94)', 'Reference configuration.', {}, [], 'agent')
+      const base = this.newStar(null, 'Baseline', 'The reference configuration, about 94% accuracy.', {}, [], 'agent')
       this.run(base.id, SEEDS, () => this.propose(base.id, FIRST_WAVE.map((k) => MOVES.find((m) => m.key === k)!)))
     }, 700)
   }

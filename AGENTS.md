@@ -242,7 +242,7 @@ npm test             # reducer, layout, simulator + grader-port tests
 
 **The scene is a chart**: x = generations from the statue's fingertip (siblings take their own column), y = measured accuracy (22 units per point, baseline at the fingertip's height), z = a little depth per sibling. An ungraded star rides at its parent's height and glides to its accuracy when graded. Blob = experiment (graphite, distorts faster while training); ring = verdict colour (partial arc = training progress, amber = needs you); dashed edge = shadow branch or training. Scale labels are pinned to the canvas's right edge.
 
-**Camera**: a fixed offset from the midpoint of the focused star and its parent. Focus = the newest star while "Follow new branches" is on; clicking any star or claim re-centres on it; dragging the view turns follow off. "Fit all" frames the tree.
+**Camera**: a fixed three-quarter view of the accuracy plane, aimed at the midpoint of the focused star and its parent. No rotate or pan; zoom is capped (170–480 units). Focus = the newest star while following, and dispatching, answering or branching turns following back on; clicking any star or claim re-centres on it. "Fit all" frames the tree.
 
 **Branch from anywhere**: "Branch from here" sends `feedback(kind: "suggest")` for that star, so it works against the real backend too (the agent replans from it); the demo backend answers with proposals from that star.
 
