@@ -43,7 +43,7 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
-Frontend against the real backend: copy `frontend/.env.example` to `frontend/.env`, set `VITE_MOCK=0`, and start the backend (`cd backend && uv run litmus serve`). Mock mode shows a "Mock data" badge so it is never mistaken for real results.
+Run everything: `./dev.sh` (backend on :8000 with a Modal warmup, frontend on :5173, which talks to the real backend by default). Mock mode: `VITE_MOCK=1` in `frontend/.env`. Mock mode shows a "Mock data" badge so it is never mistaken for real results.
 
 ## Architecture
 

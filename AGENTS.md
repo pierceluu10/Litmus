@@ -42,6 +42,7 @@ uv run litmus --help
 ```
 
 ## Demo runbook (judging)
+0. `./dev.sh` from the repo root starts backend + frontend together (or run steps 1–2 by hand).
 1. `cd backend && uv run litmus serve` (keep the terminal visible: it logs every engine step).
 2. ~2 minutes before judging: `uv run litmus warmup` (or `POST /api/warmup`); `GET /api/health` should show
    `modal_warm, papiers_ok, openai_ok` all true. A container stays warm 10 minutes after its last use.
@@ -221,7 +222,7 @@ cd frontend && npm install
 npm run dev          # http://localhost:5173
 npm test             # reducer unit tests
 ```
-`frontend/.env`: `VITE_MOCK=1` (default) simulates the whole backend in the browser; `VITE_MOCK=0` + `VITE_API_URL=http://localhost:8000` talks to the real one. That is the only change needed to switch.
+`frontend/.env`: real backend at `VITE_API_URL` (default `http://localhost:8000`) by default; `VITE_MOCK=1` simulates the whole backend in the browser. That is the only change needed to switch.
 
 **Folder map** (`frontend/src`)
 | Path | What |

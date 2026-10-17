@@ -5,7 +5,7 @@ import { realApi } from './transport/real'
 import type { ConnState, Health } from './transport/api'
 import type { Provenance, Selection } from './types'
 
-export const api = import.meta.env.VITE_MOCK === '0' ? realApi : mockApi
+export const api = import.meta.env.VITE_MOCK === '1' ? mockApi : realApi
 
 type Store = {
   app: AppState
