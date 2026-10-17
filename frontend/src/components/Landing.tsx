@@ -367,7 +367,7 @@ function DemoSwitch() {
 }
 
 export function Landing() {
-  const { begin, health, set, error, demo } = useStore()
+  const { begin, set, error, demo } = useStore()
   const main = useRef<HTMLElement>(null)
   const [scrolled, setScrolled] = useState(false)
   const { user, logout } = useAuth()
@@ -380,9 +380,8 @@ export function Landing() {
   const textOpacity = useTransform(scrollY, [0, vh * 0.32], [1, 0])
   useEffect(() => {
     if (demo) return
-    apiFor(false).health().then((h) => set({ health: h })).catch((e: Error) => set({ error: `Could not reach the backend (${e.message}). Start it with ./dev.sh, or turn on Demo mode.` }))
+    apiFor(false).health().catch((e: Error) => set({ error: `Could not reach the backend (${e.message}). Start it with ./dev.sh, or turn on Demo mode.` }))
   }, [demo, set])
-  const status = demo ? '' : health ? `Modal GPU ${health.modal_warm ? 'warm' : 'cold'} · Papiers ${health.papiers_ok ? 'ok' : 'unavailable'} · OpenAI ${health.openai_ok ? 'ok' : 'unavailable'}` : error ? '' : 'Checking the backend…'
   const start = () => begin(false, GOAL), replay = () => begin(true)
   const cta = <Cta onStart={start} onReplay={replay} />
   const hero = (
@@ -393,7 +392,6 @@ export function Landing() {
         <button className="btn btn-primary" onClick={start}>Start research</button>
         <button className="btn" onClick={replay}>Replay demo</button>
       </div>
-      {status && <p className="mb-0 mt-3 text-[12.5px] text-muted">{status}</p>}
       {error && <p role="alert" className="mb-0 mt-2 text-[13px] text-refuted">{error}</p>}
     </motion.div>
   )

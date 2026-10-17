@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { applyEvent, initialState, type AppState } from './reducer'
 import { mockApi } from './transport/mock'
 import { realApi } from './transport/real'
-import type { Api, ConnState, Health, LibraryStage } from './transport/api'
+import type { Api, ConnState, LibraryStage } from './transport/api'
 import type { ChatTurn, Provenance, Selection } from './types'
 
 // Live (the FastAPI backend, Modal A100s) unless the front page's Demo mode switch picks the in-browser backend.
@@ -18,7 +18,6 @@ type Store = {
   sid: string | null
   conn: ConnState
   libraryStage: LibraryStage | 'ready'
-  health: Health | null
   demo: boolean
   setDemo: (demo: boolean) => void
   error: string | null
@@ -55,12 +54,12 @@ export const useStore = create<Store>((set, get) => {
     try { await f(sid); set({ error: null }) } catch (e) { set({ error: (e as Error).message }) }
   }
   return {
-    app: initialState, sid: null, conn: 'closed', libraryStage: 'papers', health: null, demo: savedDemo(), error: null, selectedId: null, hoveredClaim: null,
+    app: initialState, sid: null, conn: 'closed', libraryStage: 'papers', demo: savedDemo(), error: null, selectedId: null, hoveredClaim: null,
     follow: true, focusId: null, fitAll: false, abstractOpen: false, chats: {}, thinking: null,
     set: (p) => set(p),
     setDemo(demo) {
       try { localStorage.setItem(DEMO_KEY, demo ? '1' : '0') } catch { /* private window: the switch still works for this visit */ }
-      set({ demo, health: null, error: null })
+      set({ demo, error: null })
     },
     select: (id) => set(id ? { selectedId: id, focusId: id, abstractOpen: false, fitAll: false } : { selectedId: null }),
     leave() {
