@@ -52,7 +52,14 @@ type Store = {
 // A question in flight to the statue: the text it was typed as, and where (the chat input's box and font).
 export type Thought = {
   key: number; starId: string; text: string; landed: boolean
+  oneWay?: boolean // the first claim goes into Litmus's head and stays there: no thinking, no answer flying back
   from: { left: number; top: number; width: number; height: number; padding: number; font: string; letterSpacing: string }
+}
+// sends words on their trip to the statue from the element they were typed or shown in: they fold up from exactly there
+export function launchThought(source: HTMLElement, text: string, starId: string, oneWay = false) {
+  const r = source.getBoundingClientRect(), cs = getComputedStyle(source)
+  useStore.setState((st) => ({ thought: { key: (st.thought?.key ?? 0) + 1, starId, text, landed: false, oneWay,
+    from: { left: r.left, top: r.top, width: r.width, height: r.height, padding: parseFloat(cs.paddingLeft), font: cs.font, letterSpacing: cs.letterSpacing } } }))
 }
 
 let unsub: (() => void) | null = null

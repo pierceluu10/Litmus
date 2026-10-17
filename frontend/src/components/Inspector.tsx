@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { sessionApi, useStarting, useStore } from '../store'
+import { launchThought, sessionApi, useStarting, useStore } from '../store'
 import { agentDetail, agentName, pct, pts, starTone, toneVar } from '../lib/format'
 import type { Provenance } from '../types'
 import { PathChart } from './PathChart'
@@ -157,19 +157,16 @@ function AskBar() {
   const [draft, setDraft] = useState('')
   const busy = !!thinking
   const about = app.session?.stars.find((x) => x.id === selectedId && x.parent_id)
-  // `source` is the element the words were typed or shown in: they fold up from exactly there.
   const send = (q: string, source: HTMLElement) => {
     if (!q.trim() || busy) return
-    const r = source.getBoundingClientRect(), cs = getComputedStyle(source)
     const starId = selectedId ?? app.session?.stars[0]?.id
     if (!starId) return
-    useStore.setState((st) => ({ thought: { key: (st.thought?.key ?? 0) + 1, starId, text: q.trim(), landed: false,
-      from: { left: r.left, top: r.top, width: r.width, height: r.height, padding: parseFloat(cs.paddingLeft), font: cs.font, letterSpacing: cs.letterSpacing } } }))
+    launchThought(source, q.trim(), starId)
     setDraft('')
     ask(q.trim())
   }
   return (
-    <motion.section aria-label="Ask Litmus" className={`${CARD} relative flex min-h-0 flex-1 flex-col gap-2 overflow-hidden p-3`}
+    <motion.section data-scene-obstacle aria-label="Ask Litmus" className={`${CARD} flex min-h-0 flex-1 flex-col gap-2 overflow-hidden p-3`}
       initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8, transition: { duration: 0.15 } }} transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}>
       <SceneBackdrop seed={LITMUS_FACETS} className="card-facets" />
       <div className="flex items-center gap-2">
@@ -177,7 +174,7 @@ function AskBar() {
         <span className="text-[13px] font-semibold tracking-[-0.01em]">Litmus</span>
         {about
           ? <button className="chip ml-auto hover:border-faint" title="Ask about the whole research instead" onClick={() => select(null)}>about {agentName(about)} ×</button>
-          : <span className="text-[11.5px] text-faint">has followed every agent</span>}
+          : <span className="text-[11.5px] text-faint">about the whole research</span>}
       </div>
       <Thread />
       {!turns.length && !busy && <div className="flex flex-wrap gap-1.5">{OPENERS.map((q) => <button key={q} className="chip hover:border-faint hover:text-ink" onClick={(e) => send(q, e.currentTarget)}>{q}</button>)}</div>}
@@ -236,7 +233,7 @@ export function Inspector({ floating }: { floating: boolean }) {
       {starting
         ? <div className="flex min-h-0 flex-1 flex-col justify-end"><StartBubble /></div>
         : <>
-          <motion.aside className={`${CARD} flex min-h-0 flex-col overflow-hidden ${floating ? RESULTS_HEIGHT : ''}`} aria-label="Results" style={{ transformOrigin: 'top right' }}
+          <motion.aside data-scene-obstacle className={`${CARD} flex min-h-0 flex-col overflow-hidden ${floating ? RESULTS_HEIGHT : ''}`} aria-label="Results" style={{ transformOrigin: 'top right' }}
           {...(floating ? { initial: { opacity: 0, scale: 0.96, y: -6 }, animate: { opacity: 1, scale: 1, y: 0 }, exit: { opacity: 0, scale: 0.97, transition: { duration: 0.15 } }, transition: { duration: 0.22, ease: [0.23, 1, 0.32, 1] as const } } : {})}>
           <SceneBackdrop seed={RESULTS_FACETS} className="card-facets" />
           <div className="min-h-0 flex-1 overflow-y-auto">

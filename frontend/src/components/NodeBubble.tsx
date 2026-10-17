@@ -110,15 +110,19 @@ function Proceed({ star, items }: { star: Star; items: Proposal[] }) {
 }
 
 // The card that opens over a node when you click it: about the agent, and where it should proceed (when it has options).
-export type Side = 'above' | 'below'
+export type Side = 'above' | 'below' | 'left' | 'right'
 const GAP = 10 // px between the node's ring and the card
 const LABEL_PX = 46 // the name-and-accuracy label under a node, which a card opening below must clear
-const MARGIN = 8 // px the card keeps from the bottom of the scene
+const MARGIN = 8 // px the card keeps from the edges of the scene
 const TOP_CLEAR = 64 // px the card keeps from the top of the scene: the legend and the scene buttons live there
+const OBSTACLES = '[data-scene-obstacle]' // the floating UI a card must not cover: the dock, the results card, the chat
+type Box = { left: number; top: number; right: number; bottom: number }
+const hits = (a: Box, b: Box) => a.left < b.right + GAP && a.right > b.left - GAP && a.top < b.bottom + GAP && a.bottom > b.top - GAP
 
-// Keeps a node's card inside the scene: above the node when it fits there (or there is more room above), otherwise
-// below its label, and never taller than the room on that side (the card then scrolls). Re-measured every frame, so it
-// holds while the camera moves. `ringPx` is the node's on-screen radius, kept current by the scene.
+// Keeps a node's card in clear space: above the node, else below its label, else beside it (right, then left), wherever the
+// whole card fits inside the scene without covering the dock or the cards on the right. When nowhere fits it takes the
+// roomier of above and below (each stopping at the first floating card in the way) and scrolls. Re-measured every frame,
+// so it holds while the camera moves and the dock changes. `ringPx` is the node's on-screen radius, kept current by the scene.
 export function PlacedCard({ ringPx, children }: { ringPx: { current: number }; children: (side: Side) => React.ReactNode }) {
   const box = useRef<HTMLDivElement>(null)
   const [side, setSide] = useState<Side>('above')
@@ -127,14 +131,47 @@ export function PlacedCard({ ringPx, children }: { ringPx: { current: number }; 
     const place = () => {
       const el = box.current, scene = el?.closest('main')?.getBoundingClientRect()
       if (el && scene) {
-        const y = el.parentElement!.getBoundingClientRect().top // the node's centre: the Html sits on it
-        const ring = ringPx.current
-        const above = y - ring - GAP - scene.top - TOP_CLEAR
-        const below = scene.bottom - MARGIN - (y + ring + LABEL_PX + GAP)
-        const need = el.querySelector<HTMLElement>('[data-card-body]')?.scrollHeight ?? 0
-        const next: Side = above >= need || above >= below ? 'above' : 'below'
-        el.style.transform = next === 'above' ? `translate(-50%, calc(-100% - ${ring + GAP}px))` : `translate(-50%, ${ring + LABEL_PX + GAP}px)`
-        el.style.setProperty('--card-max', `${Math.max(0, next === 'above' ? above : below)}px`)
+        const node = el.parentElement!.getBoundingClientRect() // the Html sits on the node's centre
+        const x = node.left, y = node.top, ring = ringPx.current
+        const w = el.offsetWidth, h = el.querySelector<HTMLElement>('[data-card-body]')?.scrollHeight ?? 0
+        const minTop = scene.top + TOP_CLEAR, maxBottom = scene.bottom - MARGIN
+        const obstacles = [...document.querySelectorAll(OBSTACLES)].map((o) => o.getBoundingClientRect()).filter((r) => r.width && r.height)
+        // beside the node the card centres on it, slid up or down within the clear band of that column (between the
+        // floating cards above and below it)
+        const besideTop = (left: number) => {
+          const inColumn = obstacles.filter((o) => o.left < left + w + GAP && o.right > left - GAP)
+          const top = Math.max(minTop, ...inColumn.filter((o) => o.bottom <= y).map((o) => o.bottom + GAP))
+          const bottom = Math.min(maxBottom, ...inColumn.filter((o) => o.top >= y).map((o) => o.top - GAP))
+          return Math.min(Math.max(y - h / 2, top), bottom - h)
+        }
+        const right = x + ring + GAP, left = x - ring - GAP - w
+        const spots: [Side, number, number][] = [
+          ['above', x - w / 2, y - ring - GAP - h],
+          ['below', x - w / 2, y + ring + LABEL_PX + GAP],
+          ['right', right, besideTop(right)],
+          ['left', left, besideTop(left)],
+        ]
+        const free = spots.find(([, left, top]) => {
+          const card = { left, top, right: left + w, bottom: top + h }
+          return left >= scene.left + MARGIN && card.right <= scene.right - MARGIN && top >= minTop && card.bottom <= maxBottom && !obstacles.some((o) => hits(card, o))
+        })
+        let next: Side
+        if (free) {
+          const [where, left, top] = free
+          next = where
+          el.style.transform = `translate(${left - x}px, ${top - y}px)`
+          el.style.setProperty('--card-max', 'none')
+          el.style.setProperty('--arrow-y', `${y - top}px`)
+        } else {
+          // the room above and below, each ending at the scene's edge or the first floating card in the way
+          const inColumn = obstacles.filter((o) => o.left < x + w / 2 + GAP && o.right > x - w / 2 - GAP)
+          const aboveEnd = y - ring - GAP, belowStart = y + ring + LABEL_PX + GAP
+          const above = aboveEnd - Math.max(minTop, ...inColumn.filter((o) => o.bottom <= aboveEnd).map((o) => o.bottom + GAP))
+          const below = Math.min(maxBottom, ...inColumn.filter((o) => o.top >= belowStart).map((o) => o.top - GAP)) - belowStart
+          next = above >= below ? 'above' : 'below'
+          el.style.transform = next === 'above' ? `translate(-50%, calc(-100% - ${ring + GAP}px))` : `translate(-50%, ${ring + LABEL_PX + GAP}px)`
+          el.style.setProperty('--card-max', `${Math.max(0, Math.max(above, below))}px`)
+        }
         setSide((s) => (s === next ? s : next))
       }
       frame = requestAnimationFrame(place)
@@ -145,12 +182,21 @@ export function PlacedCard({ ringPx, children }: { ringPx: { current: number }; 
   return <div ref={box}>{children(side)}</div>
 }
 
+const POINTER: Record<Side, string> = {
+  above: 'left-1/2 -bottom-[7px] -translate-x-1/2 border-b border-r',
+  below: 'left-1/2 -top-[7px] -translate-x-1/2 border-l border-t',
+  right: '-left-[7px] -translate-y-1/2 border-b border-l',
+  left: '-right-[7px] -translate-y-1/2 border-r border-t',
+}
+
 export function NodeCard({ star, items, side = 'above' }: { star: Star; items: Proposal[]; side?: Side }) {
   const [tab, setTab] = useState<Tab>(items.length ? 'proceed' : 'about')
   const shown = tab === 'proceed' && !items.length ? 'about' : tab
   return (
     <div className="relative w-[300px] rounded-2xl marble-edge border border-rule bg-surface text-[12.5px]" role="dialog" aria-label={agentName(star)}>
-      <span aria-hidden className={`absolute left-1/2 h-3.5 w-3.5 -translate-x-1/2 rotate-45 border-rule bg-surface ${side === 'above' ? '-bottom-[7px] border-b border-r' : '-top-[7px] border-l border-t'}`} />
+      {/* beside the node the pointer follows its height, kept off the rounded corners */}
+      <span aria-hidden className={`absolute h-3.5 w-3.5 rotate-45 border-rule bg-surface ${POINTER[side]}`}
+        style={side === 'left' || side === 'right' ? { top: 'clamp(18px, var(--arrow-y), calc(100% - 18px))' } : undefined} />
       {/* clipped separately so the pointer is not cut off; scrolls when the scene leaves less room than the card needs */}
       <div data-card-body className="relative isolate overflow-y-auto overflow-x-hidden rounded-2xl p-3" style={{ maxHeight: 'var(--card-max)' }}>
       <SceneBackdrop seed={CARD_FACETS} className="card-facets" />

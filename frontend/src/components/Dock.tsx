@@ -17,7 +17,7 @@ function QuestionCard({ q }: { q: Question }) {
   const [busy, setBusy] = useState(false)
   const star = app.session!.stars.find((s) => s.id === q.star_id)
   return (
-    <section aria-label={`${star ? agentName(star) : 'An agent'} needs your call`} className={panel} style={{ borderColor: 'color-mix(in srgb, var(--color-waiting) 55%, var(--color-rule))' }}>
+    <section data-scene-obstacle aria-label={`${star ? agentName(star) : 'An agent'} needs your call`} className={panel} style={{ borderColor: 'color-mix(in srgb, var(--color-waiting) 55%, var(--color-rule))' }}>
       <div className="flex items-baseline gap-2">
         <span className="dot live-dot" style={{ background: 'var(--color-waiting)' }} />
         <h2 className="m-0 text-[13.5px] font-semibold">Your call{star ? ` on ${agentName(star)}` : ''}</h2>
@@ -65,7 +65,7 @@ export function Dock() {
   return (
     <div className="pointer-events-none absolute inset-x-4 bottom-4 z-30 flex max-h-[60%] flex-col gap-2 lg:left-[max(1rem,var(--rail))] lg:right-[max(1rem,calc(var(--panel)+0.25rem))]">
       {pending.length > 1 && (
-        <div role="group" aria-label="Waiting on you" className="on-scene pointer-events-auto mx-auto flex w-full max-w-[920px] items-center justify-between gap-2 rounded-full border border-rule bg-surface px-1.5 py-1 text-[12.5px] shadow-[0_6px_18px_-8px_rgba(43,58,82,0.25)]">
+        <div data-scene-obstacle role="group" aria-label="Waiting on you" className="on-scene pointer-events-auto mx-auto flex w-full max-w-[920px] items-center justify-between gap-2 rounded-full border border-rule bg-surface px-1.5 py-1 text-[12.5px] shadow-[0_6px_18px_-8px_rgba(43,58,82,0.25)]">
           <button className="btn h-7 w-7 px-0" aria-label="Previous" onClick={() => go(-1)}>‹</button>
           <span className="inline-flex min-w-0 items-center gap-1.5 truncate">
             {pending[index].waiting && <span className="dot live-dot" style={{ background: 'var(--color-waiting)' }} />}

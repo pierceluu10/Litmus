@@ -286,13 +286,13 @@ npm test             # reducer, layout, simulator + grader-port tests
 **Upload page** (`#/upload`, `components/Upload.tsx`): Start research opens it first. One centred step: paste a Papiers token, Connect (`apiFor(demo).connectPapiers`, then the library streams in), see how many highlights and notes were found, Start research; Refresh reads again. Below it, "Try the demo highlights" (the recorded 12 claims) and "Use my saved login" (the Papiers login already on the server). The chosen library sits in `store.imported` and `begin()` sends it with `importLibrary` before creating the session. `lib/importLibrary.ts` (file/paste parsing) and `scripts/export-papiers.sh` are no longer wired into the page.
 
 **Workspace layout (user decisions, 2026-10-17)**: nodes show only the agent's name and its accuracy. Clicking a node (or a
-ranking row) opens its card above it, or below its label when there is not room above, never taller than the room
-(`PlacedCard` re-measures every frame; the card scrolls if it must) (`NodeCard` in `NodeBubble.tsx`): **About** (the claim it tests, verdict, what it
+ranking row) opens its card in clear space: above it, else below its label, else beside it (right, then left), never over the
+floating UI marked `data-scene-obstacle` (the question dock, the results card, the chat); when nothing fits it takes the roomier
+of above and below, clipped at those cards, and scrolls (`PlacedCard` re-measures every frame) (`NodeCard` in `NodeBubble.tsx`): **About** (the claim it tests, verdict, what it
 found and suggests, Stop / Branch from here) and **Where should I proceed?** (its options). The right panel is for the
 whole research only: researching now, results, accuracy by path, rankings, where you steered, research log, and the
-**Litmus card** (opened by Litmus's face, which sits under the always-open results card and narrates what the agents do in speech bubbles above it; one conversation; Litmus answers about the open agent, shown as a removable chip, or the research as a
-whole). "Where should we start?" is a speech bubble rising from Litmus's face at the bottom right (`StartBubble`, in the right column),
-with the same expandable claim cards and a Start button each, while the camera holds behind the statue; the results card, the chat
+**Litmus card** (opened by Litmus's face, which sits under the always-open results card and narrates what the agents do in speech bubbles above it; one conversation; Litmus answers about the open agent, shown as a removable chip, or else "about the whole research"). "Where should we start?" is a speech bubble rising from Litmus's face at the bottom right (`StartBubble`, in the right column),
+with the same expandable claim cards and a Start button each, while the camera holds behind the statue; the claim you start folds into a pearl that flies into the back of Litmus's head (`launchThought(..., oneWay)`), and the camera pans only once it has landed; the results card, the chat
 (the face cannot be clicked) and Fit all stay hidden until you pick, then the camera pans to the graph. A claim card opens to YOUR NOTE,
 FROM THE PAPER (or Findings once agents tested it) and the cite / page / Source line. The results card keeps one height (`RESULTS_HEIGHT`); the chat fills the room
 under it. **Test another claim** (`ClaimPicker.tsx`) lists every highlight with its status; tested ones keep a greyed-out

@@ -121,6 +121,11 @@ function Flight({ thought }: { thought: Thought }) {
       if (!alive) return
       setRipple({ ...statueAnchor.head })
       show(false, 0.3)
+      if (thought.oneWay) {
+        await wait(SETTLE_MS)
+        if (alive) done()
+        return
+      }
       setThinking(true)
 
       // 3. Litmus thinks until the backend answers (and long enough to read the label)
@@ -147,7 +152,7 @@ function Flight({ thought }: { thought: Thought }) {
     }
     run()
     return () => { alive = false }
-  }, [from, thought.starId])
+  }, [from, thought.starId, thought.oneWay])
 
   return (
     <div className="pointer-events-none fixed inset-0 z-[60]" aria-hidden="true">

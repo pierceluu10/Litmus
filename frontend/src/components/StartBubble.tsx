@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useStore } from '../store'
+import { launchThought, useStore } from '../store'
 import { toneVar } from '../lib/format'
 import { ClaimCard } from './ClaimPicker'
 import { STAGE_TEXT } from './Researching'
@@ -14,7 +14,12 @@ export function StartBubble() {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const claims = app.claims.slice().sort((a, b) => a.rank - b.rank)
-  const go = async (id: string) => { setBusy(id); await start([id]); setBusy(null) }
+  const go = async (id: string) => {
+    // the chosen claim's title flies into Litmus's head (the camera is right behind it) and stays there
+    const title = document.querySelector<HTMLElement>(`[data-claim-title="${id}"]`)
+    if (title?.textContent) launchThought(title, title.textContent, id, true)
+    setBusy(id); await start([id]); setBusy(null)
+  }
   return (
     <section aria-label="Where should we start?" className="relative flex min-h-0 flex-col rounded-2xl rounded-br-md marble-edge border border-rule bg-surface">
       <span aria-hidden className="absolute -bottom-[7px] right-6 h-3.5 w-3.5 rotate-45 border-b border-r border-rule bg-surface" />

@@ -259,8 +259,10 @@ function CameraRig({ positions, parents }: { positions: Map<string, Pos>; parent
   // held in state (not a plain ref) so the effects below run again once the controls exist
   const [ctl, setCtl] = useState<CameraControls | null>(null)
   const { focusId, fitAll } = useStore()
-  const consulting = useStore((s) => !!s.thought && !s.thought.landed)
-  const starting = useStarting()
+  const consulting = useStore((s) => !!s.thought && !s.thought.landed && !s.thought.oneWay) // the first claim flies in while the intro glides on
+  // behind Litmus while you choose where to start, and until the claim you chose has flown into its head
+  const choosing = useStarting(), claimFlying = useStore((s) => !!s.thought?.oneWay)
+  const starting = choosing || claimFlying
   // the focused agent, its direct children and its whole column (the agents running beside it) share the middle of the
   // free part of the screen, so every one of them stays on screen and clickable; their spread decides how far out we need to be
   const star = focusId ? positions.get(focusId) : undefined
@@ -296,7 +298,7 @@ function CameraRig({ positions, parents }: { positions: Map<string, Pos>; parent
       c.minDistance = 40 // the opening shot is closer than the zoom limit allows
       c.setLookAt(EAR_CAM.x, EAR_CAM.y, EAR_CAM.z, EAR_AIM.x, EAR_AIM.y, EAR_AIM.z, false)
       c.smoothTime = INTRO_SMOOTH
-      if (starting) return // behind Litmus while you choose where to start; the glide to the graph follows your choice
+      if (starting) return // the glide to the graph follows your choice
       const go = window.setTimeout(() => {
         introDone.current = true
         c.minDistance = MIN_DISTANCE

@@ -63,7 +63,7 @@ export function ClaimCard({ c, status, stars, doc, expanded, onToggle, onTest, b
             {stars.length > 1 && <span className="font-normal text-faint">· {stars.length} agents</span>}
           </span>
         )}
-        <span className="block text-[13px] font-medium leading-snug tracking-[-0.01em] text-ink">{summarize(c)}</span>
+        <span data-claim-title={c.id} className="block text-[13px] font-medium leading-snug tracking-[-0.01em] text-ink">{summarize(c)}</span>
         <span className={`mt-0.5 text-[11.5px] leading-snug text-muted ${expanded ? 'block' : 'line-clamp-1'}`}>Paper: {c.doc_title}</span>
       </button>
       {/* only an untested claim can start a new agent; the rest keep a greyed-out button so the list stays aligned */}
