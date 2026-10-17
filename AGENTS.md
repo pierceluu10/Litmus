@@ -125,9 +125,16 @@ branch subgraph: run → reflect → (run +5 seeds) | (ask ⟂) | END          �
 - Deviation from the original plan: events are emitted straight to the store (persist + broadcast) instead of
   LangGraph's stream writer, because feedback, shadows, and explain run outside the graph and need the same path.
 
+### API (`backend/litmus/api.py`)
+- Implements `shared/contract.md`. `GET /api/sessions/{id}` returns `last_seq`: open the WS with
+  `from_seq=last_seq`. WS subscribes before reading the backlog, so nothing is lost between them.
+- 404 unknown ids, 409 conflicting actions (bad knob override, skipped proposal, budget), 503 upstream down.
+- `tests/test_api.py` validates every emitted event payload against the contract models.
+
 ### Commands
 | Command | What |
 |---|---|
+| `uv run litmus serve` | API + WS on http://localhost:8000 (CORS for :5173) |
 | `uv run litmus smoke [--seeds 0 1]` | baseline on Modal, streams epochs |
 | `uv run litmus warmup` | start a warm container |
 | `uv run litmus library [--refresh]` | ranked claims with notes and conditions |

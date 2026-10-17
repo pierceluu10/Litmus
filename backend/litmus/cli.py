@@ -104,13 +104,22 @@ def main() -> None:
     commands.add_parser("warmup", help="start a warm Modal container (run ~2 min before judging)")
     library = commands.add_parser("library", help="print the ranked claims from your Papiers library")
     library.add_argument("--refresh", action="store_true", help="re-read Papiers (otherwise use the cache)")
+    serve = commands.add_parser("serve", help="start the API on http://localhost:8000")
+    serve.add_argument("--port", type=int, default=8000)
     run = commands.add_parser("run", help="headless end-to-end session; prints the tree")
     run.add_argument("--auto", action="store_true", help="the agent makes every choice itself")
     run.add_argument("--waves", type=int, default=3)
     run.add_argument("--goal")
     args = parser.parse_args()
 
-    if args.command == "smoke":
+    if args.command == "serve":
+        import logging
+
+        import uvicorn
+
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+        uvicorn.run("litmus.api:app", host="0.0.0.0", port=args.port, log_level="info")
+    elif args.command == "smoke":
         asyncio.run(_smoke(args.seeds))
     elif args.command == "warmup":
         asyncio.run(_warmup())
