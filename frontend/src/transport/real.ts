@@ -34,6 +34,7 @@ export const realApi: Api = {
   warmup: () => call('POST', '/api/warmup'),
   library: streamLibrary,
   importLibrary: (lib) => call('POST', '/api/library/import', lib),
+  connectPapiers: (token) => call('POST', '/api/library/connect', { token }),
   createSession: async (b) => (await call<{ session_id: string }>('POST', '/api/sessions', b)).session_id,
   replayDemo: async () => (await call<{ session_id: string }>('GET', '/api/replay/demo')).session_id,
   subscribe(sid, fromSeq, onEvent, onConn) {

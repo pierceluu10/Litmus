@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Billboard, CameraControls, Html, Line, useGLTF } from '@react-three/drei'
-import { Box3, MathUtils, Vector3, type Group, type Mesh } from 'three'
+import { Box3, MathUtils, Vector3, type Group, type Mesh, type PerspectiveCamera } from 'three'
 import type { Line2 } from 'three-stdlib'
 import { useStore } from '../store'
 import { FIRST_STEP, layoutStars, type Pos } from '../lib/layout'
@@ -181,7 +181,7 @@ function StarBlob({ star, target, live, dim, selected }: { star: Star; target: P
     if (body.current && !reducedMotion()) { body.current.rotation.y += dt * (running ? SPIN_TRAINING : SPIN_IDLE); body.current.rotation.x += dt * 0.4 * (running ? SPIN_TRAINING : SPIN_IDLE) }
   })
   // clicking a finished node with options for you opens its "where should I proceed?" bubble (its results are one click away in the bubble); any other node opens its results card
-  const openNode = () => { if (hasOptions) useStore.setState({ proceedFor: proceedFor === star.id ? null : star.id }); else { select(star.id); useStore.setState({ proceedFor: null }) } }
+  const openNode = () => { if (hasOptions) useStore.setState({ proceedFor: proceedFor === star.id ? null : star.id, selectedId: null, panelOpen: false }); else { select(star.id); useStore.setState({ proceedFor: null }) } }
   const g = star.grade
   const value = !g ? (running ? 'training' : star.status === 'waiting' ? 'needs you' : star.status === 'failed' ? 'stopped' : '')
     : g.verdict === 'baseline' ? `${(g.mean_child * 100).toFixed(2)}%` : `${pts(g.delta)}`
@@ -212,7 +212,7 @@ function StarBlob({ star, target, live, dim, selected }: { star: Star; target: P
       {/* anchored by its top edge, just under the ring, so the name never sits over the sphere */}
       <Html position={[0, -r - 4, 0]} zIndexRange={[20, 0]} style={{ opacity: dim ? 0.25 : 1, transition: 'opacity 200ms' }}>
         <div style={{ transform: 'translateX(-50%)', marginTop: 3 }}>
-        <button type="button" className="star-label" data-selected={selected || undefined} onClick={() => select(star.id)} aria-label={`${agentName(star)}, ${star.title}`} title={claim ? `Testing: ${claim.text}` : undefined}>
+        <button type="button" className="star-label" data-selected={selected || undefined} onClick={openNode} aria-label={`${agentName(star)}, ${star.title}`} title={claim ? `Testing: ${claim.text}` : undefined}>
           <span className="star-label-name">{agentName(star)}{shadow && <span className="text-muted"> · alone</span>}</span>
           {claimName && <span className="star-label-claim">{claimName}</span>}
           <span className="star-label-value" style={{ color: toneColor(tone) }}>{[star.parent_id && agentDetail(star), value].filter(Boolean).join('  ')}</span>
@@ -255,6 +255,7 @@ function CameraRig({ positions, parents }: { positions: Map<string, Pos>; parent
   const [ctl, setCtl] = useState<CameraControls | null>(null)
   const { focusId, fitAll } = useStore()
   const consulting = useStore((s) => !!s.thought && !s.thought.landed)
+  const proceedFor = useStore((s) => s.proceedFor)
   // frame the whole column the focused star belongs to (its generation), at the midpoint between it and its parent
   const star = focusId ? positions.get(focusId) : undefined
   const from = focusId ? positions.get(parents.get(focusId) ?? '') ?? star : undefined
@@ -300,6 +301,19 @@ function CameraRig({ positions, parents }: { positions: Map<string, Pos>; parent
       c.setLookAt(CONSULT_AIM.x + view.x, CONSULT_AIM.y + view.y, CONSULT_AIM.z + view.z, CONSULT_AIM.x, CONSULT_AIM.y, CONSULT_AIM.z, !reducedMotion())
     } else if (!fitAll) toDefault(!reducedMotion(), true)
   }, [ctl, consulting]) // eslint-disable-line react-hooks/exhaustive-deps
+  // a node's "where should I proceed?" bubble comes out to its right: slide the view so the node sits left of centre and the
+  // whole bubble stays on screen, keeping the zoom and the viewing angle
+  useEffect(() => {
+    const c = ctl, p = proceedFor ? positions.get(proceedFor) : undefined
+    if (!c || !p || !introDone.current) return
+    const cam = c.camera as PerspectiveCamera
+    const dist = c.distance
+    const visibleWidth = 2 * dist * Math.tan(MathUtils.degToRad(cam.fov / 2)) * cam.aspect
+    const right = new Vector3().setFromMatrixColumn(cam.matrixWorld, 0).normalize()
+    const target = new Vector3(p.x, p.y, p.z).addScaledVector(right, visibleWidth * 0.2)
+    const offset = c.getPosition(new Vector3()).sub(c.getTarget(new Vector3())).setLength(dist)
+    c.setLookAt(target.x + offset.x, target.y + offset.y, target.z + offset.z, target.x, target.y, target.z, !reducedMotion())
+  }, [ctl, proceedFor]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const c = ctl
     if (!c) return

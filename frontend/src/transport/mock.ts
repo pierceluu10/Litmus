@@ -14,6 +14,8 @@ export const mockApi: Api = {
   health: () => wait({ ok: true, modal_warm: true, papiers_ok: true, openai_ok: true }),
   warmup: () => wait(undefined),
   importLibrary: async () => {},
+  // the practice backend has no Papiers to ask: any well-formed token connects, and the library is the recorded snapshot
+  connectPapiers: async (token) => { await wait(undefined); if (!/^pap_live_\S+$/.test(token)) throw new Error('That does not look like a Papiers token. It starts with pap_live_.') },
   // The library is real even in the demo: read live through the backend, or its snapshot when the backend is off.
   library: (onStage, signal) => streamLibrary(onStage, signal).catch((e) => {
     if (!(e instanceof LibraryUnavailable)) throw e
