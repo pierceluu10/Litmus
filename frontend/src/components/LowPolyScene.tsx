@@ -1,4 +1,4 @@
-import { bustPolys } from './bust'
+import { thinkerPolys } from './thinker'
 // A low-poly temple: pediment, columns and a marble bust, all flat-shaded triangles.
 // Generated from seeded jitter so it renders identically every time.
 type P = [number, number]
@@ -74,13 +74,13 @@ export function LowPolyScene({ className }: { className?: string }) {
   ]
   const halo: Tri[] = Array.from({ length: 16 }, (_, i) => {
     const a0 = (i / 16) * Math.PI * 2, a1 = ((i + 1) / 16) * Math.PI * 2
-    return tri([450, 262], [450 + Math.cos(a0) * 175, 262 + Math.sin(a0) * 175], [450 + Math.cos(a1) * 175, 262 + Math.sin(a1) * 175], 0.62 + 0.22 * Math.cos(a0 - 3.9) * (i % 2 ? 1 : 0.7), [168, 190, 220])
+    return tri([450, 290], [450 + Math.cos(a0) * 175, 290 + Math.sin(a0) * 175], [450 + Math.cos(a1) * 175, 290 + Math.sin(a1) * 175], 0.62 + 0.22 * Math.cos(a0 - 3.9) * (i % 2 ? 1 : 0.7), [168, 190, 220])
   })
-  const bust = bustPolys(450, 462, 4.1)
+  const bust = thinkerPolys(450, 462, 3.8)
   const marble = [...sky, ...floor, ...halo, ...behind, ...pediment, ...front, ...steps]
   const poly = (t: Tri, i: number) => <polygon key={i} points={t.pts.map((p) => p.join(',')).join(' ')} fill={t.fill} stroke={t.fill} strokeWidth={0.6} strokeLinejoin="round" />
   return (
-    <svg viewBox="-240 -60 1380 700" className={className} preserveAspectRatio="xMidYMid meet" role="img" aria-label="A low-poly Greek temple with a marble bust between two columns">
+    <svg viewBox="-240 -60 1380 700" className={className} preserveAspectRatio="xMidYMid meet" role="img" aria-label="A low-poly Greek temple with a metal statue of a seated thinker between two columns">
       {marble.map(poly)}
       {bust.map((b, i) => <polygon key={`b${i}`} points={b.points} fill={b.fill} stroke={b.fill} strokeWidth={0.5} strokeLinejoin="round" />)}
     </svg>
