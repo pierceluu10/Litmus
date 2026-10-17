@@ -9,7 +9,6 @@ import { Scene } from './components/Scene'
 import { SceneBackdrop } from './components/LowPolyScene'
 import { Dock } from './components/Dock'
 import { Inspector } from './components/Inspector'
-import { ThoughtFlight } from './components/ThoughtFlight'
 import { Tutorial } from './components/Tutorial'
 
 // tiny hash router: '' is the home page, #/login and #/signup are the account pages
@@ -67,7 +66,6 @@ function Screens() {
         </main>
         {!wide && <Inspector floating={false} />}
       </div>
-      <ThoughtFlight />
     </div>
   )
 }

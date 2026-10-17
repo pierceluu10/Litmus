@@ -226,19 +226,11 @@ function AskBar({ s }: { s: Star }) {
   const [draft, setDraft] = useState('')
   const turns = chats[s.id] ?? []
   const busy = thinking === s.id
-  // `source` is the element the words were typed or shown in: they collapse from exactly there and fly to the statue.
-  const send = (q: string, source: HTMLElement) => {
-    if (!q.trim() || busy) return
-    const r = source.getBoundingClientRect(), cs = getComputedStyle(source)
-    useStore.setState((st) => ({ thought: { key: (st.thought?.key ?? 0) + 1, starId: s.id, text: q.trim(), landed: false,
-      from: { left: r.left, top: r.top, width: r.width, height: r.height, padding: parseFloat(cs.paddingLeft), font: cs.font, letterSpacing: cs.letterSpacing } } }))
-    setDraft('')
-    ask(s.id, q.trim())
-  }
+  const send = (q: string) => { if (!q.trim() || busy) return; setDraft(''); ask(s.id, q.trim()) }
   return (
     <div className="flex flex-col gap-2 border-t border-rule bg-surface p-3">
-      {!turns.length && !busy && <div className="flex flex-wrap gap-1.5">{OPENERS.map((q) => <button key={q} className="chip hover:border-faint hover:text-ink" onClick={(e) => send(q, e.currentTarget)}>{q}</button>)}</div>}
-      <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); send(draft, e.currentTarget.querySelector('input')!) }}>
+      {!turns.length && !busy && <div className="flex flex-wrap gap-1.5">{OPENERS.map((q) => <button key={q} className="chip hover:border-faint hover:text-ink" onClick={() => send(q)}>{q}</button>)}</div>}
+      <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); send(draft) }}>
         <label className="sr-only" htmlFor={`ask-${s.id}`}>Ask Litmus about this experiment</label>
         <input id={`ask-${s.id}`} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Ask Litmus about this experiment" className="field min-w-0 flex-1" />
         <button className="btn btn-primary" disabled={!draft.trim() || busy}>Ask</button>
