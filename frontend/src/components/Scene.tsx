@@ -40,7 +40,7 @@ const USABLE_HEIGHT = 0.62 // share of the canvas free of the top buttons and th
 // its card (which opens above it) has space. Pixels; the results card covers PANEL_PX of the right edge on wide screens.
 const PANEL_PX = 384
 const WIDE_PX = 1024
-const BELOW_MIDDLE = 0.03 // share of the canvas height the agent sits below its centre (the bottom card covers the lower third)
+const ABOVE_MIDDLE = 0.1 // share of the canvas height the agent sits above its centre: room for its card above, and its children below, clear of the bottom card
 // Opening shot: from just behind the statue's head and ear, looking over its shoulder toward the arm.
 // The head is near (-69, 16, -5) in scene units. The camera then glides to the default view, once per session.
 const EAR_CAM = new Vector3(-70, 24, -70)
@@ -252,16 +252,19 @@ function Fingertip() {
   return <mesh ref={ref}><sphereGeometry args={[1.1, 16, 16]} /><meshBasicMaterial color={BLOB_COLOR} /></mesh>
 }
 
-function CameraRig({ positions }: { positions: Map<string, Pos> }) {
+function CameraRig({ positions, parents }: { positions: Map<string, Pos>; parents: Map<string, string | null> }) {
   // held in state (not a plain ref) so the effects below run again once the controls exist
   const [ctl, setCtl] = useState<CameraControls | null>(null)
   const { focusId, fitAll } = useStore()
   const consulting = useStore((s) => !!s.thought && !s.thought.landed)
-  // the focused agent goes to the middle of the free part of the screen; its column decides how far out we need to be
+  // horizontally the focused agent and its direct children share the middle of the free part of the screen, so every agent
+  // it led to stays clickable; vertically the agent itself is the anchor; its column decides how far out we need to be
   const star = focusId ? positions.get(focusId) : undefined
   const column = star ? [...positions.values()].filter((p) => Math.abs(p.x - star.x) < 1).map((p) => p.y) : []
-  const half = column.length ? (Math.max(...column) - Math.min(...column)) / 2 : 0 // half the column's height
-  const focus = star ?? { x: FIRST_STEP, y: 0, z: 0 }
+  const kids = star ? [...parents].filter(([, parent]) => parent === focusId).map(([id]) => positions.get(id)!).filter(Boolean) : []
+  const group = star ? [star, ...kids] : []
+  const half = Math.max(column.length ? (Math.max(...column) - Math.min(...column)) / 2 : 0, group.length ? (Math.max(...group.map((p) => p.y)) - Math.min(...group.map((p) => p.y))) / 2 : 0)
+  const focus = star ? { x: (Math.max(...group.map((p) => p.x)) + Math.min(...group.map((p) => p.x))) / 2, y: star.y, z: star.z } : { x: FIRST_STEP, y: 0, z: 0 }
   const size = useThree((s) => s.size)
   const portrait = size.width / size.height < PORTRAIT_ASPECT // narrow screens see less width: pull back
   const panel = innerWidth >= WIDE_PX ? PANEL_PX : 0 // the results card is always open on wide screens
@@ -276,7 +279,7 @@ function CameraRig({ positions }: { positions: Map<string, Pos> }) {
     const dist = Math.min(MAX_DISTANCE, Math.max(MIN_DISTANCE, VIEW.length() * (portrait ? PORTRAIT_PULLBACK : 1), fits, keepZoom && c.distance ? c.distance : 0))
     // aim off the agent by the pixel offset it should sit at, converted to scene units at this distance
     const unitsPerPx = (2 * dist * FOV_HALF_TAN) / size.height
-    const t = new Vector3(focus.x + (panel / 2) * unitsPerPx, focus.y + BELOW_MIDDLE * size.height * unitsPerPx, focus.z)
+    const t = new Vector3(focus.x + (panel / 2) * unitsPerPx, focus.y - ABOVE_MIDDLE * size.height * unitsPerPx, focus.z)
     const view = VIEW.clone().setLength(dist)
     c.setLookAt(t.x + view.x, t.y + view.y, t.z + view.z, t.x, t.y, t.z, animated)
   }
@@ -324,6 +327,7 @@ function CameraRig({ positions }: { positions: Map<string, Pos> }) {
 function Stars({ stars }: { stars: Star[] }) {
   const { selectedId, hoveredClaim } = useStore()
   const positions = useMemo(() => layoutStars(stars), [stars])
+  const parents = useMemo(() => new Map(stars.map((s) => [s.id, s.parent_id])), [stars])
   const [live] = useState<Live>(() => new Map())
   const byId = new Map(stars.map((s) => [s.id, s]))
   const path = new Set<string>()
@@ -334,7 +338,7 @@ function Stars({ stars }: { stars: Star[] }) {
       {stars.map((s) => <Edge key={`e${s.id}`} star={s} live={live} dim={dim(s)} onPath={path.has(s.id)} />)}
       {stars.map((s) => <StarBlob key={s.id} star={s} target={positions.get(s.id)!} live={live} dim={dim(s)} selected={s.id === selectedId} />)}
       <AccuracyLines positions={positions} base={stars[0]?.grade?.mean_child} />
-      <CameraRig positions={positions} />
+      <CameraRig positions={positions} parents={parents} />
     </>
   )
 }

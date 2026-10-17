@@ -293,7 +293,7 @@ whole research only: researching now, results, accuracy by path, rankings, where
 whole). **Test another claim** (`ClaimPicker.tsx`) lists every highlight with its status; tested ones keep a greyed-out
 Test button; open one for its card (paper, your note, Basis, Findings, source). Following new branches is always on;
 **Fit all** zooms out (padded clear of the results card) and closes node cards, **Default view** goes back to following.
-The camera puts the focused agent in the middle of the space the results card leaves (`PANEL_PX`, `BELOW_MIDDLE`), zoom is
+The camera centres the focused agent and its direct children in the space the results card leaves, the agent a little above the middle so its card fits above and its children stay clear of the bottom card (`PANEL_PX`, `ABOVE_MIDDLE`), zoom is
 capped at `MAX_DISTANCE` (520, the user's furthest zoom; the default ≈350 is their ideal), and five dashed accuracy levels (baseline ±1, ±2 points, `AccuracyLines`) run behind the
 graph, the baseline through the fingertip. The floating cards carry the landing's faceted sky (`.card-facets`).
 
