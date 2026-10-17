@@ -6,6 +6,7 @@ import { toneVar } from './lib/format'
 import { TopBar } from './components/TopBar'
 import { Researching } from './components/Researching'
 import { Scene } from './components/Scene'
+import { Facets } from './components/LowPolyScene'
 import { Dock } from './components/Dock'
 import { Inspector } from './components/Inspector'
 
@@ -16,6 +17,8 @@ function useHash() {
   return h
 }
 
+const SCENE_FACETS = 77 // the faceted backdrop behind the statue and the graph
+const SCENE_FACET_CELL = 110 // larger facets than the rails, so the backdrop reads as low-poly
 const LEGEND = [['confirmed', 'confirmed'], ['refuted', 'refuted'], ['inconclusive', 'inconclusive'], ['running', 'training'], ['waiting', 'needs you']] as const
 
 function SceneChrome() {
@@ -46,6 +49,7 @@ export default function App() {
       <TopBar />
       <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_minmax(300px,360px)] lg:overflow-hidden">
         <main className="marble-ground relative min-h-0 overflow-hidden max-lg:order-first max-lg:h-[72vh]">
+          <Facets seed={SCENE_FACETS} width={1600} height={1000} cell={SCENE_FACET_CELL} />
           <Scene />
           <SceneChrome />
           <Researching />

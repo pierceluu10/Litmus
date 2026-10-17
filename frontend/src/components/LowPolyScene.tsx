@@ -68,8 +68,8 @@ const evenLight: Shading = (_c, _m, r) => FACET_LIGHT + (r() - 0.5) * FACET_SPRE
 
 // The landing's faceted sky, as a quiet ground behind the workspace rails. Sized in CSS pixels so facets
 // keep the same scale whatever the rail's height.
-export function Facets({ seed, width = 400, height = 1400 }: { seed: number; width?: number; height?: number }) {
-  const tris = gridMesh([0, width, 0], [0, width, height], Math.ceil(width / FACET_CELL), Math.ceil(height / FACET_CELL), seed, FACET_TINT, evenLight)
+export function Facets({ seed, width = 400, height = 1400, cell = FACET_CELL }: { seed: number; width?: number; height?: number; cell?: number }) {
+  const tris = gridMesh([0, width, 0], [0, width, height], Math.ceil(width / cell), Math.ceil(height / cell), seed, FACET_TINT, evenLight)
   return (
     <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMinYMin slice" aria-hidden="true">
       {tris.map((t, i) => <polygon key={i} points={t.pts.map((p) => p.join(',')).join(' ')} fill={t.fill} stroke={t.fill} strokeWidth={0.6} strokeLinejoin="round" />)}
