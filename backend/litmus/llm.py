@@ -4,6 +4,8 @@ The LLM only ever reads numbers the grader produced; it never produces them.
 """
 
 import json
+import logging
+import time
 from pathlib import Path
 from string import Template
 from typing import TypeVar
@@ -15,6 +17,12 @@ from litmus.config import openai_model
 
 PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 SDK_RETRIES = 3  # the SDK retries rate limits and 5xx with exponential backoff
+# Reasoning effort per prompt. Measured on gpt-5.6-luna (2026-10-17): titling 12 claims took 7.4s at the default
+# effort and 4.1s at "none" with the same quality, so lookups and plain-language answers skip reasoning; planning,
+# grading follow-ups and the abstract keep the model default. Prompts not listed use the default.
+EFFORT = {"summarize_claims": "none", "extract_conditions": "none", "chat_star": "low", "detect_conflict": "low"}
+
+log = logging.getLogger(__name__)
 
 Schema = TypeVar("Schema", bound=BaseModel)
 _client: AsyncOpenAI | None = None
@@ -45,7 +53,14 @@ async def structured(prompt_name: str, schema: type[Schema], **values) -> Schema
         content = prompt if attempt == 0 else (
             f"{prompt}\n\nYour previous answer was invalid: {last_error}\nReturn a corrected answer.")
         try:
-            response = await client().responses.parse(model=openai_model(), input=content, text_format=schema)
+            started = time.monotonic()
+            effort = {"reasoning": {"effort": EFFORT[prompt_name]}} if prompt_name in EFFORT else {}
+            response = await client().responses.parse(model=openai_model(), input=content, text_format=schema, **effort)
+            usage = response.usage
+            # cached = input tokens served from OpenAI's prompt cache (automatic for a repeated prefix of 1024+ tokens)
+            log.info("llm %s %.1fs in=%d cached=%d out=%d reasoning=%d", prompt_name, time.monotonic() - started,
+                     usage.input_tokens, usage.input_tokens_details.cached_tokens, usage.output_tokens,
+                     usage.output_tokens_details.reasoning_tokens)
             if response.output_parsed is None:
                 raise LLMError("model returned no parsed output (refusal or empty)")
             return response.output_parsed

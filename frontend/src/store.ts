@@ -3,7 +3,7 @@ import { applyEvent, initialState, type AppState } from './reducer'
 import { mockApi } from './transport/mock'
 import { realApi } from './transport/real'
 import type { Api, ConnState, Health, LibraryStage } from './transport/api'
-import type { Provenance, Selection } from './types'
+import type { ChatTurn, Provenance, Selection } from './types'
 
 // Live (the FastAPI backend, Modal A100s) unless the front page's Demo mode switch picks the in-browser backend.
 const DEMO_KEY = 'litmus.demo'
@@ -28,8 +28,8 @@ type Store = {
   focusId: string | null // what the camera is centred on
   fitAll: boolean // frame the whole tree; off returns to the default view
   abstractOpen: boolean
-  explainBusy: boolean
-  explained: Record<string, { answer: string; provenance: Provenance[] }>
+  chats: Record<string, (ChatTurn & { provenance?: Provenance[] })[]> // per star, oldest first
+  thinking: string | null // the star whose chat is waiting on Litmus
   begin: (replay: boolean, goal?: string) => Promise<void>
   leave: () => void
   select: (id: string | null) => void
@@ -37,7 +37,7 @@ type Store = {
   dispatch: (star_id: string, selections: Selection[], instruction?: string) => Promise<void>
   answer: (question_id: string, option_id: string, comment?: string) => Promise<void>
   feedback: (star_id: string, kind: 'challenge' | 'suggest' | 'prioritize', text: string) => Promise<void>
-  explain: (star_id: string, question?: string) => Promise<void>
+  ask: (star_id: string, question: string) => Promise<void>
   togglePause: () => Promise<void>
   stopBranch: (star_id: string) => Promise<void>
   branch: (star_id: string, text?: string) => Promise<void>
@@ -56,7 +56,7 @@ export const useStore = create<Store>((set, get) => {
   }
   return {
     app: initialState, sid: null, conn: 'closed', libraryStage: 'papers', health: null, demo: savedDemo(), error: null, selectedId: null, hoveredClaim: null,
-    follow: true, focusId: null, fitAll: false, abstractOpen: false, explainBusy: false, explained: {},
+    follow: true, focusId: null, fitAll: false, abstractOpen: false, chats: {}, thinking: null,
     set: (p) => set(p),
     setDemo(demo) {
       try { localStorage.setItem(DEMO_KEY, demo ? '1' : '0') } catch { /* private window: the switch still works for this visit */ }
@@ -66,11 +66,11 @@ export const useStore = create<Store>((set, get) => {
     leave() {
       unsub?.(); unsub = null
       libraryLoad?.abort(); libraryLoad = null
-      set({ app: initialState, sid: null, conn: 'closed', selectedId: null, focusId: null, fitAll: false, abstractOpen: false, explained: {}, error: null })
+      set({ app: initialState, sid: null, conn: 'closed', selectedId: null, focusId: null, fitAll: false, abstractOpen: false, chats: {}, error: null })
     },
     async begin(replay, goal) {
       unsub?.()
-      set({ app: initialState, libraryStage: 'papers', selectedId: null, focusId: null, fitAll: false, follow: true, error: null, abstractOpen: false, explained: {} })
+      set({ app: initialState, libraryStage: 'papers', selectedId: null, focusId: null, fitAll: false, follow: true, error: null, abstractOpen: false, chats: {} })
       libraryLoad?.abort()
       const api = current = apiFor(get().demo)
       const load = libraryLoad = new AbortController()
@@ -92,13 +92,14 @@ export const useStore = create<Store>((set, get) => {
     dispatch: (star_id, selections, instruction) => { set({ follow: true }); return act((sid) => current.dispatch(sid, { star_id, selections, instruction })) },
     answer: (question_id, option_id, comment) => { set({ follow: true }); return act((sid) => current.answer(sid, { question_id, option_id, comment })) },
     feedback: (star_id, kind, text) => act((sid) => current.feedback(sid, { star_id, kind, text })),
-    async explain(star_id, question) {
-      set({ explainBusy: true })
+    async ask(star_id, question) {
+      const history = (get().chats[star_id] ?? []).map(({ role, text }) => ({ role, text }))
+      set((st) => ({ thinking: star_id, chats: { ...st.chats, [star_id]: [...(st.chats[star_id] ?? []), { role: 'human', text: question }] } }))
       await act(async (sid) => {
-        const r = await current.explain(sid, { star_id, question })
-        set((st) => ({ explained: { ...st.explained, [star_id]: r } }))
+        const r = await current.explain(sid, { star_id, question, history })
+        set((st) => ({ chats: { ...st.chats, [star_id]: [...(st.chats[star_id] ?? []), { role: 'litmus', text: r.answer, provenance: r.provenance }] } }))
       })
-      set({ explainBusy: false })
+      set({ thinking: null })
     },
     togglePause: () => act((sid) => (get().app.session?.status === 'paused' ? current.resume(sid) : current.pause(sid))),
     stopBranch: (star_id) => act((sid) => current.stopBranch(sid, star_id)),

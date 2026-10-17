@@ -5,6 +5,8 @@ or remove fields, every change gets a Changelog line (newest first) and lands on
 `docs(contract): ...`.
 
 ## Changelog
+- 2026-10-17 — Additive: `POST /explain` body `history?: ChatTurn[]` (`{role: "human"|"litmus", text}`, oldest
+  first) so explain is a per-star chat; omitted = a fresh conversation.
 - 2026-10-17 — Additive: `Claim.summary?` (a 3–7 word AI title for the claim, cached per highlight + note);
   `GET /api/library/stream` (server-sent events while Papiers is read live).
 - 2026-10-17 — Additive: `SessionState.wave`, `.agenda: AgendaItem[]`, `.finish_requested`, `.last_seq`;
@@ -36,7 +38,7 @@ All JSON is snake_case. Timestamps are ISO 8601 UTC strings. IDs are stable stri
 | POST | `/api/sessions/{id}/dispatch` | `{star_id, selections:[{proposal_id, knob_overrides?}], instruction?}` | `{ok}` |
 | POST | `/api/sessions/{id}/answer` | `{question_id, option_id, comment?}` | `{ok}` |
 | POST | `/api/sessions/{id}/feedback` | `{star_id, kind:"challenge"\|"suggest"\|"prioritize", text}` | `{ok}` |
-| POST | `/api/sessions/{id}/explain` | `{star_id, question?}` | `{answer, provenance: Provenance[]}` |
+| POST | `/api/sessions/{id}/explain` | `{star_id, question?, history?: ChatTurn[]}` | `{answer, provenance: Provenance[]}` |
 | POST | `/api/sessions/{id}/pause` | | `{ok}` |
 | POST | `/api/sessions/{id}/resume` | | `{ok}` |
 | POST | `/api/sessions/{id}/stop_branch` | `{star_id}` | `{ok}` |

@@ -11,7 +11,7 @@ from litmus import papiers_client, store
 from litmus.engine import ops
 from litmus.experiments.knobs import BASELINE_KNOBS, config_hash
 from litmus.llm import structured
-from litmus.models import Claim, Proposal, Provenance, SessionState, Star, apply_changes
+from litmus.models import ChatTurn, Claim, Proposal, Provenance, SessionState, Star, apply_changes
 
 MAX_PROPOSALS = 4
 MAX_SEEDS = 10
@@ -284,19 +284,34 @@ async def replan(state: SessionState, s: Star, kind: str, text: str, plan: str) 
 
 # ---------------------------------------------------------------- explain / abstract
 
-async def explain(state: SessionState, s: Star, question: str) -> tuple[str, list[Provenance]]:
-    parent = ops.star(state, s.parent_id) if s.parent_id else None
-    query = f"{s.title} {question}"[:200]
-    try:
-        hits = await papiers_client.search(query)
-    except papiers_client.PapiersError:
-        hits = []
-    runs = {"child": [(r.seed, points(r.tta_val_acc or r.val_acc)) for r in s.runs],
-            "parent": [(r.seed, points(r.tta_val_acc or r.val_acc)) for r in s.parent_runs]}
-    result = await structured("explain_star", Explanation, question=question, star=star_summary(s),
-                              parent=star_summary(parent) if parent else "(none: this is the baseline)",
-                              grade=grade_summary(s), runs=runs, provenance=provenance_text(s.provenance),
-                              hits="\n".join(f"{h.id} ({h.doc_title}): {h.text[:300]}" for h in hits) or "(none)")
+MAX_CHAT_TURNS = 12
+# Library hits per (session, star): searched once, then reused for every turn of that star's chat.
+_library_hits: dict[tuple[str, str], list[Provenance]] = {}
+
+
+async def _hits_for(state: SessionState, s: Star) -> list[Provenance]:
+    key = (state.id, s.id)
+    if key not in _library_hits:
+        try:
+            _library_hits[key] = await papiers_client.search(s.title[:200])
+        except papiers_client.PapiersError:
+            return []
+    return _library_hits[key]
+
+
+async def chat(state: SessionState, s: Star, question: str, history: list[ChatTurn]) -> tuple[str, list[Provenance]]:
+    """One turn of the human's chat about a star. Stable context first, then the conversation, so OpenAI's prompt
+    cache serves the shared prefix on every later turn."""
+    compared = ops.star(state, s.parent_id) if s.parent_id else None
+    hits = await _hits_for(state, s)
+    runs = {"this": [(r.seed, points(r.tta_val_acc or r.val_acc)) for r in s.runs],
+            "graded_against": [(r.seed, points(r.tta_val_acc or r.val_acc)) for r in s.parent_runs]}
+    turns = "\n".join(f"{'Human' if t.role == 'human' else 'Litmus'}: {t.text}" for t in history[-MAX_CHAT_TURNS:])
+    result = await structured("chat_star", Explanation, tree=tree(state), star=star_summary(s), knobs=s.knobs.model_dump(),
+                              parent=star_summary(compared) if compared else "(none: this is the baseline)", runs=runs,
+                              provenance=provenance_text(s.provenance),
+                              hits="\n".join(f"{h.id} ({h.doc_title}): {h.text[:300]}" for h in hits) or "(none)",
+                              history=turns or "(this is the first message)", question=question)
     known = {p.id: p for p in s.provenance + hits}
     return result.answer, [known[i] for i in result.cited_ids if i in known]
 

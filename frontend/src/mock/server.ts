@@ -268,11 +268,20 @@ export class MockServer {
     this.propose(best.id, MOVES)
   }
 
-  explain(star_id: string) {
-    const s = this.star(star_id), g = s.grade
-    const answer = !g ? `${s.title} has not been graded yet.`
-      : g.verdict === 'baseline' ? `The reference configuration averaged ${(g.mean_child * 100).toFixed(2)}% over ${g.n} seeds; every other star is compared against a re-run of its parent on the same seeds.`
-      : `Changing ${knobText(s.knob_changes)} moved mean accuracy from ${(g.mean_parent * 100).toFixed(2)}% to ${(g.mean_child * 100).toFixed(2)}% over ${g.n} paired seeds (${pts(g.delta)} pts, 95% CI ${pts(g.ci_low)} to ${pts(g.ci_high)}). ${g.ci_low <= 0 && g.ci_high >= 0 ? 'The interval includes zero, so this could be noise.' : 'The interval excludes zero, so this is unlikely to be noise.'}`
+  // The demo's chat: answers from the star's own record, routed by what the question asks about.
+  chat(star_id: string, question: string) {
+    const s = this.star(star_id), g = s.grade, q = question.toLowerCase()
+    const parent = s.parent_id ? this.star(s.parent_id) : null
+    const seeds = s.runs.map((r) => r.seed)
+    const claim = s.provenance.find((p) => p.kind === 'highlight'), note = s.provenance.find((p) => p.kind === 'note')
+    const result = !g ? `${s.title} has not been graded yet.`
+      : g.verdict === 'baseline' ? `The reference configuration averaged ${(g.mean_child * 100).toFixed(2)}% over ${g.n} seeds.`
+      : `It moved accuracy from ${(g.mean_parent * 100).toFixed(2)}% to ${(g.mean_child * 100).toFixed(2)}% (${pts(g.delta)} pts, 95% CI ${pts(g.ci_low)} to ${pts(g.ci_high)}). ${g.ci_low <= 0 && g.ci_high >= 0 ? 'The interval includes zero, so seed noise could explain it.' : 'The interval excludes zero, so this is unlikely to be noise.'}`
+    const answer = /run|ran|test|seed|config|setting|did/.test(q) && parent
+      ? `I changed ${knobText(s.knob_changes)} on top of ${parent.title} and trained ${seeds.length} seeds (${seeds.join(', ')}). ${parent.title} was re-run on the same seeds, so each pair differs only by that change. ${result}`
+      : /paper|claim|highlight|note|why/.test(q) && claim
+        ? `It tests "${claim.text.slice(0, 140)}${claim.text.length > 140 ? '…' : ''}"${note ? `, and your note asked: ${note.text}` : ''}. ${result}`
+        : result
     return { answer, provenance: s.provenance }
   }
 

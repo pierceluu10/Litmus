@@ -20,7 +20,7 @@ from litmus.engine import agent, graph, ops
 from litmus.experiments.knobs import DEFAULT_SEEDS, EXTRA_SEEDS
 from litmus.experiments.service import estimate_gpu_seconds
 from litmus.llm import LLMError
-from litmus.models import Proposal, Provenance, SessionState, apply_changes
+from litmus.models import ChatTurn, Proposal, Provenance, SessionState, apply_changes
 
 log = logging.getLogger(__name__)
 
@@ -325,7 +325,8 @@ async def finish(session_id: str) -> SessionState:
     return store.get(session_id)
 
 
-async def explain(session_id: str, star_id: str, question: str | None) -> tuple[str, list[Provenance]]:
+async def explain(session_id: str, star_id: str, question: str | None,
+                  history: list[ChatTurn]) -> tuple[str, list[Provenance]]:
     state = store.get(session_id)
     s = ops.star(state, star_id)
-    return await agent.explain(state, s, question or "Why did this come out the way it did, and what does it mean?")
+    return await agent.chat(state, s, question or "Why did this come out the way it did, and what does it mean?", history)

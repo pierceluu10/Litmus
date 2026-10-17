@@ -1,4 +1,4 @@
-import type { Abstract, Claim, Document, LitmusEvent, Provenance, Selection } from '../types'
+import type { Abstract, ChatTurn, Claim, Document, LitmusEvent, Provenance, Selection } from '../types'
 
 export type Health = { ok: boolean; modal_warm: boolean; papiers_ok: boolean; openai_ok: boolean }
 export const DEFAULT_GOAL = 'Which of the training tricks I highlighted hold for a ~10-epoch CIFAR-10 run?'
@@ -21,7 +21,7 @@ export interface Api {
   dispatch(sid: string, body: { star_id: string; selections: Selection[]; instruction?: string }): Promise<void>
   answer(sid: string, body: { question_id: string; option_id: string; comment?: string }): Promise<void>
   feedback(sid: string, body: { star_id: string; kind: 'challenge' | 'suggest' | 'prioritize'; text: string }): Promise<void>
-  explain(sid: string, body: { star_id: string; question?: string }): Promise<{ answer: string; provenance: Provenance[] }>
+  explain(sid: string, body: { star_id: string; question?: string; history?: ChatTurn[] }): Promise<{ answer: string; provenance: Provenance[] }>
   pause(sid: string): Promise<void>
   resume(sid: string): Promise<void>
   stopBranch(sid: string, star_id: string): Promise<void>

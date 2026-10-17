@@ -15,6 +15,11 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+class ChatTurn(BaseModel):
+    role: Literal["human", "litmus"]
+    text: str
+
+
 class Provenance(BaseModel):
     kind: Literal["highlight", "note", "conversation", "passage", "document", "search", "human"]
     id: str

@@ -152,6 +152,12 @@ branch subgraph: run → reflect → (run +5 seeds) | (ask ⟂) | END          �
 - `tests/test_api.py` validates every emitted event payload against the contract models.
 
 ### Abstract, explain, write-back (`engine/agent.py`, `writeback.py`)
+- Chat (`POST /explain` with `history`, `prompts/chat_star.txt`): one turn of the human's chat about a star. Context is
+  the tree, the star's knobs, per-seed runs, claims and library hits (searched once per star, then reused).
+- OpenAI: per-prompt reasoning effort in `llm.py` `EFFORT` (titles and conditions `none`, chat and conflict checks
+  `low`, planning and abstract at the model default); every call logs latency, input, cached, output and reasoning
+  tokens (`llm <prompt> …` in the server log). Automatic prompt caching only hit on byte-identical prompts on
+  gpt-5.6-luna (2026-10-17), not on a shared prefix with a different ending, so no `prompt_cache_key` is set.
 - Abstract agent: ~150 words, every sentence cites `[S#][hl_…]`; citations to ids we never gave it are stripped.
 - `POST /explain`: star evidence + per-seed numbers + a fresh library search → plain-language answer with provenance.
 - Write-back = **export** (CLI is read-only): `backend/exports/<session>/findings.md` + `abstract.md`, also served by
@@ -247,7 +253,7 @@ npm test             # reducer, layout, simulator + grader-port tests
 | `App.tsx` | Hash router: home `Landing`, `#/login` and `#/signup` (`Auth`, demo account in `auth.ts`), then the workspace once a session exists |
 | `components/Landing.tsx`, `LowPolyScene.tsx`, `thinker*.ts` | The home page is one pinned horizontal scene: the hero is panel 0, vertical scroll drives `x` (slides dwell in the middle of their range, `dwell()`), and as the first slide comes in from the right the temple plays its intro backwards (`LowPolyScene` `exit`: roof lifts, columns sink, the Thinker and sky settle into a faint backdrop that drifts behind the slides). The slides are plain-language cards that copy the real workspace (claims, proposal dock, tree, leaderboard, question card, write-up). Below 860px or with reduced motion the slides stack vertically. SVG low-poly temple with the Thinker |
 | `components/Scene.tsx` | The 3D canvas: statue, blobs, edges, accuracy scale, follow camera |
-| `components/` | `TopBar` (GPU budget, Generate abstract), `Claims` (left rail: AI title, "Paper:", then your note, Basis (the highlight + paper setting) and Findings (once tested), cite · page · Source), `Inspector` (right rail: results, rankings, one agent's detail, abstract), `PathChart`, `Dock` (everything waiting on you: one tab per open question and per star with proposals, so you can branch from several agents at once), `Prov`, `Icons` |
+| `components/` | `TopBar` (GPU budget, Generate abstract), `Claims` (left rail: AI title, "Paper:", then your note, Basis (the highlight + paper setting) and Findings (once tested), cite · page · Source), `Inspector` (right rail: results, rankings, one agent's detail with its tested claims and an Ask Litmus chat that opens with the agent's conclusion, abstract), `PathChart`, `Dock` (everything waiting on you: one tab per open question and per star with proposals, so you can branch from several agents at once), `Prov`, `Icons` |
 | `components/LowPolyScene.tsx` `Facets` | The landing's faceted low-poly sky, reused as the rails' ground |
 | `public/litmus-statue.glb` | The agent: SMK's public-domain scan of the Artemision Bronze (KAS2100, api.smk.dk), decimated to 1,200 faces, fingertip at the origin |
 

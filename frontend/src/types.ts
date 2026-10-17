@@ -23,6 +23,7 @@ export type Star = {
 export type QuestionOption = { id: string; label: string; consequence: string }
 export type Question = { id: string; star_id: string; text: string; evidence: Provenance[]; options: QuestionOption[]; agent_leaning?: string; status: 'open' | 'answered'; answer?: { option_id: string; comment?: string } }
 export type Decision = { id: string; star_id: string; kind: 'dispatch' | 'answer' | 'feedback'; agent_recommendation: string; human_choice: string; agent_recommendation_ids?: string[]; human_choice_ids?: string[]; changed_trajectory: boolean; note: string; created_at: string }
+export type ChatTurn = { role: 'human' | 'litmus'; text: string }
 export type Abstract = { text: string; findings: string[]; citations: Provenance[] }
 export type SessionStatus = 'running' | 'paused' | 'waiting_human' | 'done'
 export type SessionState = { id: string; goal: string; status: SessionStatus; stars: Star[]; proposals: Proposal[]; questions: Question[]; decisions: Decision[]; abstract?: Abstract; budget_used: number; budget_total: number; replay?: boolean; created_at?: string }

@@ -3,7 +3,7 @@ import { sessionApi, useStore } from '../store'
 import { agentDetail, agentName, pct, progressFraction, pts, starTone, toneVar } from '../lib/format'
 import type { Star } from '../types'
 import { PathChart } from './PathChart'
-import { ProvChip, ProvList } from './Prov'
+import { ProvChip } from './Prov'
 import { Facets } from './LowPolyScene'
 
 const FACET_SEED = 73
@@ -129,10 +129,9 @@ function Verdict({ s }: { s: Star }) {
 }
 
 function Actions({ s }: { s: Star }) {
-  const { branch, explain, explained, explainBusy, stopBranch, app } = useStore()
+  const { branch, stopBranch, app } = useStore()
   const [mode, setMode] = useState(false)
   const [text, setText] = useState('')
-  const ex = explained[s.id]
   const live = s.status === 'running' || s.status === 'queued'
   const pending = app.session?.proposals.some((p) => p.star_id === s.id && p.status === 'open')
   const submit = async () => {
@@ -140,23 +139,73 @@ function Actions({ s }: { s: Star }) {
     setText(''); setMode(false)
   }
   return (
-    <section className="space-y-2.5">
+    <section className="flex flex-col gap-2.5">
       <div className="flex flex-wrap gap-2">
         <button className="btn btn-primary" disabled={live || pending} onClick={() => setMode(!mode)}>{pending ? 'Proposals ready below' : 'Branch from here'}</button>
-        <button className="btn" disabled={explainBusy || !s.grade} onClick={() => explain(s.id)}>{explainBusy ? 'Explaining…' : 'Explain'}</button>
         {live && <button className="btn" onClick={() => stopBranch(s.id)}>Stop</button>}
       </div>
       {mode && (
-        <div className="space-y-2">
+        <div className="flex flex-col gap-2">
           <label htmlFor="steer" className="label block">Agents will propose experiments that start from this result. Steer them (optional):</label>
           <textarea id="steer" autoFocus value={text} onChange={(e) => setText(e.target.value)} rows={2}
             placeholder="e.g. try it with longer training"
             className="w-full resize-none rounded-md border border-rule bg-surface p-2 focus:border-ink focus:outline-none"
             onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit() }} />
-          <button className="btn btn-primary" onClick={submit}>Ask for proposals</button>
+          <button className="btn btn-primary self-start" onClick={submit}>Ask for proposals</button>
         </div>
       )}
-      {ex && <div className="rounded-md bg-paper p-3 text-[12.5px] leading-relaxed"><p className="m-0">{ex.answer}</p></div>}
+    </section>
+  )
+}
+
+// Each claim the star tested once, named by its title in the Claims rail rather than "Highlight from …".
+function TestedClaims({ s }: { s: Star }) {
+  const claims = useStore((st) => st.app.claims)
+  const tested = s.provenance.filter((p, i, all) => p.kind !== 'note' && p.kind !== 'human' && all.findIndex((q) => q.id === p.id) === i)
+  if (!tested.length) return null
+  return (
+    <section>
+      <H>Tested claim{tested.length > 1 ? 's' : ''}</H>
+      <div className="flex flex-wrap items-start gap-1.5">{tested.map((p) => <ProvChip key={p.id} p={p} label={claims.find((c) => c.id === p.id)?.summary} />)}</div>
+    </section>
+  )
+}
+
+const OPENERS = ['What did you run?', 'Is this result real?', 'What should I try next?']
+const firstSentence = (t: string) => t.match(/^.*?[.!?](\s|$)/)?.[0].trim() ?? t
+
+// A chat about this star: the agent's conclusion opens it, replans appear as notes, then the human's questions.
+function Chat({ s }: { s: Star }) {
+  const { chats, thinking, ask, app } = useStore()
+  const [draft, setDraft] = useState('')
+  const [full, setFull] = useState(false)
+  const turns = chats[s.id] ?? []
+  const replans = app.replans.filter((r) => r.star_id === s.id)
+  const busy = thinking === s.id
+  const send = (q: string) => { if (!q.trim() || busy) return; setDraft(''); ask(s.id, q.trim()) }
+  return (
+    <section className="flex flex-col gap-3">
+      <H>Ask Litmus</H>
+      {s.reflection && (
+        <button className={`text-left text-[13px] leading-relaxed text-ink ${full ? '' : 'line-clamp-4'}`} aria-expanded={full} onClick={() => setFull(!full)} title={full ? undefined : 'Show all'}>{s.reflection}</button>
+      )}
+      {replans.map((r) => (
+        <p key={r.seq} className="m-0 flex gap-2 text-[12px] leading-snug text-muted" title={r.because}>
+          <span className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-agent" aria-hidden="true" />{firstSentence(r.change)}
+        </p>
+      ))}
+      {turns.map((t, i) => t.role === 'human'
+        ? <p key={i} className="m-0 max-w-[85%] self-end rounded-xl rounded-br-sm bg-paper px-3 py-2 text-[13px] leading-snug">{t.text}</p>
+        : <p key={i} className="m-0 text-[13px] leading-relaxed">{t.text}</p>)}
+      {busy && <p className="m-0 flex items-center gap-2 text-[12.5px] text-muted" aria-live="polite"><span className="dot live-dot" style={{ background: 'var(--color-agent)' }} />Thinking…</p>}
+      {!turns.length && !busy && (
+        <div className="flex flex-wrap gap-1.5">{OPENERS.map((q) => <button key={q} className="chip hover:border-faint hover:text-ink" onClick={() => send(q)}>{q}</button>)}</div>
+      )}
+      <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); send(draft) }}>
+        <label className="sr-only" htmlFor={`ask-${s.id}`}>Ask Litmus about this experiment</label>
+        <input id={`ask-${s.id}`} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Ask about this experiment" className="field min-w-0 flex-1" />
+        <button className="btn btn-primary" disabled={!draft.trim() || busy}>Ask</button>
+      </form>
     </section>
   )
 }
@@ -164,7 +213,6 @@ function Actions({ s }: { s: Star }) {
 function Detail({ s }: { s: Star }) {
   const { app, select } = useStore()
   const stars = app.session!.stars
-  const replans = app.replans.filter((r) => r.star_id === s.id)
   return (
     <div className="flex flex-col gap-5 p-4">
       <button className="btn btn-quiet -ml-2 h-7 self-start px-2" onClick={() => select(null)}>← All results</button>
@@ -179,10 +227,9 @@ function Detail({ s }: { s: Star }) {
       </section>
       <Verdict s={s} />
       <section><H>Accuracy along this path</H><div className="plate px-3 pb-1.5 pt-2.5"><PathChart stars={stars} highlight={s} /></div></section>
-      {s.reflection && <p className="m-0 text-[13px] leading-relaxed">{s.reflection}</p>}
-      {replans.map((r) => <p key={r.seq} className="m-0 text-[12.5px] text-human">“{r.because}” → {r.change}</p>)}
-      {s.provenance.length > 0 && <section><H>Tested claim</H><ProvList items={s.provenance} /></section>}
+      <TestedClaims s={s} />
       <Actions s={s} key={s.id} />
+      <Chat s={s} key={`chat-${s.id}`} />
     </div>
   )
 }

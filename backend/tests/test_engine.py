@@ -9,7 +9,7 @@ from litmus import store
 from litmus.engine import agent, driver, graph, ops
 from litmus.experiments import service
 from litmus.experiments.knobs import BASELINE_KNOBS
-from litmus.models import Claim, Document, Provenance, Star
+from litmus.models import ChatTurn, Claim, Document, Provenance, Star
 
 
 # ---------------------------------------------------------------- pure logic
@@ -82,10 +82,20 @@ async def fake_structured(prompt_name, schema, **values):
                                        parent_star_id=None, knob_changes=None)])
     if prompt_name == "write_abstract":
         return agent.AbstractDraft(text="Mixup failed at 10 epochs [S1][hl_mixup][bogus_id].", findings=["S1 refuted [S1]"])
+    if prompt_name == "chat_star":
+        CHAT_PROMPTS.append(values)
+        return agent.Explanation(answer="Five paired seeds against the baseline.", cited_ids=["hl_bot", "hl_invented"])
     raise AssertionError(prompt_name)
 
 
+CHAT_PROMPTS: list[dict] = []
+
+
+SEARCHES: list[str] = []
+
+
 async def fake_search(query, limit=6):
+    SEARCHES.append(query)
     return [Provenance(kind="highlight", id="hl_bot", doc_id="doc_b", doc_title="Bag of Tricks", text="increase epochs")]
 
 
@@ -172,6 +182,26 @@ async def test_full_session_with_question_mid_branch(engine):
         assert [e.seq for e in events] == list(range(1, len(events) + 1))
         assert {"question.asked", "question.answered", "library.search", "abstract.ready",
                 "papiers.export_ready", "agent.replanned"} <= {e.type for e in events}
+    finally:
+        await driver.shutdown()
+
+
+async def test_chat_about_a_star_carries_history_and_searches_the_library_once(engine):
+    await driver.startup()
+    try:
+        state = driver.create_session(None, 1800, auto_mode=True, auto_timeout_seconds=None, max_waves=1)
+        state = await wait_for(state.id, lambda s: s.status == "done", timeout=30)
+        star = next(s for s in state.stars if s.parent_id)
+        SEARCHES.clear()
+        CHAT_PROMPTS.clear()
+        answer, cited = await driver.explain(state.id, star.id, "What did you run?", [])
+        history = [ChatTurn(role="human", text="What did you run?"), ChatTurn(role="litmus", text=answer)]
+        await driver.explain(state.id, star.id, "Is that enough seeds?", history)
+        assert [p.id for p in cited] == ["hl_bot"], "ids the model invents must be dropped"
+        assert SEARCHES == [star.title], "the library is searched once per star, then reused"
+        assert CHAT_PROMPTS[0]["history"] == "(this is the first message)"
+        assert "Human: What did you run?\nLitmus: Five paired seeds" in CHAT_PROMPTS[1]["history"]
+        assert CHAT_PROMPTS[1]["question"] == "Is that enough seeds?"
     finally:
         await driver.shutdown()
 

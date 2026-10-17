@@ -18,7 +18,7 @@ from litmus.config import budget_gpu_seconds
 from litmus.engine import driver
 from litmus.experiments import runner
 from litmus.library import get_library
-from litmus.models import SessionState
+from litmus.models import ChatTurn, SessionState
 
 log = logging.getLogger(__name__)
 
@@ -72,6 +72,7 @@ class FeedbackBody(BaseModel):
 class ExplainBody(BaseModel):
     star_id: str
     question: str | None = None
+    history: list[ChatTurn] = []  # earlier turns of this star's chat, oldest first
 
 
 class StarRef(BaseModel):
@@ -202,7 +203,7 @@ async def feedback(session_id: str, body: FeedbackBody):
 async def explain(session_id: str, body: ExplainBody):
     _session(session_id)
     try:
-        answer_text, provenance = await driver.explain(session_id, body.star_id, body.question)
+        answer_text, provenance = await driver.explain(session_id, body.star_id, body.question, body.history)
     except KeyError as error:
         raise HTTPException(404, f"unknown id {error}") from None
     except llm.LLMError as error:
