@@ -131,6 +131,13 @@ branch subgraph: run → reflect → (run +5 seeds) | (ask ⟂) | END          �
 - 404 unknown ids, 409 conflicting actions (bad knob override, skipped proposal, budget), 503 upstream down.
 - `tests/test_api.py` validates every emitted event payload against the contract models.
 
+### Abstract, explain, write-back (`engine/agent.py`, `writeback.py`)
+- Abstract agent: ~150 words, every sentence cites `[S#][hl_…]`; citations to ids we never gave it are stripped.
+- `POST /explain`: star evidence + per-seed numbers + a fresh library search → plain-language answer with provenance.
+- Write-back = **export** (CLI is read-only): `backend/exports/<session>/findings.md` + `abstract.md`, also served by
+  `GET /api/sessions/{id}/export`; event `papiers.export_ready` tells the UI to show "Add to Papiers" (paste into a
+  Papiers note, which Papiers indexes, so later sessions' searches find it). Shadow branches get their own section.
+
 ### Commands
 | Command | What |
 |---|---|
@@ -170,6 +177,9 @@ branch subgraph: run → reflect → (run +5 seeds) | (ask ⟂) | END          �
   something the human path didn't. `ses_c39e548c59` — mixup α=1 refuted → library search → question → answer →
   wave 2 implements it (mixup @20 epochs) → wave-2 question → wave 3 (@40 epochs). Found and fixed a race where
   two branches both asked in one wave.
+- 2026-10-17 abstract-and-writeback: `POST /api/sessions/ses_4a61ce2ffe/explain {"star_id":"S7"}` → 5.8s, answer
+  quotes 94.79→95.05 (+0.26, CI 0.20–0.32) and cites hl_07db… (Bag of Tricks) + hl_50d0… (mixup).
+  `GET …/export` → findings Markdown incl. shadow section.
 
 ## Frontend
 (owned by frontend agent)

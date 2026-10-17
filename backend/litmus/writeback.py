@@ -43,6 +43,10 @@ def findings_markdown(state: SessionState) -> str:
                       f"(95% CI {root.grade.ci_low * POINTS:.2f}–{root.grade.ci_high * POINTS:.2f}, n={root.grade.n})."]
     lines += ["", "## Findings", ""]
     lines += [_finding(s, by_id.get(s.parent_id)) + "\n" for s in graded]
+    shadows = [s for s in state.stars if s.chosen_by == "shadow" and s.grade]
+    if shadows:
+        lines += ["## What the agent would have found alone (shadow branches)", ""]
+        lines += [_finding(s, by_id.get(s.parent_id)) + "\n" for s in shadows]
     human = [d for d in state.decisions if d.changed_trajectory]
     if human:
         lines += ["## Where human judgment changed the course", ""]
