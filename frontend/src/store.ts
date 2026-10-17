@@ -101,7 +101,9 @@ export const useStore = create<Store>((set, get) => {
           set((st) => {
             const app = applyEvent(st.app, e)
             const born = (e.type === 'star.created' || e.type === 'shadow.created') && st.follow ? (e.payload.star.id as string) : null
-            return { app, focusId: born ?? st.focusId }
+            // a finished experiment opens its own card automatically (unless you are already looking at one)
+            const finished = e.type === 'star.graded' && e.payload.grade?.verdict !== 'baseline' && !st.selectedId && !st.abstractOpen ? { selectedId: e.payload.star_id as string } : {}
+            return { app, focusId: born ?? st.focusId, ...finished }
           })
         }, (conn) => set({ conn }))
       } catch (e) { set({ error: (e as Error).message }) }

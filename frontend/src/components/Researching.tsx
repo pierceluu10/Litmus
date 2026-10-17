@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { agentDetail, agentName, progressFraction, provMatches, pts, shortCite, starTone, toneVar } from '../lib/format'
 import { ExternalIcon } from './Icons'
@@ -99,6 +99,8 @@ function ClaimCard({ c, status, stars, doc, expanded, onToggle, canPivot }: { c:
 export function Researching({ inline = false }: { inline?: boolean }) {
   const { app, libraryStage, select, set } = useStore()
   const [expanded, setExpanded] = useState<string | null>(null)
+  // hovering a claim dims the other nodes; if this card goes away mid-hover, the dimming must not stay
+  useEffect(() => () => useStore.getState().set({ hoveredClaim: null }), [])
   const session = app.session
   const stars = session?.stars ?? []
   const claimOf = (s: Star) => app.claims.find((c) => s.provenance.some((p) => provMatches(p, c.id)))

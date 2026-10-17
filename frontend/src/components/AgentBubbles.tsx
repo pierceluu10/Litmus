@@ -46,7 +46,7 @@ export function AgentBubbles() {
       </ul>
       <button aria-pressed={open} aria-label={open ? 'Close results' : 'Open results'} title={open ? 'Close results' : 'Results'} className="pointer-events-auto shrink-0 rounded-full border bg-surface p-1 shadow-[0_8px_24px_-10px_rgba(43,58,82,0.3)] transition-transform active:scale-95"
         style={{ borderColor: open ? 'var(--color-ink)' : 'var(--color-rule)' }}
-        onClick={() => set(open ? { panelOpen: false, selectedId: null, abstractOpen: false } : { panelOpen: true })}>
+        onClick={() => set(open ? { panelOpen: false, selectedId: null, abstractOpen: false, hoveredClaim: null } : { panelOpen: true })}>
         <img src="/litmus-face.svg" alt="" width={44} height={44} />
       </button>
     </div>
