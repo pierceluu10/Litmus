@@ -164,8 +164,15 @@ async def run_star(session_id: str, star_id: str, seeds: list[int] = DEFAULT_SEE
     always compared fairly (re-running the parent at the new length when needed, cached otherwise).
     """
     await gate(session_id).wait()
+    in_flight = _running.get((session_id, star_id))
+    if in_flight:
+        # Someone (the human's challenge or the agent's own rule) is already adding these runs: join it.
+        await asyncio.wait([in_flight])
+        return star(store.get(session_id), star_id)
     state = store.get(session_id)
     s = star(state, star_id)
+    # A "fresh" session shifts every seed so nothing comes from the cache and every run trains live.
+    seeds = [seed + store.config(session_id).get("seed_offset", 0) for seed in seeds]
     parent = star(state, s.parent_id) if s.parent_id else None
     s.status = "running"
     emit(state, "experiment.started", {"star_id": s.id, "seeds": seeds})

@@ -106,6 +106,8 @@ def main() -> None:
     library.add_argument("--refresh", action="store_true", help="re-read Papiers (otherwise use the cache)")
     serve = commands.add_parser("serve", help="start the API on http://localhost:8000")
     serve.add_argument("--port", type=int, default=8000)
+    record = commands.add_parser("record-demo", help="save a finished session to shared/demo-session.json")
+    record.add_argument("session_id")
     run = commands.add_parser("run", help="headless end-to-end session; prints the tree")
     run.add_argument("--auto", action="store_true", help="the agent makes every choice itself")
     run.add_argument("--waves", type=int, default=3)
@@ -125,5 +127,9 @@ def main() -> None:
         asyncio.run(_warmup())
     elif args.command == "run":
         asyncio.run(_run(args.auto, args.waves, args.goal))
+    elif args.command == "record-demo":
+        from litmus import replay
+
+        print(replay.record(args.session_id))
     elif args.command == "library":
         asyncio.run(_library(args.refresh))

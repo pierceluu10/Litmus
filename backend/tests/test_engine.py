@@ -189,3 +189,21 @@ async def test_long_training_child_reruns_parent_at_same_epochs(engine):
         assert longer.grade.delta == pytest.approx(-0.004, abs=0.001)
     finally:
         await driver.shutdown()
+
+
+async def test_concurrent_requests_for_the_same_star_train_once(engine, monkeypatch):
+    calls = []
+
+    async def counting_stream(knobs, seeds):
+        calls.append(tuple(seeds))
+        async for event in fake_stream_runs(knobs, seeds):
+            yield event
+
+    monkeypatch.setattr(service, "stream_runs", counting_stream)
+    state = driver.SessionState(id="ses_x", goal="g", budget_total=1000)
+    store.create_session(state, {"auto_mode": False, "max_waves": 1})
+    root = ops.new_star(state, parent=None, title="root", hypothesis="", knobs=ops.baseline_knobs(), knob_changes={},
+                        provenance=[], chosen_by="agent", predicted=None)
+    first, second = await asyncio.gather(ops.run_star("ses_x", root.id), ops.run_star("ses_x", root.id))
+    assert calls == [(0, 1, 2, 3, 4)] and first.grade and len(first.runs) == 5
+    assert len([e for e in store.events_after("ses_x", 0) if e.type == "experiment.run_done"]) == 5
