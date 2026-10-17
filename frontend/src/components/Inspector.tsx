@@ -5,6 +5,7 @@ import { agentDetail, agentName, pct, progressFraction, pts, starTone, toneVar }
 import type { Provenance, Star } from '../types'
 import { PathChart } from './PathChart'
 import { ProvChip } from './Prov'
+import { Steering } from './Steering'
 
 const H = ({ children, aside }: { children: React.ReactNode; aside?: React.ReactNode }) => (
   <div className="mb-2 flex items-baseline justify-between"><h3 className="m-0 text-[12px] font-semibold text-muted">{children}</h3>{aside}</div>
@@ -19,9 +20,7 @@ function Overview() {
   const graded = s.stars.filter((x) => x.grade && x.grade.verdict !== 'baseline' && x.status !== 'failed')
   const ranked = s.stars.filter((x) => x.grade && x.status !== 'failed').sort((a, b) => b.grade!.mean_child - a.grade!.mean_child)
   const count = (v: string) => graded.filter((x) => x.grade!.verdict === v).length
-  const steered = s.decisions.filter((d) => d.kind === 'answer' && d.changed_trajectory)
   const starting = !s.start_claim_ids?.length && s.stars.every((x) => !x.parent_id)
-  const asker = (id: string) => { const star = s.stars.find((x) => x.id === id); return star ? agentName(star) : 'Agent' }
   return (
     <div className="space-y-6 p-4">
       {starting && <StartPicker />}
@@ -52,21 +51,7 @@ function Overview() {
           </ol>
         </section>
       )}
-      {steered.length > 0 && (
-        <section>
-          <H>Where you changed course</H>
-          <ul className="m-0 list-none space-y-2 p-0">
-            {steered.map((d) => (
-              <li key={d.id}>
-                <button className="block w-full rounded-md border border-rule px-3 py-2 text-left text-[12.5px] leading-snug hover:border-faint" onClick={() => select(d.star_id)}>
-                  <span className="block text-human">You: {d.human_choice}</span>
-                  <span className="block text-muted">{asker(d.star_id)}: {d.agent_recommendation || 'nothing'}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+      <Steering />
       <Activity />
     </div>
   )

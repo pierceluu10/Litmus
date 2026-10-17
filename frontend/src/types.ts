@@ -20,7 +20,7 @@ export type Star = {
   progress?: Progress[]; runs: RunResult[]; parent_runs: RunResult[]; grade?: Grade
   reflection?: string; suggestion?: string; error?: string; created_at: string; finished_at?: string
 }
-export type QuestionOption = { id: string; label: string; consequence: string }
+export type QuestionOption = { id: string; label: string; consequence: string; knob_changes?: Partial<Knobs>; parent_star_id?: string }
 export type Question = { id: string; star_id: string; text: string; evidence: Provenance[]; options: QuestionOption[]; agent_leaning?: string; status: 'open' | 'answered'; answer?: { option_id: string; comment?: string } }
 export type Decision = { id: string; star_id: string; kind: 'dispatch' | 'answer' | 'feedback'; agent_recommendation: string; human_choice: string; agent_recommendation_ids?: string[]; human_choice_ids?: string[]; changed_trajectory: boolean; note: string; created_at: string }
 export type ChatTurn = { role: 'human' | 'litmus'; text: string }
