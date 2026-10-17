@@ -3,7 +3,18 @@ name = "litmus"
 version = "0.1.0"
 description = "Litmus backend: turns highlighted research claims into graded experiments."
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "aiosqlite>=0.22.1",
+    "fastapi>=0.143.3",
+    "langgraph>=1.2.16",
+    "langgraph-checkpoint-sqlite>=3.1.2",
+    "modal>=1.6.2",
+    "openai>=3.33.0",
+    "pydantic>=2.14.1",
+    "python-dotenv>=1.2.4",
+    "scipy>=1.17.1",
+    "uvicorn[standard]>=0.54.0",
+]
 
 [project.scripts]
 litmus = "litmus.cli:main"
@@ -14,3 +25,12 @@ build-backend = "hatchling.build"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "torch>=2.14.1",
+]
