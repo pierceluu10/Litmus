@@ -146,19 +146,15 @@ export function PlacedCard({ ringPx, children }: { ringPx: { current: number }; 
 }
 
 export function NodeCard({ star, items, side = 'above' }: { star: Star; items: Proposal[]; side?: Side }) {
-  const set = useStore((s) => s.set)
   const [tab, setTab] = useState<Tab>(items.length ? 'proceed' : 'about')
   const shown = tab === 'proceed' && !items.length ? 'about' : tab
   return (
-    <div className="relative w-[300px] rounded-2xl border border-rule bg-surface text-[12.5px] shadow-[0_16px_40px_-12px_rgba(43,58,82,0.35)]" role="dialog" aria-label={agentName(star)}>
+    <div className="relative w-[300px] rounded-2xl marble-edge border border-rule bg-surface text-[12.5px]" role="dialog" aria-label={agentName(star)}>
       <span aria-hidden className={`absolute left-1/2 h-3.5 w-3.5 -translate-x-1/2 rotate-45 border-rule bg-surface ${side === 'above' ? '-bottom-[7px] border-b border-r' : '-top-[7px] border-l border-t'}`} />
       {/* clipped separately so the pointer is not cut off; scrolls when the scene leaves less room than the card needs */}
       <div data-card-body className="relative isolate overflow-y-auto overflow-x-hidden rounded-2xl p-3" style={{ maxHeight: 'var(--card-max)' }}>
       <SceneBackdrop seed={CARD_FACETS} className="card-facets" />
-      <div className="flex items-start justify-between gap-2">
-        <h2 className="m-0 text-[13.5px] font-semibold">{agentName(star)}{star.parent_id && <span className="num ml-1.5 text-[11.5px] font-normal text-faint">{agentDetail(star)}</span>}</h2>
-        <button className="border-0 bg-transparent p-0 text-[16px] leading-none text-faint hover:text-ink" aria-label="Close" onClick={() => set({ cardFor: null })}>×</button>
-      </div>
+      <h2 className="m-0 text-[13.5px] font-semibold">{agentName(star)}{star.parent_id && <span className="num ml-1.5 text-[11.5px] font-normal text-faint">{agentDetail(star)}</span>}</h2>
       {items.length > 0 && (
         <div role="tablist" aria-label={`${agentName(star)} details`} className="tabs mt-2">
           <button role="tab" aria-selected={shown === 'about'} onClick={() => setTab('about')}>About</button>

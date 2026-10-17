@@ -133,7 +133,7 @@ export function ClaimPicker() {
       <AnimatePresence>
         {open && (
           <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, transition: { duration: 0.12 } }} transition={{ duration: 0.18, ease: [0.23, 1, 0.32, 1] }}
-            className="absolute left-0 top-9 z-40 isolate flex max-h-[min(66vh,560px)] w-[360px] flex-col overflow-hidden rounded-xl border border-rule bg-surface shadow-[0_16px_40px_-12px_rgba(43,58,82,0.32)]">
+            className="absolute left-0 top-9 z-40 isolate flex max-h-[min(66vh,560px)] w-[360px] flex-col overflow-hidden rounded-xl marble-edge border border-rule bg-surface">
             <SceneBackdrop seed={PICKER_FACETS} className="card-facets" />
             <div className="flex items-baseline justify-between px-3.5 pb-1 pt-3"><h2 className="m-0 text-[12px] font-semibold text-muted">Your claims</h2><span className="num text-[11px] text-faint">{rows.length - untested}/{rows.length} tested</span></div>
             <ul className="m-0 flex list-none flex-col gap-0.5 overflow-y-auto p-1.5 pt-0">

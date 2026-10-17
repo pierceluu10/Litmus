@@ -16,7 +16,7 @@ export function StartBubble() {
   const claims = app.claims.slice().sort((a, b) => a.rank - b.rank)
   const go = async (id: string) => { setBusy(id); await start([id]); setBusy(null) }
   return (
-    <section aria-label="Where should we start?" className="relative flex min-h-0 flex-col rounded-2xl rounded-br-md border border-rule bg-surface shadow-[0_16px_40px_-12px_rgba(43,58,82,0.35)]">
+    <section aria-label="Where should we start?" className="relative flex min-h-0 flex-col rounded-2xl rounded-br-md marble-edge border border-rule bg-surface">
       <span aria-hidden className="absolute -bottom-[7px] right-6 h-3.5 w-3.5 rotate-45 border-b border-r border-rule bg-surface" />
       <div className="relative isolate flex min-h-0 flex-col overflow-hidden rounded-2xl rounded-br-md">
         <SceneBackdrop seed={START_FACETS} className="card-facets" />

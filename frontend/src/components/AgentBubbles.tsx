@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useStore, useStarting } from '../store'
+import { SceneBackdrop } from './LowPolyScene'
 
 const SHOW_MS = 9000
 const MAX_QUEUED = 5
+const BUBBLE_FACETS = 89
 type Bubble = { seq: number; text: string }
 
 // Litmus's face sits under the results card and opens the chat with it. Whenever the agents do something, Litmus says
@@ -40,7 +42,8 @@ export function AgentBubbles() {
           {!chatOpen && !starting && shown && [shown].map((b) => (
             <motion.li key={b.seq} initial={{ opacity: 0, scale: 0.9, x: 10 }} animate={{ opacity: 1, scale: 1, x: 0 }} exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.2 } }}
               transition={{ type: 'spring', duration: 0.4, bounce: 0.18 }} style={{ transformOrigin: 'right bottom' }}
-              className="relative rounded-2xl rounded-br-md border border-rule bg-surface px-3 py-2 text-[12.5px] leading-snug shadow-[0_8px_24px_-10px_rgba(43,58,82,0.3)]">
+              className="marble-edge relative isolate overflow-hidden rounded-2xl rounded-br-md border border-rule bg-surface px-3 py-2 text-[12.5px] leading-snug">
+              <SceneBackdrop seed={BUBBLE_FACETS} className="card-facets" />
               <span className="line-clamp-4">{b.text}</span>
             </motion.li>
           ))}

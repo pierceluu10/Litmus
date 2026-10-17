@@ -73,7 +73,10 @@ export const useStore = create<Store>((set, get) => {
       try { localStorage.setItem(DEMO_KEY, demo ? '1' : '0') } catch { /* private window: the switch still works for this visit */ }
       set({ demo, error: null })
     },
-    select: (id) => set(id ? { selectedId: id, focusId: id, cardFor: id, abstractOpen: false, fitAll: false } : { selectedId: null, cardFor: null }),
+    // letting go of an agent shows everything, or keeps following while agents are still running; either way the next new
+    // agent is followed (a Fit all you chose yourself turns following off instead)
+    select: (id) => set((st) => id ? { selectedId: id, focusId: id, cardFor: id, abstractOpen: false, fitAll: false }
+      : { selectedId: null, cardFor: null, follow: true, fitAll: !st.app.session?.stars.some((s) => s.status === 'running' || s.status === 'queued'), focusId: st.app.lastStarId ?? null }),
     leave() {
       unsub?.(); unsub = null
       libraryLoad?.abort(); libraryLoad = null
@@ -104,7 +107,7 @@ export const useStore = create<Store>((set, get) => {
             const born = (e.type === 'star.created' || e.type === 'shadow.created') && st.follow ? (e.payload.star.id as string) : null
             // a finished experiment opens its own card automatically (unless you are already looking at one)
             const finished = e.type === 'star.graded' && e.payload.grade?.verdict !== 'baseline' && !st.selectedId && !st.abstractOpen ? { selectedId: e.payload.star_id as string } : {}
-            return { app, focusId: born ?? st.focusId, ...finished }
+            return { app, focusId: born ?? st.focusId, ...(born ? { fitAll: false } : {}), ...finished }
           })
         }, (conn) => set({ conn }))
       } catch (e) { set({ error: (e as Error).message }) }

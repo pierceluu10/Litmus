@@ -41,7 +41,7 @@ const USABLE_HEIGHT = 0.62 // share of the canvas free of the top buttons and th
 // its card (which opens above it) has space. Pixels; the results card covers PANEL_PX of the right edge on wide screens.
 const PANEL_PX = 384
 const WIDE_PX = 1024
-const ABOVE_MIDDLE = 0.1 // share of the canvas height the agent sits above its centre: room for its card above, and its children below, clear of the bottom card
+const ABOVE_MIDDLE = 0.1 // share of the canvas height the focused group sits above its centre: room for a card above, clear of the bottom card
 // Opening shot: from just behind the statue's head and ear, looking over its shoulder toward the arm.
 // The head is near (-69, 16, -5) in scene units. The camera then glides to the default view, once per session.
 const EAR_CAM = new Vector3(-70, 24, -70)
@@ -261,14 +261,14 @@ function CameraRig({ positions, parents }: { positions: Map<string, Pos>; parent
   const { focusId, fitAll } = useStore()
   const consulting = useStore((s) => !!s.thought && !s.thought.landed)
   const starting = useStarting()
-  // horizontally the focused agent and its direct children share the middle of the free part of the screen, so every agent
-  // it led to stays clickable; vertically the agent itself is the anchor; its column decides how far out we need to be
+  // the focused agent, its direct children and its whole column (the agents running beside it) share the middle of the
+  // free part of the screen, so every one of them stays on screen and clickable; their spread decides how far out we need to be
   const star = focusId ? positions.get(focusId) : undefined
-  const column = star ? [...positions.values()].filter((p) => Math.abs(p.x - star.x) < 1).map((p) => p.y) : []
+  const column = star ? [...positions.values()].filter((p) => Math.abs(p.x - star.x) < 1) : []
   const kids = star ? [...parents].filter(([, parent]) => parent === focusId).map(([id]) => positions.get(id)!).filter(Boolean) : []
-  const group = star ? [star, ...kids] : []
-  const half = Math.max(column.length ? (Math.max(...column) - Math.min(...column)) / 2 : 0, group.length ? (Math.max(...group.map((p) => p.y)) - Math.min(...group.map((p) => p.y))) / 2 : 0)
-  const focus = star ? { x: (Math.max(...group.map((p) => p.x)) + Math.min(...group.map((p) => p.x))) / 2, y: star.y, z: star.z } : { x: FIRST_STEP, y: 0, z: 0 }
+  const xs = [star, ...kids].filter(Boolean).map((p) => p!.x), ys = [...column, ...kids].map((p) => p.y)
+  const half = star ? (Math.max(...ys) - Math.min(...ys)) / 2 : 0
+  const focus = star ? { x: (Math.max(...xs) + Math.min(...xs)) / 2, y: (Math.max(...ys) + Math.min(...ys)) / 2, z: star.z } : { x: FIRST_STEP, y: 0, z: 0 }
   const size = useThree((s) => s.size)
   const portrait = size.width / size.height < PORTRAIT_ASPECT // narrow screens see less width: pull back
   const panel = innerWidth >= WIDE_PX ? PANEL_PX : 0 // the results card is always open on wide screens
@@ -278,9 +278,11 @@ function CameraRig({ positions, parents }: { positions: Map<string, Pos>; parent
   const toDefault = (animated: boolean, keepZoom: boolean) => {
     const c = ctl
     if (!c) return
-    // far enough that the whole column fits; a taller column zooms out, and a zoom the user chose is kept if it is wider
+    // far enough that the whole column fits; a taller column zooms out, and a zoom the user chose is kept if it is wider.
+    // Agents running side by side always fit, even past the zoom cap (which then only limits your own zooming)
     const fits = (half + 18) / (FOV_HALF_TAN * USABLE_HEIGHT)
-    const dist = Math.min(MAX_DISTANCE, Math.max(MIN_DISTANCE, VIEW.length() * (portrait ? PORTRAIT_PULLBACK : 1), fits, keepZoom && c.distance ? c.distance : 0))
+    const dist = Math.max(fits, Math.min(MAX_DISTANCE, Math.max(MIN_DISTANCE, VIEW.length() * (portrait ? PORTRAIT_PULLBACK : 1), keepZoom && c.distance ? c.distance : 0)))
+    c.maxDistance = Math.max(MAX_DISTANCE, dist)
     // aim off the agent by the pixel offset it should sit at, converted to scene units at this distance
     const unitsPerPx = (2 * dist * FOV_HALF_TAN) / size.height
     const t = new Vector3(focus.x + (panel / 2) * unitsPerPx, focus.y - ABOVE_MIDDLE * size.height * unitsPerPx, focus.z)
@@ -382,7 +384,8 @@ export function Scene() {
   const stars = useStore((s) => s.app.session?.stars ?? NO_STARS)
   return (
     <Canvas className="!absolute inset-0" camera={{ fov: 30, near: 1, far: 3000, position: [12, -4, 300] }} dpr={[1, 2]}
-      aria-label="Research tree: each node is an experiment, each column a generation">
+      aria-label="Research tree: each node is an experiment, each column a generation"
+      onPointerMissed={() => { const st = useStore.getState(); if (st.selectedId || st.cardFor) st.select(null) }}>
       <Background />
       <hemisphereLight args={['#ffffff', '#a6b4c8', 0.9]} />
       <directionalLight position={[-140, 160, 140]} intensity={2.1} />

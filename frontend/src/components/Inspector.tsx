@@ -81,7 +81,7 @@ function Activity() {
   )
 }
 
-const CARD = 'isolate rounded-2xl border border-rule bg-surface shadow-[0_20px_50px_-14px_rgba(43,58,82,0.30)]'
+const CARD = 'marble-edge relative isolate rounded-2xl border border-rule bg-surface'
 const RESULTS_FACETS = 23, LITMUS_FACETS = 61
 // The results card keeps one height whether or not the chat is open; the chat fills the room under it.
 const RESULTS_HEIGHT = 'h-[56%] flex-none'

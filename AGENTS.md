@@ -297,10 +297,10 @@ with the same expandable claim cards and a Start button each, while the camera h
 FROM THE PAPER (or Findings once agents tested it) and the cite / page / Source line. The results card keeps one height (`RESULTS_HEIGHT`); the chat fills the room
 under it. **Test another claim** (`ClaimPicker.tsx`) lists every highlight with its status; tested ones keep a greyed-out
 Test button; open one for its card (paper, your note, Basis, Findings, source). Following new branches is always on;
-**Fit all** zooms out (padded clear of the results card) and closes node cards, **Default view** goes back to following.
+**Fit all** zooms out (padded clear of the results card) and closes node cards, **Default view** goes back to following. Clicking empty space lets go of the open agent (there is no ×): the camera fits everything, or keeps following while agents run, and the next new agent is followed. Agents running side by side always fit on screen: the follow camera centres the focused agent's whole column and may pull back past the zoom cap (which then only limits your own zooming).
 The camera centres the focused agent and its direct children in the space the results card leaves, the agent a little above the middle so its card fits above and its children stay clear of the bottom card (`PANEL_PX`, `ABOVE_MIDDLE`), zoom is
 capped at `MAX_DISTANCE` (520, the user's furthest zoom; the default ≈350 is their ideal), and five dashed accuracy levels (baseline ±1, ±2 points, `AccuracyLines`) run behind the
-graph, the baseline through the fingertip. The floating cards carry the landing's faceted sky (`.card-facets`: fixed size from the bottom-right corner, contrast boosted so the facets read).
+graph, the baseline through the fingertip. The floating cards carry the landing's faceted sky (`.card-facets`: fixed size from the bottom-right corner, pale sky tones with white seams so the cards stay white; `.marble-edge` rim; `.plate` panes are frosted so the facets glint through; Litmus's narration bubbles carry it too).
 
 **Branch from anywhere**: "Branch from here" sends `feedback(kind: "suggest")` for that star, so it works against the real backend too (the agent replans from it); the demo backend answers with proposals from that star.
 
