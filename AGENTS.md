@@ -65,13 +65,38 @@ uv run litmus --help
 - Never commit secrets. `.env` is gitignored.
 
 ## Backend
-(Filled in as features land.)
+
+### Experiments (`backend/litmus/experiments/`, `backend/litmus/modal_app.py`)
+- Trainer = airbench94 **paper version** (`legacy/airbench94.py`, MIT, vendored with attribution in
+  `trainer.py` + `LICENSE-airbench`). Chosen over `airbench94_muon.py` because it has no `torch.compile`
+  (no autotune warmup) and every paper feature we test is a real hyperparameter there.
+- Knobs and **true baseline defaults** (`knobs.py: BASELINE_KNOBS`):
+  `label_smoothing=0.2, epochs=9.9, tta_level=2, flip="alternating", mixup_alpha=0, cutout=0,
+  lr_scale=1.0, whiten=True, dirac_init=True, translate=2`. Added by us: mixup, cutout, `flip="random"|"none"`,
+  `whiten=False` (trainable first conv), `dirac_init=False`. So "label smoothing" tests vary ε around 0.2 and
+  "TTA"/"flip"/"whitening" tests are ablations.
+- Metric: `tta_val_acc` = final accuracy at the config's own `tta_level` (equals `val_acc` at level 0).
+- Modal: deployed app `litmus`, class `Trainer` (`train(knobs, seeds)` generator, `ping()`). Deploy with
+  `cd backend && uv run modal deploy litmus/modal_app.py` after changing trainer code. Seeds run sequentially
+  per call (one container per branch), `max_containers=8`, `scaledown_window=600`.
+- CIFAR is cached as `train.pt`/`test.pt` on the `cifar-data` volume (created on first container start).
+
+### Commands
+| Command | What |
+|---|---|
+| `uv run litmus smoke [--seeds 0 1]` | baseline on Modal, streams epochs |
+| `uv run litmus warmup` | start a warm container |
+| `uv run pytest` | tests (CPU only) |
 
 ## Gotchas
-- (none yet)
+- Local `torch` is a dev dependency for CPU tests only; the server never imports the trainer.
+- `train_run` is a generator so per-epoch progress streams live through `remote_gen`.
 
 ## Verification log
-- (none yet)
+- 2026-10-16 modal-runner: `uv run litmus smoke --seeds 0 1` → seed 0 tta_val_acc 0.9389, seed 1 0.9401;
+  **4.2 GPU-s per seed**, cold start ≈17s (container boot + data load + cudnn warmup), warm ≈4.5s/seed wall.
+  All 11 knob variants ran in parallel on 8 containers: e.g. mixup α=0.2 @9.9ep 0.9369, mixup @20ep 0.9457,
+  no whitening 0.9284, flip none 0.9338 (single seed each).
 
 ## Frontend
 (owned by frontend agent)
