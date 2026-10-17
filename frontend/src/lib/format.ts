@@ -21,12 +21,21 @@ const AGENT_NAMES: Record<keyof Knobs, string> = {
   label_smoothing: 'Smoothing', epochs: 'Long training', tta_level: 'TTA', flip: 'Flip', mixup_alpha: 'Mixup',
   cutout: 'Cutout', lr_scale: 'Learning rate', whiten: 'Whitening', dirac_init: 'Identity init', translate: 'Translate',
 }
-// The short name shown under a star: the method it tests, plus training length when that changed too.
-export function agentName(s: Star): string {
-  const keys = Object.keys(s.knob_changes) as (keyof Knobs)[]
+// The name shown under a star: the method it tests. Agents sharing one get A, B, C… (agent_label, set by the reducer).
+function baseName(s: Star): string {
   if (!s.parent_id) return 'Baseline'
-  const method = keys.find((k) => k !== 'epochs')
-  return method ? `${AGENT_NAMES[method]} agent` : `${AGENT_NAMES.epochs} agent`
+  const method = (Object.keys(s.knob_changes) as (keyof Knobs)[]).find((k) => k !== 'epochs')
+  return `${AGENT_NAMES[method ?? 'epochs']} agent`
+}
+export const agentName = (s: Star): string => s.agent_label ?? baseName(s)
+// Letters in the order the agents started, mirroring the backend's agent_name.
+export function labelAgents(stars: Star[]): Star[] {
+  const groups = new Map<string, string[]>()
+  for (const s of stars) if (s.parent_id) groups.set(baseName(s), [...(groups.get(baseName(s)) ?? []), s.id])
+  return stars.map((s) => {
+    const same = groups.get(baseName(s)) ?? []
+    return { ...s, agent_label: same.length > 1 ? `${baseName(s)} ${String.fromCharCode(65 + same.indexOf(s.id))}` : undefined }
+  })
 }
 export function agentDetail(s: Star): string {
   const k = s.knob_changes

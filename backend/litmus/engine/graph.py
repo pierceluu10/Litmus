@@ -387,7 +387,7 @@ async def suggest(bs: BranchState) -> dict:
     if (s.status != "done" or not s.grade or s.suggestion or state.finish_requested or final_wave
             or len(research_stars(state)) >= MAX_STARS):
         return {}
-    name = agent.agent_name(s)
+    name = agent.agent_name(state, s)
     ops.think(state, f"{name}: reading the other agents' results to decide where to go next.", s.id)
     _, claims = await get_library()
     try:

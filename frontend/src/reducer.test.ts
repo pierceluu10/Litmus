@@ -3,7 +3,7 @@ import { applyEvent, initialState } from './reducer'
 import type { LitmusEvent } from './types'
 
 const ev = (seq: number, type: string, payload: any): LitmusEvent => ({ seq, ts: 't', session_id: 's', type, payload })
-const star = { id: 'S1', parent_id: 'S0', depth: 1, title: 'x', status: 'queued', runs: [], parent_runs: [] }
+const star = { id: 'S1', parent_id: 'S0', depth: 1, title: 'x', status: 'queued', knob_changes: {}, runs: [], parent_runs: [] }
 
 describe('applyEvent', () => {
   it('ignores duplicate seq', () => {
@@ -33,6 +33,13 @@ describe('applyEvent', () => {
   })
   it('records where the session starts', () => {
     expect(applyEvent(initialState, ev(1, 'start.chosen', { claim_ids: ['hl_a'] })).session?.start_claim_ids).toEqual(['hl_a'])
+  })
+  it('agents that share a name get A, B, C in start order', () => {
+    let s = applyEvent(initialState, ev(1, 'star.created', { star: { ...star, knob_changes: { mixup_alpha: 1 } } }))
+    expect(s.session?.stars[0].agent_label).toBeUndefined()
+    s = applyEvent(s, ev(2, 'star.created', { star: { ...star, id: 'S2', knob_changes: { mixup_alpha: 0.2, epochs: 20 } } }))
+    s = applyEvent(s, ev(3, 'star.created', { star: { ...star, id: 'S3', knob_changes: { tta_level: 0 } } }))
+    expect(s.session?.stars.map((x) => x.agent_label)).toEqual(['Mixup agent A', 'Mixup agent B', undefined])
   })
   it('ignores unknown events', () => {
     expect(applyEvent(initialState, ev(1, 'future.thing', {})).lastSeq).toBe(1)

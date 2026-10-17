@@ -141,17 +141,22 @@ function Face() {
   return <img src="/litmus-face.svg" alt="" width={24} height={24} className="mt-[7px] shrink-0" />
 }
 
-function LitmusMessage({ text, provenance }: { text: string; provenance?: Provenance[] }) {
+// The answer opens out from where the pearl lands on its first line.
+const HIDDEN_ANSWER = { clipPath: 'circle(0px at 12px 11px)', opacity: 0, filter: 'blur(4px)' }
+const SHOWN_ANSWER = { clipPath: 'circle(150% at 12px 11px)', opacity: 1, filter: 'blur(0px)' }
+
+function LitmusMessage({ text, provenance, pending }: { text: string; provenance?: Provenance[]; pending?: boolean }) {
   const claims = useStore((st) => st.app.claims)
   const cited = (provenance ?? []).filter((p, i, all) => p.kind === 'highlight' && all.findIndex((q) => q.id === p.id) === i).slice(0, MAX_CITED)
   return (
     <div className="flex items-start gap-2">
       <Face />
       <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-        <motion.div className="msg-litmus" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}>
+        <motion.div className="msg-litmus" data-answer-slot={pending ? 'pending' : undefined} initial={pending ? HIDDEN_ANSWER : { opacity: 0, y: 4 }}
+          animate={pending ? HIDDEN_ANSWER : { ...SHOWN_ANSWER, y: 0 }} transition={{ duration: 0.6, ease: [0.23, 1, 0.32, 1] }}>
           {text}
         </motion.div>
-        {cited.length > 0 && <div className="flex flex-wrap gap-1">{cited.map((p) => <ProvChip key={p.id} p={p} label={claims.find((c) => c.id === p.id)?.summary} />)}</div>}
+        {!pending && cited.length > 0 && <div className="flex flex-wrap gap-1">{cited.map((p) => <ProvChip key={p.id} p={p} label={claims.find((c) => c.id === p.id)?.summary} />)}</div>}
       </div>
     </div>
   )
@@ -212,18 +217,20 @@ function AgentReport({ s }: { s: Star }) {
 
 // The conversation with Litmus about this star: replans read as notes between messages, then your questions.
 function Story({ s }: { s: Star }) {
-  const { chats, thinking, app } = useStore()
+  const { chats, thinking, thought, app } = useStore()
   const turns = chats[s.id] ?? []
   const replans = app.replans.filter((r) => r.star_id === s.id)
   const busy = thinking === s.id
+  const flying = thought?.starId === s.id
+  const pending = flying && !thought.landed // the newest answer stays hidden until the pearl lands on it
   if (!replans.length && !turns.length && !busy) return null
   return (
     <section aria-label="Conversation with Litmus" className="flex flex-col gap-3">
       {replans.map((r) => <p key={r.seq} className="thread-note" title={r.because}>{firstSentence(r.change)}</p>)}
       {turns.map((t, i) => t.role === 'human'
         ? <p key={i} className="msg-human">{t.text}</p>
-        : <LitmusMessage key={i} text={t.text} provenance={t.provenance} />)}
-      {busy && (
+        : <LitmusMessage key={i} text={t.text} provenance={t.provenance} pending={pending && i === turns.length - 1} />)}
+      {busy && !flying && (
         <div className="flex items-start gap-2" aria-live="polite" aria-label="Litmus is thinking">
           <Face /><div className="msg-litmus thinking"><span className="thinking-text">Thinking</span><span className="typing"><span /><span /><span /></span></div>
         </div>
@@ -238,13 +245,21 @@ function AskBar({ s }: { s: Star }) {
   const [draft, setDraft] = useState('')
   const turns = chats[s.id] ?? []
   const busy = thinking === s.id
-  const send = (q: string) => { if (!q.trim() || busy) return; setDraft(''); ask(s.id, q.trim()) }
+  // `source` is the element the words were typed or shown in: they fold up from exactly there.
+  const send = (q: string, source: HTMLElement) => {
+    if (!q.trim() || busy) return
+    const r = source.getBoundingClientRect(), cs = getComputedStyle(source)
+    useStore.setState((st) => ({ thought: { key: (st.thought?.key ?? 0) + 1, starId: s.id, text: q.trim(), landed: false,
+      from: { left: r.left, top: r.top, width: r.width, height: r.height, padding: parseFloat(cs.paddingLeft), font: cs.font, letterSpacing: cs.letterSpacing } } }))
+    setDraft('')
+    ask(s.id, q.trim())
+  }
   return (
     <div className="flex flex-col gap-2 border-t border-rule bg-surface p-3">
-      {!turns.length && !busy && <div className="flex flex-wrap gap-1.5">{OPENERS.map((q) => <button key={q} className="chip hover:border-faint hover:text-ink" onClick={() => send(q)}>{q}</button>)}</div>}
-      <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); send(draft) }}>
+      {!turns.length && !busy && <div className="flex flex-wrap gap-1.5">{OPENERS.map((q) => <button key={q} className="chip hover:border-faint hover:text-ink" onClick={(e) => send(q, e.currentTarget)}>{q}</button>)}</div>}
+      <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); send(draft, e.currentTarget.querySelector('input')!) }}>
         <label className="sr-only" htmlFor={`ask-${s.id}`}>Ask Litmus about this experiment</label>
-        <input id={`ask-${s.id}`} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Ask Litmus about this experiment" className="field min-w-0 flex-1" />
+        <input id={`ask-${s.id}`} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Ask Litmus" className="field min-w-0 flex-1" />
         <button className="btn btn-primary" disabled={!draft.trim() || busy}>Ask</button>
       </form>
     </div>

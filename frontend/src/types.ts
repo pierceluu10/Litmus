@@ -18,7 +18,8 @@ export type Star = {
   knobs: Knobs; knob_changes: Partial<Knobs>; provenance: Provenance[]; chosen_by: ChosenBy
   status: StarStatus; predicted?: Predicted; proposal_id?: string; shadow_of?: string
   progress?: Progress[]; runs: RunResult[]; parent_runs: RunResult[]; grade?: Grade
-  reflection?: string; suggestion?: string; error?: string; created_at: string; finished_at?: string
+  reflection?: string; suggestion?: string; agent_label?: string; // agent_label: frontend only
+  error?: string; created_at: string; finished_at?: string
 }
 export type QuestionOption = { id: string; label: string; consequence: string; knob_changes?: Partial<Knobs>; parent_star_id?: string }
 export type Question = { id: string; star_id: string; text: string; evidence: Provenance[]; options: QuestionOption[]; agent_leaning?: string; status: 'open' | 'answered'; answer?: { option_id: string; comment?: string } }

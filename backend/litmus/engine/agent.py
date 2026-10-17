@@ -156,21 +156,28 @@ def grade_summary(s: Star) -> dict | None:
             "p_value": round(g.p_value, 4), "n": g.n, "practical": g.practical}
 
 
-def agent_name(s: Star) -> str:
+def _base_name(s: Star) -> str:
     if not s.parent_id:
         return "Baseline"
     method = next((k for k in s.knob_changes if k != "epochs"), "epochs")
     return f"{AGENT_NAMES[method]} agent"
 
 
-def star_summary(s: Star) -> dict:
-    return {"id": s.id, "agent": agent_name(s), "parent": s.parent_id, "title": s.title, "status": s.status,
+def agent_name(state: SessionState, s: Star) -> str:
+    """The agent's name; agents that share one get A, B, C… in the order they started (mirrors the frontend)."""
+    base = _base_name(s)
+    same = [x.id for x in state.stars if x.parent_id and _base_name(x) == base]
+    return f"{base} {chr(ord('A') + same.index(s.id))}" if len(same) > 1 else base
+
+
+def star_summary(state: SessionState, s: Star) -> dict:
+    return {"id": s.id, "agent": agent_name(state, s), "parent": s.parent_id, "title": s.title, "status": s.status,
             "chosen_by": s.chosen_by, "knob_changes": s.knob_changes, "predicted": s.predicted, "grade": grade_summary(s),
             "reflection": s.reflection, "suggestion": s.suggestion, "error": s.error}
 
 
 def tree(state: SessionState) -> list[dict]:
-    return [star_summary(s) for s in state.stars]
+    return [star_summary(state, s) for s in state.stars]
 
 
 def claim_summary(c: Claim) -> dict:
@@ -279,10 +286,10 @@ async def suggest(state: SessionState, s: Star, claims: list[Claim], conditions:
     the other agents' open suggestions so they build on each other instead of repeating. Repairs once."""
     by_id = {c.id: c for c in claims}
     mine = human_agenda(state, s.id)
-    siblings = [star_summary(x) for x in state.stars if x.id != s.id and x.wave == s.wave and x.parent_id]
-    others = [{"agent": agent_name(ops.star(state, p.star_id)), "title": p.title, "knob_changes": p.knob_changes}
+    siblings = [star_summary(state, x) for x in state.stars if x.id != s.id and x.wave == s.wave and x.parent_id]
+    others = [{"agent": agent_name(state, ops.star(state, p.star_id)), "title": p.title, "knob_changes": p.knob_changes}
               for p in state.proposals if p.status == "open"]
-    values = dict(agent=agent_name(s), goal=state.goal, star=star_summary(s), grade=grade_summary(s),
+    values = dict(agent=agent_name(state, s), goal=state.goal, star=star_summary(state, s), grade=grade_summary(s),
                   provenance=provenance_text(s.provenance), conditions=conditions or "(unknown)", siblings=siblings or "(none yet)",
                   others=others or "(none)", tree=tree(state), claims=[claim_summary(c) for c in claims],
                   knob_schema=KNOB_SCHEMA, agenda=_agenda_view(mine) or "(empty)", most=str(MAX_SUGGESTIONS),
@@ -301,7 +308,7 @@ async def suggest(state: SessionState, s: Star, claims: list[Claim], conditions:
 # ---------------------------------------------------------------- reflect / conflicts
 
 async def reflect(state: SessionState, s: Star, conditions: str, budget_left: float) -> Reflection:
-    return await structured("reflect", Reflection, star=star_summary(s), grade=grade_summary(s),
+    return await structured("reflect", Reflection, star=star_summary(state, s), grade=grade_summary(s),
                             provenance=provenance_text(s.provenance), conditions=conditions or "(unknown)",
                             tree=tree(state), n=str(s.grade.n if s.grade else 0), max_seeds=str(MAX_SEEDS),
                             budget_left=f"{budget_left:.0f}")
@@ -309,7 +316,7 @@ async def reflect(state: SessionState, s: Star, conditions: str, budget_left: fl
 
 async def detect_conflict(state: SessionState, s: Star, query: str, hits: list[Provenance], may_ask: bool) -> ConflictCheck:
     hit_lines = "\n".join(f"{h.id} ({h.doc_title}): {h.text[:400]}" for h in hits) or "(no hits)"
-    check = await structured("detect_conflict", ConflictCheck, knob_schema=KNOB_SCHEMA, star=star_summary(s), grade=grade_summary(s),
+    check = await structured("detect_conflict", ConflictCheck, knob_schema=KNOB_SCHEMA, star=star_summary(state, s), grade=grade_summary(s),
                              provenance=provenance_text(s.provenance), query=query, hits=hit_lines,
                              tree=tree(state), may_ask=str(may_ask).lower())
     if check.conflict and (not may_ask or not check.question or len(check.options) < 2):
@@ -331,7 +338,7 @@ def demote_to_follow_up(check: ConflictCheck) -> None:
 async def replan(state: SessionState, s: Star, kind: str, text: str, plan: str) -> Replan:
     open_proposals = [p.model_dump(include={"id", "title", "knob_changes"}) for p in state.proposals
                       if p.status == "open" and p.wave == state.wave]
-    return await structured("replan", Replan, kind=kind, text=text, star=star_summary(s), grade=grade_summary(s),
+    return await structured("replan", Replan, kind=kind, text=text, star=star_summary(state, s), grade=grade_summary(s),
                             plan=plan, wave=str(state.wave), open_proposals=open_proposals or "(none)",
                             tree=tree(state), knob_schema=KNOB_SCHEMA, n=str(s.grade.n if s.grade else 0),
                             max_seeds=str(MAX_SEEDS))
@@ -362,8 +369,8 @@ async def chat(state: SessionState, s: Star, question: str, history: list[ChatTu
     runs = {"this": [(r.seed, points(r.tta_val_acc or r.val_acc)) for r in s.runs],
             "graded_against": [(r.seed, points(r.tta_val_acc or r.val_acc)) for r in s.parent_runs]}
     turns = "\n".join(f"{'Human' if t.role == 'human' else 'Litmus'}: {t.text}" for t in history[-MAX_CHAT_TURNS:])
-    result = await structured("chat_star", Explanation, tree=tree(state), star=star_summary(s), knobs=s.knobs.model_dump(),
-                              parent=star_summary(compared) if compared else "(none: this is the baseline)", runs=runs,
+    result = await structured("chat_star", Explanation, tree=tree(state), star=star_summary(state, s), knobs=s.knobs.model_dump(),
+                              parent=star_summary(state, compared) if compared else "(none: this is the baseline)", runs=runs,
                               provenance=provenance_text(s.provenance),
                               hits="\n".join(f"{h.id} ({h.doc_title}): {h.text[:300]}" for h in hits) or "(none)",
                               history=turns or "(this is the first message)", question=question)

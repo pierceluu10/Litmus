@@ -10,6 +10,7 @@ import { Scene } from './components/Scene'
 import { SceneBackdrop } from './components/LowPolyScene'
 import { Dock } from './components/Dock'
 import { Inspector } from './components/Inspector'
+import { ThoughtFlight } from './components/ThoughtFlight'
 
 // tiny hash router: '' is the home page, #/login and #/signup are the account pages
 function useWide() {
@@ -55,8 +56,8 @@ function Screens() {
     <div className="flex h-full flex-col">
       <TopBar />
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:overflow-hidden">
-        {/* --panel is the room the floating results card takes on the right; the scene's own controls keep clear of it */}
-        <main className="marble-ground relative min-h-0 flex-1 overflow-hidden max-lg:h-[72vh] max-lg:flex-none lg:[--panel:372px]">
+        {/* --panel / --rail: the room the floating cards take on the right and left; the scene's controls and the dock keep clear */}
+        <main className="marble-ground relative min-h-0 flex-1 overflow-hidden max-lg:h-[72vh] max-lg:flex-none lg:[--panel:372px] lg:[--rail:324px]">
           <SceneBackdrop seed={SCENE_FACETS} />
           <Scene />
           <SceneChrome />
@@ -66,6 +67,7 @@ function Screens() {
         </main>
         {!wide && <Inspector floating={false} />}
       </div>
+      <ThoughtFlight />
     </div>
   )
 }

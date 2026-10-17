@@ -30,6 +30,7 @@ type Store = {
   abstractOpen: boolean
   chats: Record<string, (ChatTurn & { provenance?: Provenance[] })[]> // per star, oldest first
   thinking: string | null // the star whose chat is waiting on Litmus
+  thought: Thought | null // the question's trip to the statue and back; the answer stays hidden until it lands
   begin: (replay: boolean, goal?: string) => Promise<void>
   leave: () => void
   select: (id: string | null) => void
@@ -46,6 +47,12 @@ type Store = {
   generateAbstract: () => Promise<void>
 }
 
+// A question in flight to the statue: the text it was typed as, and where (the chat input's box and font).
+export type Thought = {
+  key: number; starId: string; text: string; landed: boolean
+  from: { left: number; top: number; width: number; height: number; padding: number; font: string; letterSpacing: string }
+}
+
 let unsub: (() => void) | null = null
 let libraryLoad: AbortController | null = null
 
@@ -58,7 +65,7 @@ export const useStore = create<Store>((set, get) => {
   }
   return {
     app: initialState, sid: null, conn: 'closed', libraryStage: 'papers', demo: savedDemo(), error: null, selectedId: null, hoveredClaim: null, imported: null,
-    follow: true, focusId: null, fitAll: false, abstractOpen: false, chats: {}, thinking: null,
+    follow: true, focusId: null, fitAll: false, abstractOpen: false, chats: {}, thinking: null, thought: null,
     set: (p) => set(p),
     setDemo(demo) {
       try { localStorage.setItem(DEMO_KEY, demo ? '1' : '0') } catch { /* private window: the switch still works for this visit */ }
@@ -68,11 +75,11 @@ export const useStore = create<Store>((set, get) => {
     leave() {
       unsub?.(); unsub = null
       libraryLoad?.abort(); libraryLoad = null
-      set({ app: initialState, sid: null, conn: 'closed', selectedId: null, focusId: null, fitAll: false, abstractOpen: false, chats: {}, error: null, demo: savedDemo(), imported: null })
+      set({ app: initialState, sid: null, conn: 'closed', selectedId: null, focusId: null, fitAll: false, abstractOpen: false, chats: {}, thought: null, error: null, demo: savedDemo(), imported: null })
     },
     async begin(replay, goal) {
       unsub?.()
-      set({ app: initialState, libraryStage: 'papers', selectedId: null, focusId: null, fitAll: false, follow: true, error: null, abstractOpen: false, chats: {} })
+      set({ app: initialState, libraryStage: 'papers', selectedId: null, focusId: null, fitAll: false, follow: true, error: null, abstractOpen: false, chats: {}, thought: null })
       libraryLoad?.abort()
       const api = current = apiFor(get().demo)
       const load = libraryLoad = new AbortController()

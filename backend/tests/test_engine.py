@@ -27,6 +27,13 @@ def test_comparison_isolates_the_method_at_the_child_epoch_count():
     assert ops.comparison_knobs(longer_only, root) == root.knobs.model_dump()  # never compare a star with itself
 
 
+def test_agents_that_share_a_name_get_letters_in_start_order():
+    state = driver.SessionState(id="s", goal="g", budget_total=1, stars=[
+        make_star("S0", None), make_star("S1", "S0", mixup_alpha=1.0), make_star("S2", "S0", tta_level=0),
+        make_star("S3", "S0", mixup_alpha=0.2, epochs=20)])
+    assert [agent.agent_name(state, s) for s in state.stars] == ["Baseline", "Mixup agent A", "TTA agent", "Mixup agent B"]
+
+
 # ---------------------------------------------------------------- integration fixtures
 
 CLAIMS = [

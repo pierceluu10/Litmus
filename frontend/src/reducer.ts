@@ -1,3 +1,4 @@
+import { labelAgents } from './lib/format'
 import type { Abstract, Claim, Decision, Document, LitmusEvent, Provenance, Question, SessionState, Star } from './types'
 
 export type FeedItem = {
@@ -65,7 +66,7 @@ export function applyEvent(state: AppState, ev: LitmusEvent): AppState {
       addFeed({ kind: 'decision', star_id: p.star_id, text: `You chose: ${d.human_choice}` }); break
     }
     case 'star.created': case 'shadow.created': case 'star.updated':
-      s = { ...s, stars: upsert(s.stars, p.star as Star) }; touch(p.star.id); break
+      s = { ...s, stars: labelAgents(upsert(s.stars, p.star as Star)) }; touch(p.star.id); break
     case 'experiment.started': s = patchStar(s, p.star_id, (st) => ({ ...st, status: 'running', progress: [] })); touch(p.star_id); break
     case 'experiment.progress':
       s = patchStar(s, p.star_id, (st) => ({ ...st, status: 'running', progress: [...(st.progress ?? []).filter((x) => x.seed !== p.seed || x.epoch !== p.epoch), { seed: p.seed, epoch: p.epoch, val_acc: p.val_acc }] }))
