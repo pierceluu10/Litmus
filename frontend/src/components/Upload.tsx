@@ -64,7 +64,8 @@ export function Upload() {
     <main className="relative h-full overflow-y-auto bg-surface">
       <SceneBackdrop seed={77} className="pointer-events-none fixed inset-0 h-full w-full" />
       {[{ seed: 31, side: 'left-[3vw]', delay: 0.15 }, { seed: 32, side: 'right-[3vw]', delay: 0.4 }].map((p) => (
-        <motion.div key={p.seed} aria-hidden className={`pointer-events-none fixed bottom-[7vh] top-[5vh] hidden h-[88vh] w-[clamp(110px,12vw,180px)] xl:block ${p.side}`}
+        // floor to ceiling: the column's own width-to-height ratio (150:1000 in Pillar), so it never stretches
+        <motion.div key={p.seed} aria-hidden className={`pointer-events-none fixed inset-y-0 hidden h-full w-[15vh] xl:block ${p.side}`}
           initial={reduce ? false : { y: '-115%' }} animate={{ y: 0 }} transition={{ duration: 1.25, delay: p.delay, ease: [0.16, 1, 0.3, 1] }}>
           <Pillar seed={p.seed} className="h-full w-full" />
         </motion.div>

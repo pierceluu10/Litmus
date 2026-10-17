@@ -60,7 +60,7 @@ function column(cx: number, top: number, bottom: number, w: number, seed: number
 
 // One full-height column for the page margins (the upload page): the same capital, fluted shaft and base as the temple's.
 export function Pillar({ className, seed }: { className?: string; seed: number }) {
-  const tris = column(75, 20, 1000, 100, seed)
+  const tris = column(75, 0, 1000, 100, seed)
   return (
     <svg viewBox="0 0 150 1000" className={className} preserveAspectRatio="xMidYMid meet" aria-hidden="true">
       {tris.map((t, i) => <polygon key={i} points={t.pts.map((q) => q.join(',')).join(' ')} fill={t.fill} stroke={t.fill} strokeWidth={0.6} strokeLinejoin="round" />)}
