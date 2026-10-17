@@ -249,7 +249,7 @@ npm test             # reducer, layout, simulator + grader-port tests
 ```
 **Live by default, Demo mode on a switch** (user decision, 2026-10-17): the front page's nav has a **Demo mode** switch at the top right (remembered in `localStorage` as `litmus.demo`; `?demo=1` also turns it on). The guided tutorial was removed. Off, it is the real backend at `VITE_API_URL` (default `http://localhost:8000`), sessions created with `fresh: true` so every star trains live on Modal; the front page shows Modal/Papiers/OpenAI health. The practice backend is `src/mock/`. A session keeps the backend it started on (`sessionApi()` in `store.ts`); the workspace shows no badge either way.
 
-**The library is always real**: on launch the claims rail streams `GET /api/library/stream` from the backend (Getting papers… highlights… notes… Summarizing…), in the demo too, so run `uv run litmus serve`. If the backend is unreachable the demo falls back to `src/mock/library.json`, a snapshot of `backend/data/library_cache.json` with the same ids (refresh it by copying the cache).
+**The library is always real**: on launch the claims rail streams `GET /api/library/stream` from the backend (Fetching papers… Fetching highlights… Gathering notes… Summarizing each highlight…, shown in the start bubble; each claim card's title is that summary), in the demo too, so run `uv run litmus serve`. If the backend is unreachable the demo falls back to `src/mock/library.json`, a snapshot of `backend/data/library_cache.json` with the same ids (refresh it by copying the cache).
 
 **The demo backend** (`src/mock/`): `sim.ts` is a simulated airbench94 whose knob effects are calibrated from the recorded real session (`shared/demo-session.json`: mixup α=1 −1.44, α=0.2 +0.22 at 30 epochs, no TTA −0.75, no whitening −1.48, …) with seed-paired noise, plus a port of the locked grader (paired t-interval, verdict relative to prediction). `server.ts` emits the contract's events: any star can be branched (a catalog of moves tied to library highlights), there is no agent's pick and no shadow runs, inconclusive results get 5 more seeds, the first mixup refutation triggers library search + a question, the session waits for "Where should we start?" (one claim, one first agent), each agent offers its own card with a short take when its verdict lands, and Litmus plans from the best star only when no card is open. `library.ts` maps the demo's moves onto highlights in that snapshot by their real ids.
 
@@ -279,7 +279,7 @@ npm test             # reducer, layout, simulator + grader-port tests
 
 **Testing another claim**: the "Test another claim" button next to Fit all (`components/ClaimPicker.tsx`) lists every highlight no agent has touched, notes first, with a one-click Test (pivot). The bottom dock shows one card at a time with a ‹ 2 of 5 › pager, proposals as short checkable titles, and the instruction field behind "Add an instruction". Node names hang below the ring (anchored by their top edge) and columns are `LAYER_GAP` 120 apart with `MIN_GAP` 46, so labels never overlap.
 
-**Bulbs, bubbles and eyes**: every node has low-poly eyes (blink, look around while training, glance up when it needs you). When an experiment is done and has options for you, a low-poly light bulb sits at its top right; clicking the node or the bulb opens "Where should I proceed?" as a speech bubble out of the node (`components/NodeBubble.tsx`, `proceedFor` in the store), with "See results" for its card. The bottom dock now holds only questions. The first question, "Where should we start?", is a bubble out of Litmus's face (`components/StartBubble.tsx`).
+**Bulbs, bubbles and eyes**: every node has low-poly eyes (blink, look around while training, glance up when it needs you). When an experiment is done and has options for you, a low-poly light bulb sits at its top right; clicking the node or the bulb opens "Where should I proceed?" as a speech bubble out of the node (`components/NodeBubble.tsx`, `proceedFor` in the store), with "See results" for its card. The bottom dock now holds only questions. The first question, "Where should we start?", is a bubble rising from Litmus's face at the bottom right (`components/StartBubble.tsx`).
 
 **Where you steered** (`components/Steering.tsx`, `lib/steering.ts`): the Results card lists each human decision (`Decision` events: dispatch, answer, feedback) with the stars it produced and their graded result. When the agent's alternative also ran (same `proposal_id`, or an answer option's `knob_changes`), it shows the accuracy gap; otherwise it says nothing can be compared. Nothing is invented: the practice backend has no agent pick, so only real backend sessions show a "would have picked" line.
 
@@ -291,14 +291,16 @@ ranking row) opens its card above it, or below its label when there is not room 
 found and suggests, Stop / Branch from here) and **Where should I proceed?** (its options). The right panel is for the
 whole research only: researching now, results, accuracy by path, rankings, where you steered, research log, and the
 **Litmus card** (opened by Litmus's face, which sits under the always-open results card and narrates what the agents do in speech bubbles above it; one conversation; Litmus answers about the open agent, shown as a removable chip, or the research as a
-whole). "Where should we start?" is a speech bubble out of the statue's head (`StartBubble`, following `statueAnchor`), with the same
-expandable claim cards and a Start button each. The results card keeps one height (`RESULTS_HEIGHT`); the chat fills the room
+whole). "Where should we start?" is a speech bubble rising from Litmus's face at the bottom right (`StartBubble`, in the right column),
+with the same expandable claim cards and a Start button each, while the camera holds behind the statue; the results card, the chat
+(the face cannot be clicked) and Fit all stay hidden until you pick, then the camera pans to the graph. A claim card opens to YOUR NOTE,
+FROM THE PAPER (or Findings once agents tested it) and the cite / page / Source line. The results card keeps one height (`RESULTS_HEIGHT`); the chat fills the room
 under it. **Test another claim** (`ClaimPicker.tsx`) lists every highlight with its status; tested ones keep a greyed-out
 Test button; open one for its card (paper, your note, Basis, Findings, source). Following new branches is always on;
 **Fit all** zooms out (padded clear of the results card) and closes node cards, **Default view** goes back to following.
 The camera centres the focused agent and its direct children in the space the results card leaves, the agent a little above the middle so its card fits above and its children stay clear of the bottom card (`PANEL_PX`, `ABOVE_MIDDLE`), zoom is
 capped at `MAX_DISTANCE` (520, the user's furthest zoom; the default ≈350 is their ideal), and five dashed accuracy levels (baseline ±1, ±2 points, `AccuracyLines`) run behind the
-graph, the baseline through the fingertip. The floating cards carry the landing's faceted sky (`.card-facets`).
+graph, the baseline through the fingertip. The floating cards carry the landing's faceted sky (`.card-facets`: fixed size from the bottom-right corner, contrast boosted so the facets read).
 
 **Branch from anywhere**: "Branch from here" sends `feedback(kind: "suggest")` for that star, so it works against the real backend too (the agent replans from it); the demo backend answers with proposals from that star.
 

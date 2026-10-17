@@ -5,7 +5,7 @@ import { useStore } from '../store'
 import { type LibraryStage } from '../transport/api'
 import type { Claim, Star } from '../types'
 
-const STAGE_TEXT: Record<LibraryStage, string> = { papers: 'Getting papers', highlights: 'Getting highlights', notes: 'Getting notes', summaries: 'Summarizing highlights' }
+export const STAGE_TEXT: Record<LibraryStage, string> = { papers: 'Fetching papers', highlights: 'Fetching highlights', notes: 'Gathering notes', summaries: 'Summarizing each highlight' }
 const SUMMARY_WORDS = 7
 const MAX_ROWS = 4
 const reveal = { duration: 0.28, ease: [0.23, 1, 0.32, 1] as const }

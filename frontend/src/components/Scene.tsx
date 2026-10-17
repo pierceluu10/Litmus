@@ -3,7 +3,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Billboard, CameraControls, Html, Line, useGLTF } from '@react-three/drei'
 import { Box3, MathUtils, Vector3, type Group, type Mesh } from 'three'
 import type { Line2 } from 'three-stdlib'
-import { useStore } from '../store'
+import { useStarting, useStore } from '../store'
 import { FIRST_STEP, layoutStars, UNITS_PER_POINT, type Pos } from '../lib/layout'
 import { agentName, progressFraction, provMatches, starTone, type Tone } from '../lib/format'
 import type { Star } from '../types'
@@ -260,6 +260,7 @@ function CameraRig({ positions, parents }: { positions: Map<string, Pos>; parent
   const [ctl, setCtl] = useState<CameraControls | null>(null)
   const { focusId, fitAll } = useStore()
   const consulting = useStore((s) => !!s.thought && !s.thought.landed)
+  const starting = useStarting()
   // horizontally the focused agent and its direct children share the middle of the free part of the screen, so every agent
   // it led to stays clickable; vertically the agent itself is the anchor; its column decides how far out we need to be
   const star = focusId ? positions.get(focusId) : undefined
@@ -293,6 +294,7 @@ function CameraRig({ positions, parents }: { positions: Map<string, Pos>; parent
       c.minDistance = 40 // the opening shot is closer than the zoom limit allows
       c.setLookAt(EAR_CAM.x, EAR_CAM.y, EAR_CAM.z, EAR_AIM.x, EAR_AIM.y, EAR_AIM.z, false)
       c.smoothTime = INTRO_SMOOTH
+      if (starting) return // behind Litmus while you choose where to start; the glide to the graph follows your choice
       const go = window.setTimeout(() => {
         introDone.current = true
         c.minDistance = MIN_DISTANCE
@@ -302,7 +304,7 @@ function CameraRig({ positions, parents }: { positions: Map<string, Pos>; parent
       return () => window.clearTimeout(go)
     }
     toDefault(!reducedMotion(), true)
-  }, [ctl, focus.x, focus.y, focus.z, half, portrait, panel, size.width, size.height]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ctl, focus.x, focus.y, focus.z, half, portrait, panel, size.width, size.height, starting]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const c = ctl
     if (!c || !introDone.current) return

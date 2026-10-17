@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react'
-import { useStore } from './store'
+import { useStarting, useStore } from './store'
 import { Login, Signup } from './components/Auth'
 import { Upload } from './components/Upload'
 import { Landing } from './components/Landing'
 import { toneVar } from './lib/format'
 import { TopBar } from './components/TopBar'
 import { ClaimPicker } from './components/ClaimPicker'
-import { StartPrompt } from './components/AgentBubbles'
 import { Scene } from './components/Scene'
 import { SceneBackdrop } from './components/LowPolyScene'
 import { Dock } from './components/Dock'
@@ -31,6 +30,7 @@ const LEGEND = [['confirmed', 'confirmed'], ['refuted', 'refuted'], ['inconclusi
 
 function SceneChrome() {
   const { set, fitAll, app } = useStore()
+  const starting = useStarting()
   // Fit all zooms out and closes the speech bubbles (they would slide around as the camera moves); Default view goes
   // back to following the newest branch, which is always on otherwise.
   const fit = () => set(fitAll ? { fitAll: false, follow: true, focusId: app.lastStarId ?? null } : { fitAll: true, follow: false, cardFor: null })
@@ -42,7 +42,8 @@ function SceneChrome() {
         </p>
       </div>
       <div className="absolute left-4 top-10 z-40 flex gap-1.5">
-        <button className="btn h-7 px-2.5 text-[12px]" aria-pressed={fitAll} title={fitAll ? 'Go back to the default view' : 'Zoom out to see every experiment'} onClick={fit} style={fitAll ? { borderColor: 'var(--color-ink)' } : undefined}>{fitAll ? 'Default view' : 'Fit all'}</button>
+        {/* nothing to fit while you choose where to start */}
+        {!starting && <button className="btn h-7 px-2.5 text-[12px]" aria-pressed={fitAll} title={fitAll ? 'Go back to the default view' : 'Zoom out to see every experiment'} onClick={fit} style={fitAll ? { borderColor: 'var(--color-ink)' } : undefined}>{fitAll ? 'Default view' : 'Fit all'}</button>}
         <ClaimPicker />
       </div>
     </>
@@ -63,7 +64,6 @@ function Screens() {
           <SceneBackdrop seed={SCENE_FACETS} />
           <Scene />
           <SceneChrome />
-          <StartPrompt />
           <Dock />
           {wide && <Inspector floating />}
         </main>

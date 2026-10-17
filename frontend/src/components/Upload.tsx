@@ -65,11 +65,10 @@ export function Upload() {
               <p className="m-0 max-w-[34ch] text-[15px] leading-snug text-muted">Paste your Papiers token and Litmus will read your highlights and notes.</p>
               <input type="password" autoComplete="off" spellCheck={false} aria-label="Papiers token" value={token} onChange={(e) => setToken(e.target.value)} placeholder="Papiers token" className="field mt-6 h-11 text-center text-[14px]" />
               <button type="submit" className="btn btn-primary mt-3 h-10 w-full text-[14px]" disabled={!token.trim() || working}>{step === 'connecting' ? 'Connecting…' : step === 'reading' ? 'Reading your highlights…' : 'Connect'}</button>
-              <p className="mb-0 mt-3 text-[12.5px] text-faint">You can find it in Papiers under Settings, API tokens.</p>
             </form>
           )}
         {(problem || error) && <p role="alert" className="mb-0 mt-4 text-[13px] text-refuted">{problem || error}</p>}
-        <p className="mb-0 mt-10 text-[13px] text-muted">
+        <p className="mb-0 mt-5 flex w-full items-center justify-center text-[13px] text-muted">
           <button className={link} disabled={busy || working} onClick={() => go({ documents: sampleDocuments, claims: sampleClaims })}>Try the demo highlights</button>
           <span className="mx-2 text-faint" aria-hidden="true">·</span>
           <button className={link} disabled={busy || working} onClick={() => go(null)}>Use my saved login</button>

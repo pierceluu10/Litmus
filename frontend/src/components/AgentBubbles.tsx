@@ -1,20 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { useStore, useStarting } from '../store'
-import { StartBubble } from './StartBubble'
 
 const SHOW_MS = 9000
 const MAX_QUEUED = 5
 type Bubble = { seq: number; text: string }
 
-// "Where should we start?" comes out of the statue's head until the session has its first claim.
-export function StartPrompt() {
-  return useStarting() ? <StartBubble /> : null
-}
-
 // Litmus's face sits under the results card and opens the chat with it. Whenever the agents do something, Litmus says
 // so in a speech bubble that rises above its face and fades away (not while the chat is open, where the
-// conversation already is). Your own actions (answers, notes) are not narrated back to you.
+// conversation already is). Your own actions (answers, notes) are not narrated back to you. While you choose where to
+// start, the face only speaks the start bubble: there is nothing to ask about yet.
 export function AgentBubbles() {
   const feed = useStore((s) => s.app.feed)
   const [queue, setQueue] = useState<Bubble[]>([])
@@ -51,12 +46,12 @@ export function AgentBubbles() {
           ))}
         </AnimatePresence>
       </ul>
-      <button aria-pressed={chatOpen} aria-label={chatOpen ? 'Close the chat with Litmus' : 'Chat with Litmus'} title={chatOpen ? 'Close chat' : 'Chat with Litmus'}
+      {starting ? <img src="/litmus-face.svg" alt="Litmus" width={44} height={44} className="rounded-full border border-rule bg-surface p-1 shadow-[0_8px_24px_-10px_rgba(43,58,82,0.3)]" /> : <button aria-pressed={chatOpen} aria-label={chatOpen ? 'Close the chat with Litmus' : 'Chat with Litmus'} title={chatOpen ? 'Close chat' : 'Chat with Litmus'}
         className="flex items-center gap-2 rounded-full border bg-surface py-1 pl-1 pr-3.5 shadow-[0_8px_24px_-10px_rgba(43,58,82,0.3)] transition-transform active:scale-95"
         style={{ borderColor: chatOpen ? 'var(--color-ink)' : 'var(--color-rule)' }} onClick={() => set({ chatOpen: !chatOpen })}>
         <img src="/litmus-face.svg" alt="" width={36} height={36} />
         <span className="text-[13px] font-semibold">{chatOpen ? 'Close chat' : 'Ask Litmus'}</span>
-      </button>
+      </button>}
     </div>
   )
 }
