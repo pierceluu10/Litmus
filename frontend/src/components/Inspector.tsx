@@ -239,7 +239,7 @@ function Detail({ s }: { s: Star }) {
         <button className="btn btn-quiet -ml-2 h-7 px-2" onClick={() => select(null)}>← All results</button>
         <div className="flex gap-1.5">
           {live && <StopButton id={s.id} />}
-          <button className="btn h-7 px-2.5 text-[12.5px]" disabled={live || pending} aria-expanded={branching} onClick={() => setBranching(!branching)}>{pending ? 'Options on its bulb' : 'Branch from here'}</button>
+          {!pending && <button className="btn h-7 px-2.5 text-[12.5px]" disabled={live} aria-expanded={branching} onClick={() => setBranching(!branching)}>Branch from here</button>}
         </div>
       </div>
       {branching && <BranchForm s={s} done={() => setBranching(false)} />}
