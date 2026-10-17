@@ -1,17 +1,17 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import { sessionApi, useStore } from '../store'
-import { agentDetail, agentName, pct, progressFraction, pts, starTone, toneVar } from '../lib/format'
-import type { Provenance, Star } from '../types'
+import { agentDetail, agentName, pct, pts, starTone, toneVar } from '../lib/format'
+import type { Provenance } from '../types'
 import { PathChart } from './PathChart'
 import { ProvChip } from './Prov'
 import { Researching } from './Researching'
 import { Steering } from './Steering'
+import { SceneBackdrop } from './LowPolyScene'
 
 const H = ({ children, aside }: { children: React.ReactNode; aside?: React.ReactNode }) => (
   <div className="mb-2 flex items-baseline justify-between"><h3 className="m-0 text-[12px] font-semibold text-muted">{children}</h3>{aside}</div>
 )
-const VERDICT_TEXT = { confirmed: 'Confirmed', refuted: 'Refuted', inconclusive: 'Inconclusive', baseline: 'Baseline' }
 
 // ---------------------------------------------------------------- overview
 
@@ -81,60 +81,10 @@ function Activity() {
   )
 }
 
-// ---------------------------------------------------------------- one agent
-
-function Verdict({ s }: { s: Star }) {
-  const g = s.grade
-  if (s.status === 'running' || s.status === 'queued') {
-    const latest = (s.progress ?? []).reduce<{ epoch: number; val_acc: number } | null>((m, p) => (!m || p.epoch > m.epoch ? p : m), null)
-    const f = progressFraction(s)
-    return (
-      <div className="rounded-xl border border-rule p-3.5">
-        <div className="flex items-baseline justify-between"><span className="text-[12px] font-medium" style={{ color: toneVar('running') }}>Training</span><span className="num text-[11.5px] text-muted">{latest ? `epoch ${latest.epoch}/${s.knobs.epochs} · ${pct(latest.val_acc)}` : 'starting'}</span></div>
-        <div className="mt-2.5 h-1 overflow-hidden rounded-full bg-rule"><div className="h-full rounded-full transition-[width] duration-300" style={{ width: `${f * 100}%`, background: toneVar('running') }} /></div>
-        <p className="m-0 mt-2 text-[12px] text-muted">{s.runs.length}/{Math.max(5, s.runs.length)} runs done. The verdict lands when they all finish.</p>
-      </div>
-    )
-  }
-  if (!g) return <p className="m-0 text-muted">{s.status === 'waiting' ? 'Waiting for your answer below.' : s.status === 'failed' ? s.error ?? 'Stopped.' : 'Not graded yet.'}</p>
-  const color = toneVar(starTone(s))
-  if (g.verdict === 'baseline') return (
-    <div className="rounded-xl border border-rule p-3.5">
-      <div className="flex items-baseline justify-between"><span className="text-[12px] font-medium">Baseline</span><span className="text-[11.5px] text-muted">{g.n} runs</span></div>
-      <div className="num mt-1 text-[30px] font-medium leading-none tracking-[-0.03em]">{pct(g.mean_child)}</div>
-      <p className="num m-0 mt-2 text-[12px] text-faint">Likely range {pct(g.ci_low)} to {pct(g.ci_high)}</p>
-    </div>
-  )
-  return (
-    <div className="rounded-xl border p-3.5" style={{ borderColor: `color-mix(in srgb, ${color} 45%, var(--color-rule))` }} title={`${g.n} paired seeds · p ${g.p_value < 0.001 ? '< 0.001' : g.p_value.toFixed(3)}`}>
-      <div className="flex items-baseline justify-between"><span className="text-[12px] font-medium" style={{ color }}>{VERDICT_TEXT[g.verdict]}</span><span className="text-[11.5px] text-muted">{g.n} runs</span></div>
-      <div className="num mt-1 text-[30px] font-medium leading-none tracking-[-0.03em]" style={{ color }}>{pts(g.delta)} <span className="text-[14px]">pts</span></div>
-      <p className="num m-0 mt-2 text-[12px] text-muted">{pct(g.mean_parent)} → {pct(g.mean_child)}</p>
-      <p className="num m-0 mt-0.5 text-[12px] text-faint">Likely range {pts(g.ci_low)} to {pts(g.ci_high)}</p>
-    </div>
-  )
-}
-
-// "Branch from here" lives in the header; this is the little form it opens.
-function BranchForm({ s, done }: { s: Star; done: () => void }) {
-  const branch = useStore((st) => st.branch)
-  const [text, setText] = useState('')
-  const submit = async () => { await branch(s.id, text); setText(''); done() }
-  return (
-    <div className="flex flex-col gap-2">
-      <label htmlFor="steer" className="label block">Agents will propose experiments that start from this result. Steer them (optional):</label>
-      <textarea id="steer" autoFocus value={text} onChange={(e) => setText(e.target.value)} rows={2} placeholder="e.g. try it with longer training"
-        className="w-full resize-none rounded-md border border-rule bg-surface p-2 focus:border-ink focus:outline-none"
-        onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submit() }} />
-      <button className="btn btn-primary self-start" onClick={submit}>Ask for proposals</button>
-    </div>
-  )
-}
-
-const CARD = 'rounded-2xl border border-rule bg-surface shadow-[0_20px_50px_-14px_rgba(43,58,82,0.30)]'
+const CARD = 'isolate rounded-2xl border border-rule bg-surface shadow-[0_20px_50px_-14px_rgba(43,58,82,0.30)]'
+const RESULTS_FACETS = 23, LITMUS_FACETS = 61
 const MAX_CITED = 3
-const OPENERS = ['What did you run?', 'Is this result real?', 'What should I try next?']
-const firstSentence = (t: string) => t.match(/^.*?[.!?](\s|$)/)?.[0].trim() ?? t
+const OPENERS = ['What have we learned so far?', 'Which result is most solid?', 'What should we test next?']
 
 // Litmus's face: the statue's bearded head, low poly (also the favicon). Nudged down so it sits level with the
 // bubble's first line.
@@ -163,31 +113,15 @@ function LitmusMessage({ text, provenance, pending }: { text: string; provenance
   )
 }
 
-// "Where should we start?": Litmus's first line, and the human's claims as the answers.
-
-// What this star's agent found and where it would go next, in its own words.
-function AgentReport({ s }: { s: Star }) {
-  if (!s.parent_id || (!s.reflection && !s.suggestion)) return null
-  return (
-    <section aria-label={`${agentName(s)} report`} className="plate flex flex-col gap-2 p-3 text-[12.5px] leading-snug">
-      {s.reflection && <div><p className="label m-0 mb-0.5">{agentName(s)} found</p><p className="m-0">{s.reflection}</p></div>}
-      {s.suggestion && <div><p className="label m-0 mb-0.5">{agentName(s)} suggests</p><p className="m-0">{s.suggestion}</p></div>}
-    </section>
-  )
-}
-
-// The conversation with Litmus about this star: replans read as notes between messages, then your questions.
-function Story({ s }: { s: Star }) {
-  const { chats, thinking, thought, app } = useStore()
-  const turns = chats[s.id] ?? []
-  const replans = app.replans.filter((r) => r.star_id === s.id)
-  const busy = thinking === s.id
-  const flying = thought?.starId === s.id
+// The conversation with Litmus: your questions in graphite, its answers in marble beside its face.
+function Story() {
+  const { chat: turns, thinking, thought } = useStore()
+  const busy = !!thinking
+  const flying = !!thought
   const pending = flying && !thought.landed // the newest answer stays hidden until the pearl lands on it
-  if (!replans.length && !turns.length && !busy) return null
+  if (!turns.length && !busy) return null
   return (
     <section aria-label="Conversation with Litmus" className="flex flex-col gap-3">
-      {replans.map((r) => <p key={r.seq} className="thread-note" title={r.because}>{firstSentence(r.change)}</p>)}
       {turns.map((t, i) => t.role === 'human'
         ? <p key={i} className="msg-human">{t.text}</p>
         : <LitmusMessage key={i} text={t.text} provenance={t.provenance} pending={pending && i === turns.length - 1} />)}
@@ -201,91 +135,57 @@ function Story({ s }: { s: Star }) {
 }
 
 // The conversation scrolls inside the Litmus card, newest at the bottom.
-function Thread({ s }: { s: Star }) {
-  const { chats, thinking, thought } = useStore()
+function Thread() {
+  const { chat, thinking, thought } = useStore()
   const box = useRef<HTMLDivElement>(null)
-  const count = (chats[s.id] ?? []).length
+  const count = chat.length
   const landed = thought?.landed
   useEffect(() => { if (box.current) box.current.scrollTop = box.current.scrollHeight }, [count, thinking, landed])
   return (
     <div ref={box} className="-mx-3 max-h-[42vh] overflow-y-auto px-3">
-      <Story s={s} />
+      <Story />
     </div>
   )
 }
 
-// The question bar is pinned to the bottom of the panel, so the details above can scroll without losing it.
-function AskBar({ s }: { s: Star }) {
-  const { chats, thinking, ask } = useStore()
+// The Litmus card: its own card under the results, holding the whole conversation. Litmus answers about the agent you
+// have open, or the research as a whole.
+function AskBar() {
+  const { chat: turns, thinking, ask, selectedId, app, select } = useStore()
   const [draft, setDraft] = useState('')
-  const turns = chats[s.id] ?? []
-  const busy = thinking === s.id
+  const busy = !!thinking
+  const about = app.session?.stars.find((x) => x.id === selectedId && x.parent_id)
   // `source` is the element the words were typed or shown in: they fold up from exactly there.
   const send = (q: string, source: HTMLElement) => {
     if (!q.trim() || busy) return
     const r = source.getBoundingClientRect(), cs = getComputedStyle(source)
-    useStore.setState((st) => ({ thought: { key: (st.thought?.key ?? 0) + 1, starId: s.id, text: q.trim(), landed: false,
+    const starId = selectedId ?? app.session?.stars[0]?.id
+    if (!starId) return
+    useStore.setState((st) => ({ thought: { key: (st.thought?.key ?? 0) + 1, starId, text: q.trim(), landed: false,
       from: { left: r.left, top: r.top, width: r.width, height: r.height, padding: parseFloat(cs.paddingLeft), font: cs.font, letterSpacing: cs.letterSpacing } } }))
     setDraft('')
-    ask(s.id, q.trim())
+    ask(q.trim())
   }
   return (
-    <motion.section aria-label="Ask Litmus" className={`${CARD} flex shrink-0 flex-col gap-2 p-3`}
+    <motion.section aria-label="Ask Litmus" className={`${CARD} relative flex shrink-0 flex-col gap-2 overflow-hidden p-3`}
       initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8, transition: { duration: 0.15 } }} transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}>
+      <SceneBackdrop seed={LITMUS_FACETS} className="card-facets" />
       <div className="flex items-center gap-2">
         <img src="/litmus-face.svg" alt="" width={22} height={22} />
         <span className="text-[13px] font-semibold tracking-[-0.01em]">Litmus</span>
-        <span className="text-[11.5px] text-faint">has followed every agent</span>
+        {about
+          ? <button className="chip ml-auto hover:border-faint" title="Ask about the whole research instead" onClick={() => select(null)}>about {agentName(about)} ×</button>
+          : <span className="text-[11.5px] text-faint">has followed every agent</span>}
       </div>
-      <Thread s={s} />
+      <Thread />
       {!turns.length && !busy && <div className="flex flex-wrap gap-1.5">{OPENERS.map((q) => <button key={q} className="chip hover:border-faint hover:text-ink" onClick={(e) => send(q, e.currentTarget)}>{q}</button>)}</div>}
       <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); send(draft, e.currentTarget.querySelector('input')!) }}>
-        <label className="sr-only" htmlFor={`ask-${s.id}`}>Ask Litmus about this experiment</label>
-        <input id={`ask-${s.id}`} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Ask Litmus" className="field min-w-0 flex-1" />
+        <label className="sr-only" htmlFor="ask-litmus">Ask Litmus</label>
+        <input id="ask-litmus" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Ask Litmus" className="field min-w-0 flex-1" />
         <button className="btn btn-primary" disabled={!draft.trim() || busy}>Ask</button>
       </form>
     </motion.section>
   )
-}
-
-function Detail({ s }: { s: Star }) {
-  const { app, select } = useStore()
-  const stars = app.session!.stars
-  const [branching, setBranching] = useState(false)
-  const parent = stars.find((x) => x.id === s.parent_id)
-  const live = s.status === 'running' || s.status === 'queued'
-  const pending = app.session?.proposals.some((p) => p.star_id === s.id && p.status === 'open')
-  return (
-    <div className="flex flex-col gap-4 p-4">
-      <div className="flex items-center justify-between gap-2">
-        <button className="btn btn-quiet -ml-2 h-7 px-2" onClick={() => select(null)}>← All results</button>
-        <div className="flex gap-1.5">
-          {live && <StopButton id={s.id} />}
-          {!pending && <button className="btn h-7 px-2.5 text-[12.5px]" disabled={live} aria-expanded={branching} onClick={() => setBranching(!branching)}>Branch from here</button>}
-        </div>
-      </div>
-      {branching && <BranchForm s={s} done={() => setBranching(false)} />}
-      <header>
-        <div className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded-full ring-2 ring-offset-2 ring-offset-surface" style={{ background: 'var(--color-graphite)', ['--tw-ring-color' as string]: toneVar(starTone(s)) }} />
-          <h2 className="m-0 text-[17px] font-semibold tracking-[-0.02em]">{agentName(s)}</h2>
-          {s.parent_id && <span className="num text-[12px] text-faint">{agentDetail(s)}</span>}
-        </div>
-        <p className="m-0 mt-1.5 text-[13px] leading-snug text-muted">{s.title}{parent && ` · from ${agentName(parent)}`}</p>
-      </header>
-      <Verdict s={s} />
-      <div className="plate px-3 pb-1.5 pt-2.5">
-        <p className="label m-0 mb-1">Accuracy along this path</p>
-        <PathChart stars={stars} highlight={s} />
-      </div>
-      <AgentReport s={s} />
-    </div>
-  )
-}
-
-function StopButton({ id }: { id: string }) {
-  const stop = useStore((st) => st.stopBranch)
-  return <button className="btn h-7 px-2.5 text-[12.5px]" onClick={() => stop(id)}>Stop</button>
 }
 
 // ---------------------------------------------------------------- abstract
@@ -324,8 +224,7 @@ function AbstractView() {
 
 // On wide screens the panel floats over the scene as a card with space around it; on narrow ones it sits below the scene.
 export function Inspector({ floating }: { floating: boolean }) {
-  const { app, selectedId, abstractOpen } = useStore()
-  const s = app.session?.stars.find((x) => x.id === selectedId)
+  const { app, abstractOpen } = useStore()
   const showAbstract = abstractOpen && !!app.session?.abstract
   // The results card and the Litmus chat are two cards stacked in one column: what you're looking at, and who you ask.
   const column = floating ? 'absolute bottom-3 right-3 top-[76px] z-20 flex w-[348px] flex-col gap-2.5' : 'flex flex-col gap-2.5 border-t border-rule bg-paper p-3'
@@ -333,11 +232,12 @@ export function Inspector({ floating }: { floating: boolean }) {
     <div className={column}>
       <motion.aside className={`${CARD} flex min-h-0 flex-1 flex-col overflow-hidden`} aria-label="Results" style={{ transformOrigin: 'top right' }}
         {...(floating ? { initial: { opacity: 0, scale: 0.96, y: -6 }, animate: { opacity: 1, scale: 1, y: 0 }, exit: { opacity: 0, scale: 0.97, transition: { duration: 0.15 } }, transition: { duration: 0.22, ease: [0.23, 1, 0.32, 1] as const } } : {})}>
+        <SceneBackdrop seed={RESULTS_FACETS} className="card-facets" />
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {showAbstract ? <AbstractView /> : s ? <Detail s={s} key={s.id} /> : <Overview />}
+          {showAbstract ? <AbstractView /> : <Overview />}
         </div>
       </motion.aside>
-      {s && !showAbstract && <AskBar s={s} key={`ask-${s.id}`} />}
+      {!showAbstract && <AskBar />}
     </div>
   )
 }

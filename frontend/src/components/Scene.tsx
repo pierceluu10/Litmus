@@ -3,16 +3,18 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Billboard, CameraControls, Html, Line, useGLTF } from '@react-three/drei'
 import { Box3, MathUtils, Vector3, type Group, type Mesh } from 'three'
 import type { Line2 } from 'three-stdlib'
-import { useStore } from '../store'
-import { FIRST_STEP, layoutStars, type Pos } from '../lib/layout'
-import { agentDetail, agentName, pts, progressFraction, provMatches, starTone, type Tone } from '../lib/format'
+import { usePanelOpen, useStore } from '../store'
+import { FIRST_STEP, layoutStars, UNITS_PER_POINT, type Pos } from '../lib/layout'
+import { agentName, progressFraction, provMatches, starTone, type Tone } from '../lib/format'
 import type { Star } from '../types'
-import { ProceedBubble } from './NodeBubble'
+import { NodeCard } from './NodeBubble'
 import { statueAnchor, type Point } from '../lib/statueAnchor'
 
 const STATUE_URL = '/litmus-statue.glb'
 const STATUE_COLOR = '#e3e8ef' // cool marble, close to the ground so the statue reads as a relief in the same material
 const BLOB_COLOR = '#2b2f34'
+const LEVEL_COLOR = '#c5cfdc'
+const LEVEL_BASE_COLOR = '#93a3b8'
 const NODE_FACE_COLOR = '#3b4048' // a touch lighter than the fingertip, so each flat facet catches the light
 const NODE_DETAIL = 1 // icosahedron subdivisions: 80 flat faces, a low-poly sphere
 const SPIN_IDLE = 0.25, SPIN_TRAINING = 1.6 // radians per second
@@ -31,10 +33,14 @@ const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').match
 // toward the nodes' side, so the tree is met more head-on.
 const VIEW = new Vector3(-48, 30, 345)
 const MIN_DISTANCE = 170
-const MAX_DISTANCE = 760
+const MAX_DISTANCE = 520 // the farthest you can zoom out: past this the labels and cards stop matching the scene's scale
 const FOV_HALF_TAN = Math.tan(MathUtils.degToRad(15)) // the canvas's fov is 30
 const USABLE_HEIGHT = 0.62 // share of the canvas free of the top buttons and the bottom dock
-const AIM = new Vector3(26, -18, 0) // aimed right of the star, so the graph sits in the open part of the scene beside the results card
+// Where the focused agent sits on screen: centred in the room the results card leaves, and a little below the middle so
+// its card (which opens above it) has space. Pixels; the results card covers PANEL_PX of the right edge on wide screens.
+const PANEL_PX = 384
+const WIDE_PX = 1024
+const BELOW_MIDDLE = 0.03 // share of the canvas height the agent sits below its centre (the bottom card covers the lower third)
 // Opening shot: from just behind the statue's head and ear, looking over its shoulder toward the arm.
 // The head is near (-69, 16, -5) in scene units. The camera then glides to the default view, once per session.
 const EAR_CAM = new Vector3(-70, 24, -70)
@@ -148,13 +154,11 @@ type Live = Map<string, Vector3>
 
 function StarBlob({ star, target, live, dim, selected }: { star: Star; target: Pos; live: Live; dim: boolean; selected: boolean }) {
   const select = useStore((s) => s.select)
-  const proceedFor = useStore((s) => s.proceedFor)
+  const cardFor = useStore((s) => s.cardFor)
+  const fitAll = useStore((s) => s.fitAll)
   const proposals = useStore((s) => s.app.session?.proposals) // the store's own array: filtering inside the selector would return a new one every render
   const options = useMemo(() => (proposals ?? []).filter((p) => p.star_id === star.id && p.status === 'open'), [proposals, star.id])
   const hasOptions = options.length > 0 && star.status === 'done'
-  const claims = useStore((s) => s.app.claims)
-  const claim = star.parent_id ? claims.find((c) => star.provenance.some((p) => provMatches(p, c.id))) : undefined
-  const claimName = claim ? (claim.summary ?? claim.text.split(/\s+/).slice(0, 6).join(' ') + '…') : undefined
   const group = useRef<import('three').Group>(null)
   const body = useRef<Mesh>(null)
   const [hover, setHover] = useState(false)
@@ -180,11 +184,10 @@ function StarBlob({ star, target, live, dim, selected }: { star: Star; target: P
     // the node turns slowly, and faster while its experiment trains, so the facets glint
     if (body.current && !reducedMotion()) { body.current.rotation.y += dt * (running ? SPIN_TRAINING : SPIN_IDLE); body.current.rotation.x += dt * 0.4 * (running ? SPIN_TRAINING : SPIN_IDLE) }
   })
-  // clicking a finished node with options for you opens its "where should I proceed?" bubble (its results are one click away in the bubble); any other node opens its results card
-  const openNode = () => { if (hasOptions) useStore.setState({ proceedFor: proceedFor === star.id ? null : star.id }); else { select(star.id); useStore.setState({ proceedFor: null }) } }
+  // clicking a node opens its card over it (about the agent, and where it should proceed); clicking again closes it
+  const openNode = () => (cardFor === star.id ? useStore.setState({ cardFor: null }) : select(star.id))
   const g = star.grade
-  const value = !g ? (running ? 'training' : star.status === 'waiting' ? 'needs you' : star.status === 'failed' ? 'stopped' : '')
-    : g.verdict === 'baseline' ? `${(g.mean_child * 100).toFixed(2)}%` : `${pts(g.delta)}`
+  const value = g ? `${(g.mean_child * 100).toFixed(2)}%` : running ? 'training' : star.status === 'waiting' ? 'needs you' : star.status === 'failed' ? 'stopped' : ''
   return (
     <group ref={group}>
       <mesh
@@ -198,9 +201,9 @@ function StarBlob({ star, target, live, dim, selected }: { star: Star; target: P
       </mesh>
       <Eyes r={r} running={running} waiting={star.status === 'waiting'} />
       {hasOptions && <Bulb r={r} onClick={openNode} />}
-      {hasOptions && proceedFor === star.id && (
-        <Html position={[r + 8, 0, 0]} zIndexRange={[60, 40]}>
-          <div style={{ transform: 'translate(8px, -31px)' }}><ProceedBubble star={star} items={options} /></div>
+      {cardFor === star.id && !fitAll && (
+        <Html position={[0, r + 3, 0]} zIndexRange={[60, 40]}>
+          <div style={{ transform: 'translate(-50%, calc(-100% - 10px))' }}><NodeCard star={star} items={hasOptions ? options : []} /></div>
         </Html>
       )}
       <Billboard>
@@ -212,10 +215,9 @@ function StarBlob({ star, target, live, dim, selected }: { star: Star; target: P
       {/* anchored by its top edge, just under the ring, so the name never sits over the sphere */}
       <Html position={[0, -r - 4, 0]} zIndexRange={[20, 0]} style={{ opacity: dim ? 0.25 : 1, transition: 'opacity 200ms' }}>
         <div style={{ transform: 'translateX(-50%)', marginTop: 3 }}>
-        <button type="button" className="star-label" data-selected={selected || undefined} onClick={() => select(star.id)} aria-label={`${agentName(star)}, ${star.title}`} title={claim ? `Testing: ${claim.text}` : undefined}>
-          <span className="star-label-name">{agentName(star)}{shadow && <span className="text-muted"> · alone</span>}</span>
-          {claimName && <span className="star-label-claim">{claimName}</span>}
-          <span className="star-label-value" style={{ color: toneColor(tone) }}>{[star.parent_id && agentDetail(star), value].filter(Boolean).join('  ')}</span>
+        <button type="button" className="star-label" data-selected={selected || undefined} onClick={openNode} aria-label={`${agentName(star)}, ${value}`}>
+          <span className="star-label-name">{agentName(star)}</span>
+          <span className="star-label-value" style={{ color: toneColor(tone) }}>{value}</span>
         </button>
         </div>
       </Html>
@@ -250,29 +252,32 @@ function Fingertip() {
   return <mesh ref={ref}><sphereGeometry args={[1.1, 16, 16]} /><meshBasicMaterial color={BLOB_COLOR} /></mesh>
 }
 
-function CameraRig({ positions, parents }: { positions: Map<string, Pos>; parents: Map<string, string | null> }) {
+function CameraRig({ positions }: { positions: Map<string, Pos> }) {
   // held in state (not a plain ref) so the effects below run again once the controls exist
   const [ctl, setCtl] = useState<CameraControls | null>(null)
   const { focusId, fitAll } = useStore()
   const consulting = useStore((s) => !!s.thought && !s.thought.landed)
-  // frame the whole column the focused star belongs to (its generation), at the midpoint between it and its parent
+  // the focused agent goes to the middle of the free part of the screen; its column decides how far out we need to be
   const star = focusId ? positions.get(focusId) : undefined
-  const from = focusId ? positions.get(parents.get(focusId) ?? '') ?? star : undefined
   const column = star ? [...positions.values()].filter((p) => Math.abs(p.x - star.x) < 1).map((p) => p.y) : []
   const half = column.length ? (Math.max(...column) - Math.min(...column)) / 2 : 0 // half the column's height
-  const focus = star && from ? { x: (star.x + from.x) / 2, y: column.length ? (Math.max(...column) + Math.min(...column)) / 2 : star.y, z: (star.z + from.z) / 2 } : { x: FIRST_STEP, y: 0, z: 0 }
-  const portrait = useThree((s) => s.size.width / s.size.height) < PORTRAIT_ASPECT // narrow screens see less width: pull back
+  const focus = star ?? { x: FIRST_STEP, y: 0, z: 0 }
+  const size = useThree((s) => s.size)
+  const portrait = size.width / size.height < PORTRAIT_ASPECT // narrow screens see less width: pull back
+  const panel = usePanelOpen() && innerWidth >= WIDE_PX ? PANEL_PX : 0
   const introDone = useRef(false)
   const wasFit = useRef(false)
   // the default view; later moves keep whatever zoom the user chose, only the target moves
   const toDefault = (animated: boolean, keepZoom: boolean) => {
     const c = ctl
     if (!c) return
-    const t = new Vector3(focus.x, focus.y, focus.z).add(AIM)
     // far enough that the whole column fits; a taller column zooms out, and a zoom the user chose is kept if it is wider
     const fits = (half + 18) / (FOV_HALF_TAN * USABLE_HEIGHT)
-    const dist = Math.max(VIEW.length() * (portrait ? PORTRAIT_PULLBACK : 1), fits, keepZoom && c.distance ? c.distance : 0)
-    const view = VIEW.clone().setLength(Math.min(MAX_DISTANCE, Math.max(MIN_DISTANCE, dist)))
+    const dist = Math.min(MAX_DISTANCE, Math.max(MIN_DISTANCE, VIEW.length() * (portrait ? PORTRAIT_PULLBACK : 1), fits, keepZoom && c.distance ? c.distance : 0))
+    // aim off the agent by the pixel offset it should sit at, converted to scene units at this distance
+    const unitsPerPx = (2 * dist * FOV_HALF_TAN) / size.height
+    const t = new Vector3(focus.x + (panel / 2) * unitsPerPx, focus.y + BELOW_MIDDLE * size.height * unitsPerPx, focus.z)
+    const view = VIEW.clone().setLength(dist)
     c.setLookAt(t.x + view.x, t.y + view.y, t.z + view.z, t.x, t.y, t.z, animated)
   }
   useEffect(() => {
@@ -291,7 +296,7 @@ function CameraRig({ positions, parents }: { positions: Map<string, Pos>; parent
       return () => window.clearTimeout(go)
     }
     toDefault(!reducedMotion(), true)
-  }, [ctl, focus.x, focus.y, focus.z, half, portrait]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ctl, focus.x, focus.y, focus.z, half, portrait, panel, size.width, size.height]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     const c = ctl
     if (!c || !introDone.current) return
@@ -307,17 +312,18 @@ function CameraRig({ positions, parents }: { positions: Map<string, Pos>; parent
       const box = new Box3().setFromPoints([new Vector3(-40, -30, 0), ...[...positions.values()].map((p) => new Vector3(p.x, p.y, p.z))])
       box.expandByScalar(16)
       c.minDistance = 40
-      c.fitToBox(box, !reducedMotion(), { paddingLeft: 10, paddingRight: 40, paddingTop: 30, paddingBottom: 30 })
+      // keep every node out from under the results card: pad the right by the share of the width it covers
+      const width = box.max.x - box.min.x, covered = panel / size.width
+      c.fitToBox(box, !reducedMotion(), { paddingLeft: 10, paddingRight: 40 + (width * covered) / (1 - covered), paddingTop: 30, paddingBottom: 30 })
     } else if (wasFit.current) { c.minDistance = MIN_DISTANCE; toDefault(!reducedMotion(), false) }
     wasFit.current = fitAll
-  }, [ctl, fitAll, positions.size]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [ctl, fitAll, positions.size, panel]) // eslint-disable-line react-hooks/exhaustive-deps
   return <CameraControls ref={setCtl} makeDefault minDistance={MIN_DISTANCE} maxDistance={MAX_DISTANCE} smoothTime={0.6} azimuthRotateSpeed={0} polarRotateSpeed={0} truckSpeed={0} />
 }
 
 function Stars({ stars }: { stars: Star[] }) {
   const { selectedId, hoveredClaim } = useStore()
   const positions = useMemo(() => layoutStars(stars), [stars])
-  const parents = useMemo(() => new Map(stars.map((s) => [s.id, s.parent_id])), [stars])
   const [live] = useState<Live>(() => new Map())
   const byId = new Map(stars.map((s) => [s.id, s]))
   const path = new Set<string>()
@@ -327,7 +333,32 @@ function Stars({ stars }: { stars: Star[] }) {
     <>
       {stars.map((s) => <Edge key={`e${s.id}`} star={s} live={live} dim={dim(s)} onPath={path.has(s.id)} />)}
       {stars.map((s) => <StarBlob key={s.id} star={s} target={positions.get(s.id)!} live={live} dim={dim(s)} selected={s.id === selectedId} />)}
-      <CameraRig positions={positions} parents={parents} />
+      <AccuracyLines positions={positions} base={stars[0]?.grade?.mean_child} />
+      <CameraRig positions={positions} />
+    </>
+  )
+}
+
+// Five accuracy levels behind the graph, one point apart: the middle one runs through Litmus's fingertip, the baseline.
+const ACCURACY_LEVELS = [2, 1, 0, -1, -2] // points relative to the baseline
+const LEVELS_FROM = -26 // just behind the fingertip, so the baseline line reads as the arm's continuation
+const LEVELS_PAST = 70 // how far the lines run beyond the last column
+
+function AccuracyLines({ positions, base }: { positions: Map<string, Pos>; base?: number }) {
+  const right = Math.max(FIRST_STEP, ...[...positions.values()].map((p) => p.x)) + LEVELS_PAST
+  return (
+    <>
+      {ACCURACY_LEVELS.map((k) => {
+        const y = k * UNITS_PER_POINT
+        const label = k === 0 ? `baseline${base !== undefined ? ` ${(base * 100).toFixed(2)}%` : ''}`
+          : `${k > 0 ? '+' : '−'}${Math.abs(k)} pt${base !== undefined ? ` · ${((base + k / 100) * 100).toFixed(2)}%` : ''}`
+        return (
+          <group key={k}>
+            <Line points={[[LEVELS_FROM, y, -4], [right, y, -4]]} color={k === 0 ? LEVEL_BASE_COLOR : LEVEL_COLOR} lineWidth={1} dashed={k !== 0} dashSize={3} gapSize={3} transparent opacity={0.9} />
+            <Html position={[right, y, -4]} zIndexRange={[5, 0]}><span className="level-label">{label}</span></Html>
+          </group>
+        )
+      })}
     </>
   )
 }

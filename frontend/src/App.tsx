@@ -31,7 +31,10 @@ const SCENE_FACETS = 77 // the faceted backdrop behind the statue and the graph
 const LEGEND = [['confirmed', 'confirmed'], ['refuted', 'refuted'], ['inconclusive', 'inconclusive'], ['running', 'training'], ['waiting', 'needs you']] as const
 
 function SceneChrome() {
-  const { follow, set, fitAll } = useStore()
+  const { set, fitAll, app } = useStore()
+  // Fit all zooms out and closes the speech bubbles (they would slide around as the camera moves); Default view goes
+  // back to following the newest branch, which is always on otherwise.
+  const fit = () => set(fitAll ? { fitAll: false, follow: true, focusId: app.lastStarId ?? null } : { fitAll: true, follow: false, cardFor: null })
   return (
     <>
       <div className="pointer-events-none absolute left-4 top-3 z-30 max-w-[min(60%,520px)] space-y-1.5">
@@ -39,11 +42,8 @@ function SceneChrome() {
           {LEGEND.map(([tone, label]) => <span key={tone} className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full border-[1.5px]" style={{ borderColor: toneVar(tone) }} />{label}</span>)}
         </p>
       </div>
-      <div className="absolute left-4 top-10 z-30 flex gap-1.5">
-        <button className="btn h-7 px-2.5 text-[12px]" aria-pressed={follow} onClick={() => set({ follow: !follow })} style={follow ? { borderColor: 'var(--color-ink)' } : undefined}>
-          {follow ? 'Following' : 'Follow'} new branches
-        </button>
-        <button className="btn h-7 px-2.5 text-[12px]" aria-pressed={fitAll} title={fitAll ? 'Go back to the default view' : 'Zoom out to see every experiment'} onClick={() => set({ follow: false, fitAll: !fitAll, proceedFor: null })} style={fitAll ? { borderColor: 'var(--color-ink)' } : undefined}>{fitAll ? 'Default view' : 'Fit all'}</button>
+      <div className="absolute left-4 top-10 z-40 flex gap-1.5">
+        <button className="btn h-7 px-2.5 text-[12px]" aria-pressed={fitAll} title={fitAll ? 'Go back to the default view' : 'Zoom out to see every experiment'} onClick={fit} style={fitAll ? { borderColor: 'var(--color-ink)' } : undefined}>{fitAll ? 'Default view' : 'Fit all'}</button>
         <ClaimPicker />
       </div>
     </>

@@ -285,6 +285,18 @@ npm test             # reducer, layout, simulator + grader-port tests
 
 **Upload page** (`#/upload`, `components/Upload.tsx`): Start research opens it first. Run `./scripts/export-papiers.sh` (one file, `litmus-papiers.json`) and drop it, or drop Papiers CLI exports (`papiers list`/`read` JSON, parsed by `lib/importLibrary.ts`), a `.txt`/`.md`, or paste passages; untick claims you do not want; or pick the sample library or the connected Papiers library (read live). The chosen library sits in `store.imported` and `begin()` sends it with `importLibrary` before creating the session.
 
+**Workspace layout (user decisions, 2026-10-17)**: nodes show only the agent's name and its accuracy. Clicking a node (or a
+ranking row) opens its card above it (`NodeCard` in `NodeBubble.tsx`): **About** (the claim it tests, verdict, what it
+found and suggests, Stop / Branch from here) and **Where should I proceed?** (its options). The right panel is for the
+whole research only: researching now, results, accuracy by path, rankings, where you steered, research log, and the
+**Litmus card** (one conversation; Litmus answers about the open agent, shown as a removable chip, or the research as a
+whole). **Test another claim** (`ClaimPicker.tsx`) lists every highlight with its status; tested ones keep a greyed-out
+Test button; open one for its card (paper, your note, Basis, Findings, source). Following new branches is always on;
+**Fit all** zooms out (padded clear of the results card) and closes node cards, **Default view** goes back to following.
+The camera puts the focused agent in the middle of the space the results card leaves (`PANEL_PX`, `BELOW_MIDDLE`), zoom is
+capped at `MAX_DISTANCE` (520), and five dashed accuracy levels (baseline ±1, ±2 points, `AccuracyLines`) run behind the
+graph, the baseline through the fingertip. The floating cards carry the landing's faceted sky (`.card-facets`).
+
 **Branch from anywhere**: "Branch from here" sends `feedback(kind: "suggest")` for that star, so it works against the real backend too (the agent replans from it); the demo backend answers with proposals from that star.
 
 **Design tokens**: `frontend/src/index.css` (`@theme`): cool marble ground, graphite, verdict colours (`confirmed`, `refuted`, `inconclusive`), state colours (`running`, `waiting`), actor colours (`human`, `agent`). The scene reads verdict colours from these CSS variables. Design context: `PRODUCT.md`, `.impeccable/surfaces/`.

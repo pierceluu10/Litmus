@@ -28,10 +28,10 @@ type Store = {
   focusId: string | null // what the camera is centred on
   fitAll: boolean // frame the whole tree; off returns to the default view
   abstractOpen: boolean
-  proceedFor: string | null // the node whose "where should I proceed?" bubble is open
-  panelOpen: boolean // the results card, opened from Litmus's face; a selected star, the abstract or the start picker also open it
-  chats: Record<string, (ChatTurn & { provenance?: Provenance[] })[]> // per star, oldest first
-  thinking: string | null // the star whose chat is waiting on Litmus
+  cardFor: string | null // the node whose card (about it, and where it should proceed) is open over it
+  panelOpen: boolean // the results card, opened from Litmus's face; the abstract or the start picker also open it
+  chat: (ChatTurn & { provenance?: Provenance[] })[] // the conversation with Litmus, oldest first
+  thinking: string | null // the star Litmus is answering about while the chat waits
   thought: Thought | null // the question's trip to the statue and back; the answer stays hidden until it lands
   begin: (replay: boolean, goal?: string) => Promise<void>
   leave: () => void
@@ -42,7 +42,7 @@ type Store = {
   dispatch: (star_id: string, selections: Selection[], instruction?: string) => Promise<void>
   answer: (question_id: string, option_id: string, comment?: string) => Promise<void>
   feedback: (star_id: string, kind: 'challenge' | 'suggest' | 'prioritize', text: string) => Promise<void>
-  ask: (star_id: string, question: string) => Promise<void>
+  ask: (question: string) => Promise<void>
   togglePause: () => Promise<void>
   stopBranch: (star_id: string) => Promise<void>
   branch: (star_id: string, text?: string) => Promise<void>
@@ -67,21 +67,21 @@ export const useStore = create<Store>((set, get) => {
   }
   return {
     app: initialState, sid: null, conn: 'closed', libraryStage: 'papers', demo: savedDemo(), error: null, selectedId: null, hoveredClaim: null, imported: null,
-    follow: true, focusId: null, fitAll: false, abstractOpen: false, panelOpen: false, proceedFor: null, chats: {}, thinking: null, thought: null,
+    follow: true, focusId: null, fitAll: false, abstractOpen: false, panelOpen: false, cardFor: null, chat: [], thinking: null, thought: null,
     set: (p) => set(p),
     setDemo(demo) {
       try { localStorage.setItem(DEMO_KEY, demo ? '1' : '0') } catch { /* private window: the switch still works for this visit */ }
       set({ demo, error: null })
     },
-    select: (id) => set(id ? { selectedId: id, focusId: id, abstractOpen: false, fitAll: false } : { selectedId: null }),
+    select: (id) => set(id ? { selectedId: id, focusId: id, cardFor: id, abstractOpen: false, fitAll: false } : { selectedId: null, cardFor: null }),
     leave() {
       unsub?.(); unsub = null
       libraryLoad?.abort(); libraryLoad = null
-      set({ app: initialState, sid: null, conn: 'closed', selectedId: null, focusId: null, fitAll: false, abstractOpen: false, panelOpen: false, proceedFor: null, chats: {}, thought: null, error: null, demo: savedDemo(), imported: null })
+      set({ app: initialState, sid: null, conn: 'closed', selectedId: null, focusId: null, fitAll: false, abstractOpen: false, panelOpen: false, cardFor: null, chat: [], thought: null, error: null, demo: savedDemo(), imported: null })
     },
     async begin(replay, goal) {
       unsub?.()
-      set({ app: initialState, libraryStage: 'papers', selectedId: null, focusId: null, fitAll: false, follow: true, error: null, abstractOpen: false, panelOpen: false, proceedFor: null, chats: {}, thought: null })
+      set({ app: initialState, libraryStage: 'papers', selectedId: null, focusId: null, fitAll: false, follow: true, error: null, abstractOpen: false, panelOpen: false, cardFor: null, chat: [], thought: null })
       libraryLoad?.abort()
       const api = current = apiFor(get().demo)
       const load = libraryLoad = new AbortController()
@@ -114,12 +114,16 @@ export const useStore = create<Store>((set, get) => {
     dispatch: (star_id, selections, instruction) => { set({ follow: true }); return act((sid) => current.dispatch(sid, { star_id, selections, instruction })) },
     answer: (question_id, option_id, comment) => { set({ follow: true }); return act((sid) => current.answer(sid, { question_id, option_id, comment })) },
     feedback: (star_id, kind, text) => act((sid) => current.feedback(sid, { star_id, kind, text })),
-    async ask(star_id, question) {
-      const history = (get().chats[star_id] ?? []).map(({ role, text }) => ({ role, text }))
-      set((st) => ({ thinking: star_id, chats: { ...st.chats, [star_id]: [...(st.chats[star_id] ?? []), { role: 'human', text: question }] } }))
+    // One conversation with Litmus; it answers about the selected experiment, or the baseline (it sees the whole tree either way).
+    async ask(question) {
+      const { chat, selectedId, app } = get()
+      const star_id = selectedId ?? app.session?.stars[0]?.id
+      if (!star_id) return
+      const history = chat.map(({ role, text }) => ({ role, text }))
+      set((st) => ({ thinking: star_id, chat: [...st.chat, { role: 'human', text: question }] }))
       await act(async (sid) => {
         const r = await current.explain(sid, { star_id, question, history })
-        set((st) => ({ chats: { ...st.chats, [star_id]: [...(st.chats[star_id] ?? []), { role: 'litmus', text: r.answer, provenance: r.provenance }] } }))
+        set((st) => ({ chat: [...st.chat, { role: 'litmus', text: r.answer, provenance: r.provenance }] }))
       })
       set({ thinking: null })
     },
@@ -133,7 +137,7 @@ export const useStore = create<Store>((set, get) => {
 
 export const usePanelOpen = () => useStore((s) => {
   const ss = s.app.session
-  return s.panelOpen || !!s.selectedId || (s.abstractOpen && !!ss?.abstract)
+  return s.panelOpen || (s.abstractOpen && !!ss?.abstract)
 })
 
 // Before the first claim is chosen, Litmus asks where to start (a bubble from its face).
