@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { applyEvent, initialState, type AppState } from './reducer'
 import { mockApi } from './transport/mock'
 import { realApi } from './transport/real'
-import type { Api, ConnState, LibraryStage } from './transport/api'
+import type { Api, ConnState, Library, LibraryStage } from './transport/api'
 import type { ChatTurn, Provenance, Selection } from './types'
 
 // Live (the FastAPI backend, Modal A100s) unless Demo mode is on: the front page's switch (remembered), or ?demo=1.
@@ -18,6 +18,7 @@ type Store = {
   sid: string | null
   conn: ConnState
   libraryStage: LibraryStage | 'ready'
+  imported: Library | null // what the person uploaded; null means read their Papiers library live
   demo: boolean
   setDemo: (demo: boolean) => void
   error: string | null
@@ -56,7 +57,7 @@ export const useStore = create<Store>((set, get) => {
     try { await f(sid); set({ error: null }) } catch (e) { set({ error: (e as Error).message }) }
   }
   return {
-    app: initialState, sid: null, conn: 'closed', libraryStage: 'papers', demo: savedDemo(), error: null, selectedId: null, hoveredClaim: null,
+    app: initialState, sid: null, conn: 'closed', libraryStage: 'papers', demo: savedDemo(), error: null, selectedId: null, hoveredClaim: null, imported: null,
     follow: true, focusId: null, fitAll: false, abstractOpen: false, chats: {}, thinking: null,
     set: (p) => set(p),
     setDemo(demo) {
@@ -67,7 +68,7 @@ export const useStore = create<Store>((set, get) => {
     leave() {
       unsub?.(); unsub = null
       libraryLoad?.abort(); libraryLoad = null
-      set({ app: initialState, sid: null, conn: 'closed', selectedId: null, focusId: null, fitAll: false, abstractOpen: false, chats: {}, error: null, demo: savedDemo() })
+      set({ app: initialState, sid: null, conn: 'closed', selectedId: null, focusId: null, fitAll: false, abstractOpen: false, chats: {}, error: null, demo: savedDemo(), imported: null })
     },
     async begin(replay, goal) {
       unsub?.()
@@ -75,10 +76,16 @@ export const useStore = create<Store>((set, get) => {
       libraryLoad?.abort()
       const api = current = apiFor(get().demo)
       const load = libraryLoad = new AbortController()
-      api.library((libraryStage) => set({ libraryStage }), load.signal)
-        .then(({ documents, claims }) => { if (!load.signal.aborted) set((st) => ({ app: { ...st.app, documents, claims }, libraryStage: 'ready' })) })
-        .catch((e: Error) => set({ error: e.message }))
+      const { imported } = get()
       try {
+        if (imported) {
+          await api.importLibrary(imported)
+          set((st) => ({ app: { ...st.app, documents: imported.documents, claims: imported.claims }, libraryStage: 'ready' }))
+        } else {
+          api.library((libraryStage) => set({ libraryStage }), load.signal)
+            .then(({ documents, claims }) => { if (!load.signal.aborted) set((st) => ({ app: { ...st.app, documents, claims }, libraryStage: 'ready' })) })
+            .catch((e: Error) => set({ error: e.message }))
+        }
         const sid = replay ? await api.replayDemo() : await api.createSession({ goal, fresh: true })
         set({ sid })
         unsub = api.subscribe(sid, 0, (e) => {

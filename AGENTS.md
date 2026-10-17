@@ -274,6 +274,10 @@ npm test             # reducer, layout, simulator + grader-port tests
 
 **Asking Litmus**: the thread reads as a conversation (your words in graphite bubbles, Litmus's in marble beside its low-poly face, `public/litmus-face.svg`, which is also the favicon; replans as notes between them). Litmus answers about one star but sees the whole tree. While it answers, a shimmering "Thinking" bubble stands in (the demo waits 1.6s like a real call).
 
+**Where you steered** (`components/Steering.tsx`, `lib/steering.ts`): the Results card lists each human decision (`Decision` events: dispatch, answer, feedback) with the stars it produced and their graded result. When the agent's alternative also ran (same `proposal_id`, or an answer option's `knob_changes`), it shows the accuracy gap; otherwise it says nothing can be compared. Nothing is invented: the practice backend has no agent pick, so only real backend sessions show a "would have picked" line.
+
+**Upload page** (`#/upload`, `components/Upload.tsx`): Start research opens it first. Run `./scripts/export-papiers.sh` (one file, `litmus-papiers.json`) and drop it, or drop Papiers CLI exports (`papiers list`/`read` JSON, parsed by `lib/importLibrary.ts`), a `.txt`/`.md`, or paste passages; untick claims you do not want; or pick the sample library or the connected Papiers library (read live). The chosen library sits in `store.imported` and `begin()` sends it with `importLibrary` before creating the session.
+
 **Branch from anywhere**: "Branch from here" sends `feedback(kind: "suggest")` for that star, so it works against the real backend too (the agent replans from it); the demo backend answers with proposals from that star.
 
 **Design tokens**: `frontend/src/index.css` (`@theme`): cool marble ground, graphite, verdict colours (`confirmed`, `refuted`, `inconclusive`), state colours (`running`, `waiting`), actor colours (`human`, `agent`). The scene reads verdict colours from these CSS variables. Design context: `PRODUCT.md`, `.impeccable/surfaces/`.
@@ -285,4 +289,5 @@ npm test             # reducer, layout, simulator + grader-port tests
 **Known gaps**: three.js makes the bundle ~1 MB (fine locally, not code-split); below 1024px the rails stack under the canvas; star labels can still touch when a cousin's subtree lands on the same height.
 
 ### Contract requests
+- `POST /api/library/import` body `{documents: Document[], claims: Claim[]}` (the shape `GET /api/library` returns). The upload page (`components/Upload.tsx`, `lib/importLibrary.ts`) sends the library the person uploaded before it creates a session; the backend should use it as the library for sessions (skip the Papiers CLI) and may still fill in `summary` and `conditions` with its LLM calls. Until it exists, live sessions fail with the backend's 404 and only the practice backend uses an uploaded library.
 - `GET /api/sessions/{id}` should include the highest applied `seq`, so a client can load the snapshot and then subscribe from `seq + 1` instead of replaying everything.

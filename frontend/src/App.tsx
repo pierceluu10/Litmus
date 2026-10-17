@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useStore } from './store'
 import { Login, Signup } from './components/Auth'
+import { Upload } from './components/Upload'
 import { Landing } from './components/Landing'
 import { toneVar } from './lib/format'
 import { TopBar } from './components/TopBar'
@@ -49,7 +50,7 @@ function Screens() {
   const session = useStore((s) => s.app.session)
   const hash = useHash()
   const wide = useWide()
-  if (!session) return hash === '#/login' ? <Login /> : hash === '#/signup' ? <Signup /> : <Landing />
+  if (!session) return hash === '#/login' ? <Login /> : hash === '#/signup' ? <Signup /> : hash === '#/upload' ? <Upload /> : <Landing />
   return (
     <div className="flex h-full flex-col">
       <TopBar />

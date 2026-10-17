@@ -5,7 +5,7 @@ import { LowPolyScene } from './LowPolyScene'
 import { nav, useAuth } from '../auth'
 
 const ease = [0.23, 1, 0.32, 1] as const
-const GOAL = 'Which training tricks actually help a tiny CIFAR-10 classifier?'
+export const GOAL = 'Which training tricks actually help a tiny CIFAR-10 classifier?'
 const clamp = (v: number, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, v))
 
 function useMediaQuery(q: string) {
@@ -359,7 +359,7 @@ function DemoSwitch() {
 }
 
 export function Landing() {
-  const { begin, set, error, demo } = useStore()
+  const { set, error, demo } = useStore()
   const main = useRef<HTMLElement>(null)
   const [scrolled, setScrolled] = useState(false)
   const { user, logout } = useAuth()
@@ -374,7 +374,7 @@ export function Landing() {
     if (demo) return
     apiFor(false).health().catch((e: Error) => set({ error: `Could not reach the backend (${e.message}). Start it with ./dev.sh, or turn on Demo mode.` }))
   }, [demo, set])
-  const start = () => void begin(false, GOAL)
+  const start = () => nav('#/upload')
   const cta = <Cta onStart={start} />
   const hero = (
     <motion.div className="max-w-[440px]" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.2, duration: 0.8, ease }}>

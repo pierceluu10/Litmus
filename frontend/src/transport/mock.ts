@@ -13,6 +13,7 @@ export const mockApi: Api = {
   mock: true,
   health: () => wait({ ok: true, modal_warm: true, papiers_ok: true, openai_ok: true }),
   warmup: () => wait(undefined),
+  importLibrary: async () => {},
   // The library is real even in the demo: read live through the backend, or its snapshot when the backend is off.
   library: (onStage, signal) => streamLibrary(onStage, signal).catch((e) => {
     if (!(e instanceof LibraryUnavailable)) throw e
