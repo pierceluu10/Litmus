@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- roof -->
+  <polygon points="4,25 32,6 32,25" fill="#b4c4db"/>
+  <polygon points="32,6 60,25 32,25" fill="#7d95b6"/>
+  <!-- beam -->
+  <rect x="4" y="26" width="28" height="6" fill="#c9d6e8"/>
+  <rect x="32" y="26" width="28" height="6" fill="#92a8c6"/>
+  <!-- columns, each lit on the left and shaded on the right -->
+  <g>
+    <rect x="9" y="33" width="4.5" height="19" fill="#c9d6e8"/><rect x="13.5" y="33" width="4.5" height="19" fill="#8aa1c0"/>
+    <rect x="21" y="33" width="4.5" height="19" fill="#c9d6e8"/><rect x="25.5" y="33" width="4.5" height="19" fill="#8aa1c0"/>
+    <rect x="34" y="33" width="4.5" height="19" fill="#c9d6e8"/><rect x="38.5" y="33" width="4.5" height="19" fill="#8aa1c0"/>
+    <rect x="46" y="33" width="4.5" height="19" fill="#c9d6e8"/><rect x="50.5" y="33" width="4.5" height="19" fill="#8aa1c0"/>
+  </g>
+  <!-- steps -->
+  <rect x="4" y="53" width="56" height="4" fill="#a9bad2"/>
+  <rect x="1" y="57" width="62" height="5" fill="#6f87a8"/>
+</svg>

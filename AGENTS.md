@@ -234,6 +234,8 @@ npm test             # reducer, layout, simulator + grader-port tests
 | `store.ts` | zustand store: session state, selection, camera focus/follow, actions; picks the demo or real `api` |
 | `transport/` | `api.ts` interface, `real.ts` (REST + WebSocket, reconnect from last `seq`), `mock.ts` |
 | `lib/` | `format.ts` (agent names, numbers, colours), `layout.ts` (3D positions) |
+| `App.tsx` | Hash router: home `Landing`, `#/login` and `#/signup` (`Auth`, demo account in `auth.ts`), then the workspace once a session exists |
+| `components/Landing.tsx`, `LowPolyScene.tsx`, `thinker*.ts` | The home page: intro animation, Read/Test/Steer/Trace sections, SVG low-poly temple with the Thinker |
 | `components/Scene.tsx` | The 3D canvas: statue, blobs, edges, accuracy scale, follow camera |
 | `components/` | `TopBar` (status, GPU budget, Generate abstract), `Claims` (left rail), `Inspector` (right rail: results overview, one agent's detail, abstract), `PathChart`, `Dock` (proposals + questions), `Prov` |
 | `public/litmus-statue.glb` | The agent: SMK's public-domain scan of the Artemision Bronze (KAS2100, api.smk.dk), decimated to 1,200 faces, fingertip at the origin |

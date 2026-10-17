@@ -24,11 +24,8 @@ const reducedMotion = () => matchMedia('(prefers-reduced-motion: reduce)').match
 // aimed left of and below the star so the statue stays in frame and the star clears the proposal dock.
 const VIEW = new Vector3(40, 30, 350)
 const AIM = new Vector3(-14, -18, 0)
-const START_TARGET = new Vector3(-34, -6, 0)
-const START_VIEW = new Vector3(52, 12, 250)
 const PORTRAIT_ASPECT = 0.9
 const PORTRAIT_PULLBACK = 1.7
-const START_PORTRAIT_SHIFT = new Vector3(4, -70, 0)
 
 function Statue() {
   const { scene } = useGLTF(STATUE_URL)
@@ -156,35 +153,25 @@ function Fingertip() {
   return <mesh ref={ref}><sphereGeometry args={[1.1, 16, 16]} /><meshBasicMaterial color={BLOB_COLOR} /></mesh>
 }
 
-function CameraRig({ positions, parents, active }: { positions: Map<string, Pos>; parents: Map<string, string | null>; active: boolean }) {
+function CameraRig({ positions, parents }: { positions: Map<string, Pos>; parents: Map<string, string | null> }) {
   const controls = useRef<CameraControls>(null)
   const { focusId, fitRequest, set } = useStore()
   // frame the branch, not just the star: halfway between the focused star and the one it grew from
   const star = focusId ? positions.get(focusId) : undefined
   const from = focusId ? positions.get(parents.get(focusId) ?? '') ?? star : undefined
   const focus = star && from ? { x: (star.x + from.x) / 2, y: (star.y + from.y) / 2, z: (star.z + from.z) / 2 } : { x: FIRST_STEP, y: 0, z: 0 }
-  // portrait screens see less width: pull back, and on the start screen lift the statue above the form
-  const aspect = useThree((s) => s.size.width / s.size.height)
-  const portrait = aspect < PORTRAIT_ASPECT
+  const portrait = useThree((s) => s.size.width / s.size.height) < PORTRAIT_ASPECT // narrow screens see less width: pull back
   useEffect(() => {
-    const c = controls.current
-    if (!c) return
-    if (!active) {
-      const view = START_VIEW.clone().multiplyScalar(portrait ? PORTRAIT_PULLBACK : 1), t = START_TARGET.clone().add(portrait ? START_PORTRAIT_SHIFT : new Vector3())
-      c.setLookAt(t.x + view.x, t.y + view.y, t.z + view.z, t.x, t.y, t.z, false)
-      return
-    }
     const t = new Vector3(focus.x, focus.y, focus.z).add(AIM), view = VIEW.clone().multiplyScalar(portrait ? PORTRAIT_PULLBACK : 1)
-    c.setLookAt(t.x + view.x, t.y + view.y, t.z + view.z, t.x, t.y, t.z, !reducedMotion())
-  }, [active, focus.x, focus.y, focus.z, portrait])
+    controls.current?.setLookAt(t.x + view.x, t.y + view.y, t.z + view.z, t.x, t.y, t.z, !reducedMotion())
+  }, [focus.x, focus.y, focus.z, portrait])
   useEffect(() => {
     if (!fitRequest || !controls.current) return
     const box = new Box3().setFromPoints([new Vector3(-40, -30, 0), ...[...positions.values()].map((p) => new Vector3(p.x, p.y, p.z))])
     box.expandByScalar(16)
     controls.current.fitToBox(box, !reducedMotion(), { paddingLeft: 10, paddingRight: 40, paddingTop: 30, paddingBottom: 30 })
   }, [fitRequest]) // eslint-disable-line react-hooks/exhaustive-deps
-  return <CameraControls ref={controls} makeDefault minDistance={60} maxDistance={900} smoothTime={0.6} enabled={active}
-    onControl={() => { if (active) set({ follow: false }) }} />
+  return <CameraControls ref={controls} makeDefault minDistance={60} maxDistance={900} smoothTime={0.6} onControl={() => set({ follow: false })} />
 }
 
 function Stars({ stars }: { stars: Star[] }) {
@@ -204,7 +191,7 @@ function Stars({ stars }: { stars: Star[] }) {
       {baseline !== undefined && <AccuracyScale baseline={baseline} low={Math.min(baseline - 0.005, ...ys)} high={Math.max(baseline + 0.005, ...ys)} length={maxX + 30} />}
       {stars.map((s) => <Edge key={`e${s.id}`} star={s} live={live} dim={dim(s)} onPath={path.has(s.id)} />)}
       {stars.map((s) => <StarBlob key={s.id} star={s} target={positions.get(s.id)!} live={live} dim={dim(s)} selected={s.id === selectedId} />)}
-      <CameraRig positions={positions} parents={parents} active />
+      <CameraRig positions={positions} parents={parents} />
     </>
   )
 }
@@ -216,7 +203,7 @@ function Background() {
 }
 
 export function Scene() {
-  const stars = useStore((s) => s.app.session?.stars)
+  const stars = useStore((s) => s.app.session?.stars ?? NO_STARS)
   return (
     <Canvas className="!absolute inset-0" camera={{ fov: 30, near: 1, far: 3000, position: [12, -4, 300] }} dpr={[1, 2]}
       aria-label="Research tree: each star is an experiment, higher is more accurate">
@@ -226,9 +213,10 @@ export function Scene() {
       <directionalLight position={[180, 30, -60]} intensity={0.45} />
       <Suspense fallback={null}><Statue /></Suspense>
       <Fingertip />
-      {stars ? <Stars stars={stars} /> : <CameraRig positions={new Map()} parents={new Map()} active={false} />}
+      <Stars stars={stars} />
     </Canvas>
   )
 }
 
+const NO_STARS: Star[] = []
 useGLTF.preload(STATUE_URL)
