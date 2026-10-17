@@ -182,4 +182,36 @@ branch subgraph: run → reflect → (run +5 seeds) | (ask ⟂) | END          �
   `GET …/export` → findings Markdown incl. shadow section.
 
 ## Frontend
-(owned by frontend agent)
+Vite + React 19 + TypeScript (strict), Tailwind v4, `motion`, zustand, d3 (hierarchy/scale/shape). Lives in `frontend/`.
+
+**Run**
+```bash
+cd frontend && npm install
+npm run dev          # http://localhost:5173
+npm test             # reducer unit tests
+```
+`frontend/.env`: `VITE_MOCK=1` (default) simulates the whole backend in the browser; `VITE_MOCK=0` + `VITE_API_URL=http://localhost:8000` talks to the real one. That is the only change needed to switch.
+
+**Folder map** (`frontend/src`)
+| Path | What |
+|---|---|
+| `types.ts` | Contract types, snake_case, mirrors `shared/contract.md` |
+| `reducer.ts` | `applyEvent(state, event)`: the one pure reducer. Ignores `seq <= lastSeq`, logs unknown types |
+| `store.ts` | zustand store: session state, selection, actions; picks the mock or real `api` |
+| `transport/` | `api.ts` interface, `real.ts` (REST + WebSocket, reconnect from last `seq`), `mock.ts` |
+| `mock/` | `server.ts` scripted backend (drives the demo tree, answers every action), `library.ts` demo library |
+| `lib/` | `format.ts` (labels, colours, effect text), `layout.ts` (deterministic left-to-right tree) |
+| `components/` | `StarMap`, `Library`, `Sidebar`, `PathChart`, `Dock` (proposals + question), `Feed`, `Timeline`, `AbstractPanel`, `TopBar`, `Legend`, `Prov` |
+
+**State flow**: `begin()` creates a session, subscribes from `seq 0`, and every event goes through `applyEvent`. The snapshot endpoint is not used for first load because replaying all events rebuilds identical state (see Contract requests).
+
+**Design tokens**: `frontend/src/index.css` (`@theme`). Cream paper background; verdict colours (`confirmed`, `refuted`, `inconclusive`, `baseline`), state colours (`running`, `waiting`), and actor colours (`human`, `agent`) are defined once and used by stars, chips, charts and the legend. Stars are labelled with Greek letters (`S0` = α).
+
+**Animation conventions**: positions ease toward layout targets (new stars grow out of their parent), camera eases with "Follow activity" (any manual pan/zoom turns it off), CSS keyframes for pulse/breathe/bloom/line draw, `motion` for the dock. All motion is disabled under `prefers-reduced-motion`.
+
+**Add an event type**: add a `case` in `reducer.ts`, add a test in `reducer.test.ts`, emit it from `mock/server.ts`, then render it.
+
+**Known gaps**: no "rewind and branch" yet (selection is by star id, so it fits); mock mode does not load `shared/demo-session.json` yet; visual polish pass not done; layout below ~1000px is stacked rather than tuned.
+
+### Contract requests
+- `GET /api/sessions/{id}` should include the highest applied `seq`, so a client can load the snapshot and then subscribe from `seq + 1` instead of replaying everything.

@@ -5,6 +5,11 @@ or remove fields, every change gets a Changelog line (newest first) and lands on
 `docs(contract): ...`.
 
 ## Changelog
+- 2026-10-17 — Additive: `SessionState.wave`, `.agenda: AgendaItem[]`, `.finish_requested`, `.last_seq`;
+  `Proposal.wave`, `.parent_star_id`; `Star.wave`; `Question.wave`; `QuestionOption.directive?`,
+  `.parent_star_id?`, `.knob_changes?`; `RunResult.cached?`; `POST /api/sessions` body `fresh?`,
+  `auto_timeout_seconds?`, `max_waves?`; `GET /api/replay/demo?speed=N`. `shared/demo-session.json` is a real
+  recorded session (`{recorded_at, source_session_id, snapshot: SessionState, events: Event[]}`).
 - 2026-10-16 — `Claim.page` added. Clarified: baseline star `grade.ci_low/ci_high` are the CI of its own
   mean accuracy (not a delta); `papiers_url` is the paper's source link (arXiv), because Papiers is a desktop
   app with no web deep links; Papiers CLI is read-only, so write-back arrives as `papiers.export_ready`.
@@ -22,7 +27,7 @@ All JSON is snake_case. Timestamps are ISO 8601 UTC strings. IDs are stable stri
 | GET | `/api/health` | | `{ok, modal_warm, papiers_ok, openai_ok}` |
 | POST | `/api/warmup` | | `{ok}` (warms Modal container) |
 | GET | `/api/library` | | `{documents: Document[], claims: Claim[]}` ranked, with provenance |
-| POST | `/api/sessions` | `{goal?, budget_gpu_seconds?, auto_mode?}` | `{session_id}` |
+| POST | `/api/sessions` | `{goal?, budget_gpu_seconds?, auto_mode?, auto_timeout_seconds?, max_waves?, fresh?}` | `{session_id}` |
 | GET | `/api/sessions` | | `{sessions: {id, goal, status, created_at, replay}[]}` newest first |
 | GET | `/api/sessions/{id}` | | full `SessionState` snapshot |
 | POST | `/api/sessions/{id}/dispatch` | `{star_id, selections:[{proposal_id, knob_overrides?}], instruction?}` | `{ok}` |
@@ -34,7 +39,7 @@ All JSON is snake_case. Timestamps are ISO 8601 UTC strings. IDs are stable stri
 | POST | `/api/sessions/{id}/stop_branch` | `{star_id}` | `{ok}` |
 | POST | `/api/sessions/{id}/abstract` | | `{abstract, findings[]}` (ends the session: no more waves) |
 | GET | `/api/sessions/{id}/export` | | `text/markdown`: findings + abstract |
-| GET | `/api/replay/demo` | | `{session_id}` — starts a replay session from `shared/demo-session.json` |
+| GET | `/api/replay/demo?speed=1` | | `{session_id}` — starts a replay session from `shared/demo-session.json` (gaps capped at 1.5s, divided by `speed`) |
 | WS | `/ws/sessions/{id}?from_seq=N` | | stream of `Event` (JSON text frames), first every persisted event with `seq > N`, then live |
 
 Errors: non-2xx with `{detail: string}`. Validation errors are 422, unknown ids 404, conflicting
@@ -68,9 +73,12 @@ Knobs = { label_smoothing:number, epochs:number, tta_level:0|1|2, flip:"random"|
 Proposal = { id, star_id, title, hypothesis, predicted:"improves"|"hurts"|"no_effect",
              knob_changes: Partial<Knobs>, condition_notes: string, provenance: Provenance[],
              agent_recommended: boolean,
-             status?: "open"|"dispatched"|"skipped" }
+             status?: "open"|"dispatched"|"skipped",
+             wave: number,                    // 1-based wave this proposal belongs to
+             parent_star_id?: string }        // the star it changes (same as star_id)
 
-RunResult = { seed:number, val_acc:number, tta_val_acc?:number, time_seconds:number }
+RunResult = { seed:number, val_acc:number, tta_val_acc?:number, time_seconds:number,
+              cached?: boolean }                // true = served from the (config, seed) cache, not re-trained
 
 Grade = { metric:"val_acc"|"tta_val_acc", mean_parent, mean_child, delta, sd_parent, sd_child, n,
           ci_low, ci_high, p_value, verdict:"confirmed"|"refuted"|"inconclusive"|"baseline",
@@ -85,12 +93,15 @@ Star = { id,                                // "S0" is the baseline, then S1, S2
          predicted?: "improves"|"hurts"|"no_effect",
          proposal_id?: string,
          shadow_of?: string,                // for chosen_by:"shadow": the decision id it shadows
+         wave: number,                      // 0 = baseline
          progress?: { seed:number, epoch:number, val_acc:number }[],
          runs: RunResult[], parent_runs: RunResult[],
          grade?: Grade,
          reflection?: string, error?: string, created_at, finished_at? }
 
-Question = { id, star_id, text, evidence: Provenance[], options:[{id, label, consequence}],
+Question = { id, star_id, text, evidence: Provenance[],
+             options:[{id, label, consequence, directive?, parent_star_id?, knob_changes?}],
+             wave: number,
              agent_leaning?: string,         // option id the agent would pick alone
              status:"open"|"answered", answer?: {option_id, comment?} }
 
@@ -104,7 +115,14 @@ Decision = { id, star_id, kind:"dispatch"|"answer"|"feedback",
 SessionState = { id, goal, status:"running"|"paused"|"waiting_human"|"done", stars: Star[],
                  proposals: Proposal[], questions: Question[], decisions: Decision[],
                  abstract?: {text, findings:string[], citations: Provenance[]}, budget_used, budget_total,
-                 replay?: boolean, created_at }
+                 replay?: boolean, created_at,
+                 wave: number,                     // current wave
+                 agenda: AgendaItem[],             // what the agent committed to consider next wave, and why
+                 finish_requested: boolean,
+                 last_seq: number }                // open the WS with from_seq = last_seq
+
+AgendaItem = { id, source: "reflection"|"answer"|"feedback", star_id?, text, knob_changes,
+               parent_star_id?, provenance: Provenance[], consumed: boolean }
 
 Event = { seq:number, ts:string, session_id, type: EventType, payload: object }
 ```
