@@ -458,7 +458,7 @@ async def autoresearch(state: SessionState, s: Star | None, documents: list[Docu
     picked = await structured("autoresearch_pick", ReadingList, goal=state.goal, focus=focus, tree=tree(state),
                               library=[d.title for d in documents], results=results)
     by_id = {p.id: p for p in fresh}
-    papers = [{"title": by_id[k.id].title, "url": by_id[k.id].url, "authors": by_id[k.id].authors[:3],
+    papers = [{"title": by_id[k.id].title, "url": by_id[k.id].url, "pdf": by_id[k.id].pdf, "authors": by_id[k.id].authors[:3],
                "year": by_id[k.id].year, "why": k.why_read.strip()} for k in picked.picks if k.id in by_id][:MAX_READING]
     return picked.intro.strip(), papers
 

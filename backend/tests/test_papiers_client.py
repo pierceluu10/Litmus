@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from litmus.papiers_client import (WEIGHT_ANNOTATED_HIGHLIGHT, parse_documents, parse_highlights,
-                                   parse_notes_or_conversations, parse_search, rank_claims, write_commands_in_help)
+                                   parse_notes_or_conversations, parse_search, rank_claims)
 
 FIXTURES = Path(__file__).parent / "fixtures" / "papiers"
 
@@ -76,7 +76,3 @@ def test_search_flattens_evidence_best_first():
     assert hits[0].doc_title.startswith("Bag of Tricks") and "120 to 200" in hits[0].text
     assert len(hits) == 3
 
-
-def test_installed_cli_has_no_write_command():
-    assert write_commands_in_help((FIXTURES / "help_all.txt").read_text()) == []
-    assert write_commands_in_help("COMMANDS\n  search   x\n  note     write a note\n\nOUTPUT") == ["note"]

@@ -242,8 +242,6 @@ async def abstract(es: EngineState) -> dict:
         state.abstract = Abstract(text=text, findings=findings, citations=citations)
         ops.emit(state, "abstract.ready", {"abstract": state.abstract.model_dump()})
     path = writeback.export(state)
-    if await papiers_client.supports_write():
-        log.warning("Papiers CLI now has write commands; Litmus still exports (update writeback.py)")
     store.emit(state.id, "papiers.export_ready", {"path": path, "instructions": writeback.INSTRUCTIONS})
     ops.set_status(state, "done")
     return {}

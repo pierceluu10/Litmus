@@ -69,6 +69,7 @@ export function starTone(s: Star): Tone {
   if (s.status === 'queued') return 'inconclusive'
   return s.grade?.verdict ?? 'inconclusive'
 }
+export const VERDICT_TEXT = { confirmed: 'Confirmed', refuted: 'Refuted', inconclusive: 'Inconclusive', baseline: 'Baseline' }
 export const toneVar = (t: Tone) => `var(--color-${t})`
 
 export function progressFraction(s: Star): number {

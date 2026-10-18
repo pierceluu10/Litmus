@@ -5,6 +5,13 @@ or remove fields, every change gets a Changelog line (newest first) and lands on
 `docs(contract): ...`.
 
 ## Changelog
+- 2026-10-18 — Additive: Papiers writes (CLI v0.1.6). `POST /api/sessions/{id}/papiers/highlights {claim_ids?, write}` →
+  `{highlights: {claim_id, doc_id, doc_title, summary, page, start, end, verdict, color, note, star_ids}[], results?:
+  {claim_id, ok, error?}[]}`: without `write` it only previews (the human approves), with it writes the chosen claims (503
+  if the CLI is down; a refused passage is `ok: false`). `POST /api/demo/highlights {session, claim_ids?, write}` is the
+  same for a demo snapshot, every note marked simulated. `POST /api/papiers/import {url}` → `{operationId, status,
+  documentId, error}`, `GET /api/papiers/import/{operation_id}` → same (`ready`/`failed` are final; 502 when Papiers
+  refuses). Autoresearch papers gain `pdf` (the arXiv PDF link, what gets imported).
 - 2026-10-18 — Additive: `POST /api/sessions/{id}/autoresearch {star_id?}` → `{answer, papers: {title, url, authors,
   year, why}[]}` (Litmus's "Explore this topic further": up to 3 arXiv papers the human has not read; 503 if arXiv or the
   LLM fails). Demo mode: `POST /api/demo/explain|questions|autoresearch` take `{session: SessionState, star_id?,
@@ -67,8 +74,10 @@ All JSON is snake_case. Timestamps are ISO 8601 UTC strings. IDs are stable stri
 | POST | `/api/sessions/{id}/answer` | `{question_id, option_id, comment?}` | `{ok}` |
 | POST | `/api/sessions/{id}/feedback` | `{star_id, kind:"challenge"\|"suggest"\|"prioritize", text}` | `{ok}` |
 | POST | `/api/sessions/{id}/explain` | `{star_id?, question?, history?: ChatTurn[]}` (no star: the whole research) | `{answer, provenance: Provenance[]}` |
-| POST | `/api/sessions/{id}/autoresearch` | `{star_id?}` | `{answer, papers: {title, url, authors, year, why}[]}` (≤3 arXiv papers not in the library) |
-| POST | `/api/demo/explain` · `/api/demo/questions` · `/api/demo/autoresearch` | `{session: SessionState, star_id?, question?, history?, asked?}` | same as the session routes, about that snapshot |
+| POST | `/api/sessions/{id}/autoresearch` | `{star_id?}` | `{answer, papers: {title, url, pdf, authors, year, why}[]}` (≤3 arXiv papers not in the library) |
+| POST | `/api/sessions/{id}/papiers/highlights` | `{claim_ids?, write}` | `{highlights, results?}`: verdict highlights, previewed then written once approved |
+| POST | `/api/papiers/import` · GET `/api/papiers/import/{operation_id}` | `{url}` | `{operationId, status, documentId, error}` |
+| POST | `/api/demo/explain` · `/api/demo/questions` · `/api/demo/autoresearch` · `/api/demo/highlights` | `{session: SessionState, star_id?, question?, history?, asked?}` | same as the session routes, about that snapshot |
 | POST | `/api/sessions/{id}/questions` | `{star_id?, asked: string[]}` | `{questions: string[]}` (≤3, none from `asked`) |
 | POST | `/api/sessions/{id}/pause` | | `{ok}` |
 | POST | `/api/sessions/{id}/resume` | | `{ok}` |

@@ -1,6 +1,7 @@
 """Papiers CLI wrapper: library intake with judgment weighting, page reads, and semantic search.
 
-The installed CLI (v0.1.5) is read-only, so write-back is an export (see writeback.py).
+Writes (v0.1.6+): `highlight` puts Litmus's verdicts on the claims it tested, `import` adds a paper to the library.
+Both need a token with that permission and are only called after the human approves them in the UI.
 Weighting follows the papiers-research skill: judgment signals (annotations, notes, conversations,
 highlights) outrank curation signals (saved but never highlighted).
 """
@@ -248,22 +249,20 @@ async def doctor() -> bool:
     return all(check.get("ok") for check in result.get("checks", []))
 
 
-WRITE_COMMANDS = ("write", "create", "add", "import", "upload", "note")
+async def highlight(doc_id: str, start: str, end: str | None, page: int | None, note: str, color: str) -> dict:
+    """Highlight a passage of a saved document with a note (needs a token with "Allow highlights")."""
+    args = ["highlight", doc_id, "--start", start, "--note", note, "--color", color]
+    if end:
+        args += ["--end", end]
+    if page is not None:
+        args += ["--pages", str(page)]
+    return await run_cli(*args)
 
 
-def write_commands_in_help(help_text: str) -> list[str]:
-    """Command names under the help's COMMANDS section that could write to the library."""
-    section = help_text.split("COMMANDS", 1)[-1].split("\n\n", 1)[0]
-    names = [line.split()[0] for line in section.splitlines() if line.strip()]
-    return [name for name in names if name in WRITE_COMMANDS]
+async def import_url(url: str) -> dict:
+    """Queue a public PDF or webpage for the library (needs "Allow document imports"); poll import_status."""
+    return await run_cli("import", url)
 
 
-async def supports_write() -> bool:
-    """True if the installed CLI has a write command. v0.1.5 does not, so findings are exported."""
-    binary = shutil.which("papiers")
-    if not binary:
-        return False
-    process = await asyncio.create_subprocess_exec(binary, "help", "--all", stdout=asyncio.subprocess.PIPE,
-                                                   stderr=asyncio.subprocess.DEVNULL)
-    stdout, _ = await asyncio.wait_for(process.communicate(), CLI_TIMEOUT_SECONDS)
-    return bool(write_commands_in_help(stdout.decode()))
+async def import_status(operation_id: str) -> dict:
+    return await run_cli("import-status", operation_id)

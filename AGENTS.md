@@ -66,8 +66,10 @@ uv run litmus --help
 - Modal workspace `pierceluu10`, Starter plan, 10 concurrent GPUs max.
 - Volume `cifar-data` holds `/cifar-10-python.tar.gz` (md5 `c58f30108f718f92721af3b95e74349a`).
   **Never download CIFAR inside Modal** (≈40 KB/s). Mount the volume.
-- Papiers CLI `papiers` (npm, v0.1.5) is **read-only**: search, list, read, browse, auth, tokens,
-  doctor. There is no write command, so findings are exported as Markdown for manual import.
+- Papiers CLI `papiers` v0.1.6 (installed from the Papiers release tarball while npm is locked; checked: no install
+  scripts, talks only to api.papiers.ai) reads and also writes: `highlight` and `import`/`import-status`. Each write needs
+  its permission on the token ("Allow highlights", "Allow document imports"). It has no note command, so the full
+  findings are still exported as Markdown.
 
 ## Conventions
 - Branches: `main` ← `backend` (integration) ← `feat/<feature>`. Feature branches merge into `backend`
@@ -125,7 +127,15 @@ uv run litmus --help
 - `POST /api/library/import {documents, claims}`: the next session created works from this library instead of Papiers
   (`SessionState.library`; `library.session_library(state)` is what the engine, `/start` and `/pivot` read). The sign-in
   page sends the highlights that match the person's topic. One pending import per server (fine for one person at a time).
-- **No write-back via CLI**: v0.1.5 has no write command (`supports_write()` checks `papiers help --all`).
+- **Writes only after the human approves** (the CLI's own rule). **Verdict highlights** (`writeback.verdict_highlights`,
+  `POST …/papiers/highlights`, demo `POST /api/demo/highlights`): one new highlight per tested highlight-claim over the
+  same passage (`--start`/`--end` = its first/last `QUOTE_WORDS` words, `--pages` its page), tinted by the latest
+  verdict on it (`VERDICT_COLORS`), with a note listing every result (agent, delta, CI, seeds, what was predicted). The
+  call previews first; the top bar's **Highlight in Papiers** panel (`PapiersHighlights.tsx`) shows each note, the human
+  unticks any, then writes. Demo results are simulated but the library is real, so each demo note starts with
+  `writeback.SIMULATED`. A passage Papiers cannot find is reported per claim and does not stop the rest. **Import**:
+  autoresearch's paper cards have **Add to Papiers** (`POST /api/papiers/import` with the arXiv PDF, then polls
+  `import-status` every 2 s for up to 90 s).
   Papiers is a desktop app with no web deep links, so `papiers_url` = the paper's source URL (arXiv).
 
 ### Engine (`backend/litmus/engine/`)
@@ -195,7 +205,7 @@ branch subgraph (one agent): run → reflect → (run +5 seeds) | (ask ⟂ → s
   gpt-5.6-luna (2026-10-17), not on a shared prefix with a different ending, so no `prompt_cache_key` is set.
 - Abstract (Litmus, `write_abstract.txt`): ~150 words, every sentence cites `[S#][hl_…]`; citations to ids we never gave it are stripped.
 - `POST /explain`: star evidence + per-seed numbers + a fresh library search → plain-language answer with provenance.
-- Write-back = **export** (CLI is read-only): `backend/exports/<session>/findings.md` + `abstract.md`, also served by
+- Write-back = verdict highlights (above) + **export** (the CLI cannot write notes): `backend/exports/<session>/findings.md` + `abstract.md`, also served by
   `GET /api/sessions/{id}/export`; event `papiers.export_ready` tells the UI to show "Add to Papiers" (paste into a
   Papiers note, which Papiers indexes, so later sessions' searches find it). Shadow branches get their own section.
 
@@ -298,7 +308,7 @@ npm test             # reducer, layout, simulator + grader-port tests
 | `components/LowPolyScene.tsx` `Facets` | The landing's faceted low-poly sky, reused as the rails' ground |
 | `public/litmus-statue.glb` | The agent: SMK's public-domain scan of the Artemision Bronze (KAS2100, api.smk.dk), decimated to 1,200 faces, fingertip at the origin |
 
-**The scene is a layered network**: x = generation (all stars of one generation share a column, like layers of a neural network) and y = accuracy, on one scale for every star (`lib/layout.ts`: `UNITS_PER_POINT`), so node heights match the accuracy graph: higher accuracy sits higher, the baseline is level with the fingertip, and a star that is still training sits level with its parent. Stars of one column whose accuracies are too close are nudged apart (`MIN_GAP`), keeping their order. Node = experiment (a flat-shaded low-poly sphere that spins faster while training); ring = verdict colour (partial arc = training progress, amber = needs you); dashed edge = training. A finished experiment opens its own card in the results panel automatically (unless you are already reading one).
+**The scene is a layered network**: x = generation (all stars of one generation share a column, like layers of a neural network) and y = accuracy, on one scale for every star (`lib/layout.ts`: `UNITS_PER_POINT`), so node heights match the accuracy graph: higher accuracy sits higher, the baseline is level with the fingertip, and a star that is still training sits level with its parent. Stars of one column whose accuracies are too close are nudged apart (`MIN_GAP`), keeping their order; stars above the baseline only move up and those below only down, so a refuted star never sits above the baseline. A graded card says what the claim predicted next to the verdict ("Confirmed · the claim expects a loss"): an ablation like TTA off confirms by losing accuracy. Node = experiment (a flat-shaded low-poly sphere that spins faster while training); ring = verdict colour (partial arc = training progress, amber = needs you); dashed edge = training. A finished experiment opens its own card in the results panel automatically (unless you are already reading one).
 
 **Camera**: locked: no rotate or pan, zoom capped (170-480 units). At the start of a session it opens just behind the statue's head, looking over its shoulder along the arm, and glides once to the default view (`EAR_CAM`/`EAR_AIM`, `INTRO_SMOOTH` in `Scene.tsx`). The default view (`VIEW`) is swung a little toward the nodes' side so the tree is met head-on, aimed at the midpoint of the focused star and its parent. The camera frames the whole column of the focused star and zooms out (up to 760 units) when a generation gets tall. Focus = the newest star while following; dispatching, answering or branching turns following back on; clicking any star or claim re-centres on it and keeps your zoom. "Fit all" is a toggle (`fitAll` in the store): on frames every star, off returns to the default view. There is no pause button.
 

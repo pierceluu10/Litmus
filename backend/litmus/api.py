@@ -326,6 +326,67 @@ async def demo_autoresearch(body: DemoChat):
     return _reading(await _litmus(driver.autoresearch(body.session, body.star_id)))
 
 
+class HighlightsBody(BaseModel):
+    """Verdict highlights: without `write` it only lists what would be written, so the human can approve; with it,
+    it writes the approved `claim_ids` (all of them when omitted)."""
+    claim_ids: list[str] | None = None
+    write: bool = False
+
+
+class DemoHighlights(HighlightsBody):
+    session: SessionState
+
+
+async def _verdict_highlights(state: SessionState, body: HighlightsBody, simulated: bool) -> dict:
+    _, claims = await session_library(state)
+    planned = [h for h in writeback.verdict_highlights(state, claims, simulated)
+               if body.claim_ids is None or h.claim_id in body.claim_ids]
+    response = {"highlights": [h.model_dump() for h in planned]}
+    if body.write:
+        try:
+            response["results"] = await writeback.write_highlights(planned)
+        except papiers_client.PapiersUnavailable as error:
+            raise HTTPException(503, str(error)) from error
+    return response
+
+
+@app.post("/api/sessions/{session_id}/papiers/highlights")
+async def verdict_highlights(session_id: str, body: HighlightsBody):
+    return await _verdict_highlights(_session(session_id), body, simulated=False)
+
+
+@app.post("/api/demo/highlights")
+async def demo_highlights(body: DemoHighlights):
+    """Demo results are simulated, so every note says so before it reaches the person's real library."""
+    return await _verdict_highlights(body.session, body, simulated=True)
+
+
+class ImportBody(BaseModel):
+    url: str = Field(pattern=r"^https?://")
+
+
+async def _papiers_write(call) -> dict:
+    """A Papiers write, its failures mapped to HTTP: 503 when the CLI is down, 502 when Papiers refuses (e.g. a token
+    without that permission)."""
+    try:
+        return await call
+    except papiers_client.PapiersUnavailable as error:
+        raise HTTPException(503, str(error)) from error
+    except papiers_client.PapiersError as error:
+        raise HTTPException(502, str(error)) from error
+
+
+@app.post("/api/papiers/import")
+async def import_paper(body: ImportBody):
+    """Add a paper the human chose (e.g. from autoresearch) to their Papiers library. Queued: poll the status."""
+    return await _papiers_write(papiers_client.import_url(body.url))
+
+
+@app.get("/api/papiers/import/{operation_id}")
+async def import_paper_status(operation_id: str):
+    return await _papiers_write(papiers_client.import_status(operation_id))
+
+
 @app.post("/api/sessions/{session_id}/pause")
 async def pause(session_id: str):
     _session(session_id)

@@ -1,13 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
-import { agentDetail, agentName, knobText, pct, progressFraction, provMatches, pts, toneVar } from '../lib/format'
+import { agentDetail, agentName, knobText, pct, progressFraction, provMatches, pts, toneVar, VERDICT_TEXT } from '../lib/format'
 import type { Proposal, Star } from '../types'
 import { SceneBackdrop } from './LowPolyScene'
 import { Whimsy } from './Whimsy'
 
 const MAX_AGENTS = 4
 const EXPECTS = { improves: 'expects a gain', hurts: 'expects a loss', no_effect: 'expects no change' }
-const VERDICT_TEXT = { confirmed: 'Confirmed', refuted: 'Refuted', inconclusive: 'Inconclusive', baseline: 'Baseline' }
 type Tab = 'about' | 'proceed'
 const PLACEHOLDER_WIDTHS = ['72%', '58%', '66%'] // the option rows while they are written
 const CARD_FACETS = 37
@@ -29,7 +28,7 @@ function Verdict({ s }: { s: Star }) {
   const color = toneVar(g.verdict)
   return (
     <div title={`${g.n} paired seeds · p ${g.p_value < 0.001 ? '< 0.001' : g.p_value.toFixed(3)}`}>
-      <div className="flex items-baseline justify-between"><span className="font-medium" style={{ color }}>{VERDICT_TEXT[g.verdict]}</span><span className="text-[11px] text-muted">{g.n} runs</span></div>
+      <div className="flex items-baseline justify-between"><span><span className="font-medium" style={{ color }}>{VERDICT_TEXT[g.verdict]}</span>{s.predicted && g.verdict !== 'baseline' && <span className="text-[11px] text-muted"> · the claim {EXPECTS[s.predicted]}</span>}</span><span className="text-[11px] text-muted">{g.n} runs</span></div>
       <div className="num mt-0.5 text-[22px] font-medium leading-none tracking-[-0.03em]" style={{ color: g.verdict === 'baseline' ? undefined : color }}>
         {g.verdict === 'baseline' ? pct(g.mean_child) : <>{pts(g.delta)} <span className="text-[12px]">pts</span></>}
       </div>

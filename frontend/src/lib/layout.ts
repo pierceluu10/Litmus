@@ -5,7 +5,7 @@ import type { Star } from '../types'
 // on the same scale for every star, so the nodes line up with the accuracy graph: higher accuracy sits higher, and the
 // baseline stays level with the fingertip. A star that is still training sits level with its parent until it is graded.
 // Two stars of one generation never overlap: when their accuracies are too close they are nudged apart, keeping their
-// order, and the column is re-centred so it does not drift.
+// order and their side of the baseline (a star below the baseline never sits above it).
 export const FIRST_STEP = 18
 export const LAYER_GAP = 120 // wide enough that a star's label never reaches the next column
 export const MIN_GAP = 58 // the least vertical room two stars of one column get: the sphere plus its two-line label
@@ -29,13 +29,14 @@ export function layoutStars(stars: Star[]): Map<string, Pos> {
   const y = new Map<string, number>()
   const columns = new Map<number, Star[]>()
   stars.forEach((s) => columns.set(depth.get(s.id)!, [...(columns.get(depth.get(s.id)!) ?? []), s]))
-  for (const [d, col] of columns) {
-    const order = col.map((s, i) => ({ s, i })).sort((a, b) => raw.get(b.s.id)! - raw.get(a.s.id)! || a.i - b.i).map((o) => o.s)
-    const placed: number[] = []
-    order.forEach((s, i) => placed.push(i ? Math.min(raw.get(s.id)!, placed[i - 1] - MIN_GAP) : raw.get(s.id)!))
-    // pushing downward drifts the column; share the shift so the stars stay as near their accuracy as they can
-    const shift = d === 0 ? 0 : placed.reduce((sum, v, i) => sum + (raw.get(order[i].id)! - v), 0) / placed.length
-    order.forEach((s, i) => y.set(s.id, placed[i] + shift))
+  for (const col of columns.values()) {
+    const order = [...col].sort((a, b) => raw.get(b.id)! - raw.get(a.id)!) // stable: ties keep start order, first on top
+    // stars above the baseline are only nudged up and stars below only down, so none crosses the baseline
+    const above = order.filter((s) => raw.get(s.id)! >= 0).reverse()
+    let floor = -Infinity
+    for (const s of above) { y.set(s.id, Math.max(raw.get(s.id)!, floor)); floor = y.get(s.id)! + MIN_GAP }
+    let ceiling = above.length ? y.get(above[0].id)! - MIN_GAP : Infinity
+    for (const s of order.filter((s) => raw.get(s.id)! < 0)) { y.set(s.id, Math.min(raw.get(s.id)!, ceiling)); ceiling = y.get(s.id)! - MIN_GAP }
   }
   return new Map(stars.map((s) => [s.id, { x: FIRST_STEP + depth.get(s.id)! * LAYER_GAP, y: y.get(s.id)!, z: 0 }]))
 }

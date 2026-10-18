@@ -94,6 +94,40 @@ function Face() {
   return <img src="/litmus-face.svg" alt="" width={24} height={24} className="mt-[7px] shrink-0" />
 }
 
+const IMPORT_POLL_MS = 2000
+const IMPORT_POLLS = 45 // 90 s of checking; after that Papiers keeps importing on its own
+const IMPORT_DONE = ['ready', 'failed']
+type Importing = { phase: 'idle' | 'adding' | 'ready' | 'slow' | 'failed'; error?: string }
+
+// Adds one paper autoresearch found to the person's Papiers library. The click is their approval; nothing is added without it.
+function AddToPapiers({ url }: { url: string }) {
+  const [state, setState] = useState<Importing>({ phase: 'idle' })
+  const alive = useRef(true)
+  useEffect(() => () => { alive.current = false }, [])
+  const add = async () => {
+    setState({ phase: 'adding' })
+    try {
+      let s = await sessionApi().importPaper(url)
+      for (let i = 0; alive.current && !IMPORT_DONE.includes(s.status) && i < IMPORT_POLLS; i++) {
+        await new Promise((r) => setTimeout(r, IMPORT_POLL_MS))
+        s = await sessionApi().importStatus(s.operationId)
+      }
+      if (!alive.current) return
+      setState(s.status === 'ready' ? { phase: 'ready' } : s.status === 'failed' ? { phase: 'failed', error: s.error?.message ?? 'Papiers could not import it.' } : { phase: 'slow' })
+    } catch (e) { if (alive.current) setState({ phase: 'failed', error: (e as Error).message }) }
+  }
+  if (state.phase === 'ready') return <p className="m-0 mt-2 text-[11.5px] font-medium" style={{ color: toneVar('confirmed') }}>In your Papiers library</p>
+  if (state.phase === 'slow') return <p className="m-0 mt-2 text-[11.5px] text-muted">Papiers is still importing it; it will appear in your library.</p>
+  return (
+    <div className="mt-2">
+      <button className="btn h-7 px-2.5 text-[12px]" disabled={state.phase === 'adding'} title={`Imports ${url}`} onClick={add}>
+        {state.phase === 'adding' ? 'Adding to Papiers…' : state.phase === 'failed' ? 'Try again' : 'Add to Papiers'}
+      </button>
+      {state.error && <p role="alert" className="m-0 mt-1 text-[11px] leading-snug text-refuted">{state.error}</p>}
+    </div>
+  )
+}
+
 // The answer opens out from where the pearl lands on its first line.
 const HIDDEN_ANSWER = { clipPath: 'circle(0px at 12px 11px)', opacity: 0, filter: 'blur(4px)' }
 const SHOWN_ANSWER = { clipPath: 'circle(150% at 12px 11px)', opacity: 1, filter: 'blur(0px)' }
@@ -113,12 +147,13 @@ function LitmusMessage({ text, provenance, papers, pending }: { text: string; pr
         {!pending && !!papers?.length && (
           <ol aria-label="Papers to read" className="m-0 flex list-none flex-col gap-1.5 p-0">
             {papers.map((p) => (
-              <li key={p.url}>
-                <a href={p.url} target="_blank" rel="noreferrer" className="plate block p-2.5 no-underline transition-colors hover:bg-paper">
+              <li key={p.url} className="plate p-2.5">
+                <a href={p.url} target="_blank" rel="noreferrer" className="block no-underline">
                   <span className="flex items-start gap-1.5 text-[12.5px] font-medium leading-snug text-ink">{p.title}<ExternalIcon /></span>
                   <span className="mt-0.5 block text-[11px] text-faint">{p.authors.join(', ')}{p.year ? ` · ${p.year}` : ''} · arXiv</span>
                   <span className="mt-1 block text-[12px] leading-snug text-muted">{p.why}</span>
                 </a>
+                <AddToPapiers url={p.pdf ?? p.url} />
               </li>
             ))}
           </ol>

@@ -3,7 +3,7 @@ import { MockServer } from '../mock/server'
 import { claims, documents } from '../mock/library'
 import { DEFAULT_GOAL, LibraryUnavailable, type Api } from './api'
 import type { Provenance, ReadingItem } from '../types'
-import { call, streamLibrary } from './real'
+import { call, realApi, streamLibrary } from './real'
 
 let srv: MockServer | null = null
 const cur = () => { if (!srv) throw new Error('No mock session'); return srv }
@@ -46,6 +46,10 @@ export const mockApi: Api = {
     .catch((e) => { offline('questions', e); return wait(commonQuestions(cur().state.session, b.star_id ?? null).filter((q) => !b.asked.includes(q)), THINK_MS) }),
   autoresearch: (_s, b) => litmus<{ answer: string; papers: ReadingItem[] }>('autoresearch', b)
     .catch((e) => { offline('autoresearch', e); return { answer: 'Autoresearch searches arXiv through the Litmus backend. Start it with ./dev.sh and ask again.', papers: [] } }),
+  // the library is real, so these write to it; the backend marks every demo note as simulated
+  verdictHighlights: (_s, b) => litmus('highlights', b),
+  importPaper: (url) => realApi.importPaper(url),
+  importStatus: (id) => realApi.importStatus(id),
   pause: async () => cur().pause(),
   resume: async () => cur().resume(),
   stopBranch: async (_s, id) => cur().stopBranch(id),

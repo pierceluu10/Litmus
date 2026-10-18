@@ -28,6 +28,13 @@ describe('layoutStars (layers, height = accuracy)', () => {
     expect(ys[0] - ys[1]).toBeGreaterThanOrEqual(MIN_GAP - 1e-9)
     expect(ys[1] - ys[2]).toBeGreaterThanOrEqual(MIN_GAP - 1e-9)
   })
+  it('never nudges a star across the baseline', () => {
+    // the screenshot's column: one just below the baseline, two crowded further down
+    const p = layoutStars([star('S0', null, 0.9394), star('S1', 'S0', 0.9372), star('S2', 'S0', 0.9252), star('S3', 'S0', 0.9248), star('S4', 'S0', 0.9401)])
+    expect(p.get('S1')!.y).toBeLessThan(0)
+    expect(p.get('S4')!.y).toBeGreaterThan(0)
+    expect(p.get('S4')!.y - p.get('S1')!.y).toBeGreaterThanOrEqual(MIN_GAP - 1e-9)
+  })
   it('keeps a training star level with its parent until it is graded', () => {
     const p = layoutStars([star('S0', null, 0.94), star('S1', 'S0', 0.95), star('S2', 'S1')])
     expect(p.get('S2')!.y).toBe(p.get('S1')!.y)

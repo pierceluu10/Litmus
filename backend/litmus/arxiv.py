@@ -23,6 +23,7 @@ class Paper(BaseModel):
     authors: list[str]
     year: int | None
     url: str
+    pdf: str | None  # what Papiers imports: the PDF itself, not the abstract page
     abstract: str
 
 
@@ -37,8 +38,10 @@ def parse(feed: str) -> list[Paper]:
         if "/abs/" not in url:
             continue  # the API reports errors as an entry without an abstract page
         published = entry.findtext(f"{ATOM}published") or ""
+        pdf = next((link.get("href") for link in entry.findall(f"{ATOM}link") if link.get("title") == "pdf"), None)
         papers.append(Paper(
             id=url.rsplit("/abs/", 1)[1], url=url.replace("http://", "https://"),
+            pdf=pdf.replace("http://", "https://") if pdf else None,
             title=" ".join((entry.findtext(f"{ATOM}title") or "").split()),
             authors=[(a.findtext(f"{ATOM}name") or "").strip() for a in entry.findall(f"{ATOM}author")],
             year=int(published[:4]) if published[:4].isdigit() else None,

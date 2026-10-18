@@ -141,10 +141,6 @@ def engine(tmp_path, monkeypatch):
     monkeypatch.setattr(service, "stream_runs", fake_stream_runs)
     monkeypatch.setattr(agent, "structured", fake_structured)
     monkeypatch.setattr(graph.papiers_client, "search", fake_search)
-
-    async def no_write():
-        return False
-    monkeypatch.setattr(graph.papiers_client, "supports_write", no_write)
     monkeypatch.setattr(library, "get_library", fake_library)  # graph and api read it through session_library
     monkeypatch.setattr(graph.writeback, "EXPORTS_DIR", tmp_path / "exports")
 

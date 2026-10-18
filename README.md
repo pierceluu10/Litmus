@@ -23,6 +23,8 @@ comparing numbers by hand. Litmus does that loop for the claims you already mark
 5. **Ask Litmus.** Chat about one agent or the whole research. **Explore this topic further** searches arXiv for related
    papers you have not read yet, so the next step can start with reading.
 6. **Write it up.** Litmus writes an abstract in which every sentence cites the experiment and the highlight behind it.
+7. **Back to Papiers.** Once you approve, each claim an agent tested gets a highlight in Papiers tinted by its verdict,
+   with the results in its note, and any paper autoresearch found can be added to your library in one click.
 
 The research grows as a map around Litmus: each node is a training run that actually happened, each line one change,
 traced to the highlight, note or decision it came from.

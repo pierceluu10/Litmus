@@ -1,4 +1,4 @@
-import type { Abstract, ChatTurn, Claim, Document, LitmusEvent, Provenance, Selection, ReadingItem } from '../types'
+import type { Abstract, ChatTurn, Claim, Document, HighlightResult, ImportStatus, LitmusEvent, Provenance, Selection, ReadingItem, VerdictHighlight } from '../types'
 
 export type Health = { ok: boolean; modal_warm: boolean; papiers_ok: boolean; openai_ok: boolean }
 export const DEFAULT_GOAL = 'Which of the training tricks I highlighted hold for a ~10-epoch CIFAR-10 run?'
@@ -32,6 +32,11 @@ export interface Api {
   questions(sid: string, body: { star_id?: string; asked: string[] }): Promise<string[]>
   // "Explore this topic further": papers on arXiv the human has not read, about the open agent or the whole research
   autoresearch(sid: string, body: { star_id?: string }): Promise<{ answer: string; papers: ReadingItem[] }>
+  // Verdict highlights in Papiers: without write, what would be written so the human can approve; with it, the approved claims
+  verdictHighlights(sid: string, body: { claim_ids?: string[]; write: boolean }): Promise<{ highlights: VerdictHighlight[]; results?: HighlightResult[] }>
+  // adds a paper the human chose to their Papiers library; queued, so poll importStatus
+  importPaper(url: string): Promise<ImportStatus>
+  importStatus(operationId: string): Promise<ImportStatus>
   pause(sid: string): Promise<void>
   resume(sid: string): Promise<void>
   stopBranch(sid: string, star_id: string): Promise<void>

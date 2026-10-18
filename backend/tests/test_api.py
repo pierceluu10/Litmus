@@ -180,7 +180,8 @@ def test_chat_about_the_whole_research_and_generated_questions(engine, monkeypat
 
 FEED = """<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">
 <entry><id>http://arxiv.org/abs/2001.00001v1</id><published>2020-01-01T00:00:00Z</published><title>mixup</title>
-<summary>Already read.</summary><author><name>H. Zhang</name></author></entry>
+<summary>Already read.</summary><author><name>H. Zhang</name></author>
+<link title="pdf" href="http://arxiv.org/pdf/2001.00001v1" rel="related"/></entry>
 <entry><id>http://arxiv.org/abs/2001.00002v1</id><published>2021-03-04T00:00:00Z</published><title>Mixup  under
 short schedules</title><summary>Short runs.</summary><author><name>A. B</name></author><author><name>C. D</name></author></entry>
 </feed>"""
@@ -189,9 +190,9 @@ short schedules</title><summary>Short runs.</summary><author><name>A. B</name></
 def test_arxiv_feed_parses_into_papers():
     from litmus import arxiv
     papers = arxiv.parse(FEED)
-    assert [(p.id, p.title, p.year, p.url) for p in papers] == [
-        ("2001.00001v1", "mixup", 2020, "https://arxiv.org/abs/2001.00001v1"),
-        ("2001.00002v1", "Mixup under short schedules", 2021, "https://arxiv.org/abs/2001.00002v1")]
+    assert [(p.id, p.title, p.year, p.url, p.pdf) for p in papers] == [
+        ("2001.00001v1", "mixup", 2020, "https://arxiv.org/abs/2001.00001v1", "https://arxiv.org/pdf/2001.00001v1"),
+        ("2001.00002v1", "Mixup under short schedules", 2021, "https://arxiv.org/abs/2001.00002v1", None)]
     with pytest.raises(arxiv.ArxivError):
         arxiv.parse("<not xml")
 
@@ -221,3 +222,77 @@ def test_autoresearch_and_the_demo_chat(engine, monkeypatch):  # noqa: F811
         assert len(client.post("/api/demo/questions", json=demo).json()["questions"]) == 3
         assert client.post("/api/demo/autoresearch", json=demo).json()["papers"]
         assert store.list_sessions() == before
+
+
+def test_verdict_highlights_preview_then_write_only_what_was_approved(engine, monkeypatch):  # noqa: F811
+    from litmus import papiers_client, writeback
+    written = []
+
+    async def fake_cli(*args, stdin=None, token=None):
+        assert args[0] == "highlight"
+        if args[1] == "doc_a":
+            raise papiers_client.PapiersError("papiers highlight doc_a exited 1: passage not found on page 3")
+        written.append(args)
+        return {"ok": True}
+    monkeypatch.setattr(papiers_client, "run_cli", fake_cli)
+    monkeypatch.setattr(api, "_imported", None)
+    mixup, tta = CLAIMS[0], CLAIMS[1].model_copy(update={"page": 3, "text": " ".join(f"w{i}" for i in range(20))})
+    with TestClient(api.app) as client:
+        sid = client.post("/api/sessions", json={}).json()["session_id"]
+        snap = wait(client, sid, lambda s: s["status"] == "waiting_human")
+        base = snap["stars"][0]
+
+        def graded(star_id, claim, verdict, delta, predicted, chosen_by="human"):
+            return {**base, "id": star_id, "parent_id": base["id"], "depth": 1, "title": f"Test {star_id}",
+                    "provenance": [claim.provenance[0].model_dump()], "predicted": predicted, "chosen_by": chosen_by,
+                    "grade": {**base["grade"], "verdict": verdict, "delta": delta, "ci_low": delta - 0.001,
+                              "ci_high": delta + 0.001}}
+        stars = [base, graded("S1", mixup, "refuted", -0.0148, "improves"), graded("S2", tta, "confirmed", -0.0077, "hurts"),
+                 graded("S3", mixup, "confirmed", 0.0022, "improves"), graded("S4", tta, "refuted", 0.01, "hurts", "shadow")]
+        library = {"documents": [], "claims": [mixup.model_dump(), tta.model_dump(), CLAIMS[2].model_dump()]}
+        demo = {"session": {**snap, "id": "ses_demo", "stars": stars, "library": library}}
+
+        preview = client.post("/api/demo/highlights", json=demo).json()
+        assert written == [] and "results" not in preview
+        by_claim = {h["claim_id"]: h for h in preview["highlights"]}
+        assert set(by_claim) == {"hl_mixup", "hl_tta"}  # the untested claim gets none; the shadow star is left out
+        # coloured by the latest verdict on the claim, the note lists every result, and says the demo is simulated
+        assert by_claim["hl_mixup"]["color"] == writeback.VERDICT_COLORS["confirmed"]
+        assert by_claim["hl_mixup"]["star_ids"] == ["S1", "S3"]
+        assert by_claim["hl_mixup"]["note"].startswith(writeback.SIMULATED)
+        assert "refuted, -1.48 pts" in by_claim["hl_mixup"]["note"] and "predicted: a gain" in by_claim["hl_mixup"]["note"]
+        # a short passage is quoted whole; a long one by its first and last words, on its page
+        assert (by_claim["hl_mixup"]["start"], by_claim["hl_mixup"]["end"]) == (mixup.text, None)
+        assert (by_claim["hl_tta"]["start"], by_claim["hl_tta"]["end"]) == ("w0 w1 w2 w3 w4 w5 w6 w7", "w12 w13 w14 w15 w16 w17 w18 w19")
+
+        approved = client.post("/api/demo/highlights", json={**demo, "claim_ids": ["hl_mixup"], "write": True}).json()
+        assert approved["results"] == [{"claim_id": "hl_mixup", "ok": True}]
+        assert written[0][:2] == ("highlight", "doc_m") and written[0][written[0].index("--color") + 1] == "#9fd8a4"
+        assert "--end" not in written[0] and "--pages" not in written[0]
+        # one refused passage is reported and does not stop the others
+        both = client.post("/api/demo/highlights", json={**demo, "write": True}).json()["results"]
+        assert both[1]["ok"] is False and "passage not found" in both[1]["error"] and len(written) == 2
+        # a real session is never marked simulated
+        real = client.post(f"/api/sessions/{sid}/papiers/highlights", json={}).json()
+        assert real == {"highlights": []}  # its only star is the baseline
+
+
+def test_importing_a_paper_into_papiers(engine, monkeypatch):  # noqa: F811
+    from litmus import papiers_client
+    calls = []
+
+    async def fake_cli(*args, stdin=None, token=None):
+        calls.append(args)
+        if args[1] == "https://example.org/refused.pdf":
+            raise papiers_client.PapiersError("papiers import exited 1: 403 token cannot import documents")
+        return {"operationId": "op_1", "status": "ready" if args[0] == "import-status" else "queued", "documentId": None,
+                "error": None}
+    monkeypatch.setattr(papiers_client, "run_cli", fake_cli)
+    with TestClient(api.app) as client:
+        assert client.post("/api/papiers/import", json={"url": "file:///etc/passwd"}).status_code == 422
+        queued = client.post("/api/papiers/import", json={"url": "https://arxiv.org/pdf/2001.00002v1"}).json()
+        assert queued["operationId"] == "op_1" and queued["status"] == "queued"
+        assert client.get("/api/papiers/import/op_1").json()["status"] == "ready"
+        refused = client.post("/api/papiers/import", json={"url": "https://example.org/refused.pdf"})
+        assert refused.status_code == 502 and "cannot import" in refused.text
+    assert calls[:2] == [("import", "https://arxiv.org/pdf/2001.00002v1"), ("import-status", "op_1")]

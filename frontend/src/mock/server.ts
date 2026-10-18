@@ -16,6 +16,7 @@ const MAX_PROPOSALS = 3
 const SUGGEST_MS = 2400 // how long an agent takes to write its card, like the real backend's LLM call
 const EPOCH_TICKS = 6
 const TICK_MS = 380
+const PREDICTION: Record<Predicted, string> = { improves: 'a gain', hurts: 'a loss', no_effect: 'no change' }
 
 type Move = { key: string; title: (k: Knobs) => string; hypothesis: string; predicted: Predicted; changes: (k: Knobs) => Partial<Knobs> | null; prov: Provenance[]; note: string }
 
@@ -263,7 +264,7 @@ export class MockServer {
     const vs = s.parent_id ? this.star(s.parent_id).title : ''
     const d = `${pts(g.delta)} pts vs ${vs}`
     if (g.verdict === 'inconclusive') return `${d}, but the interval crosses zero at ${g.n} seeds.`
-    if (g.verdict === 'confirmed') return `${d}, as predicted. The interval clears zero.`
+    if (g.verdict === 'confirmed') return `${d}: ${PREDICTION[s.predicted ?? 'improves']}, as the claim predicted. The interval clears zero.`
     return `${d}: the opposite of the prediction.${s.knob_changes.mixup_alpha ? ' The paper trained 200 epochs; this ran ' + s.knobs.epochs + '.' : ''}`
   }
 
