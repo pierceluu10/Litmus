@@ -248,6 +248,12 @@ branch subgraph (one agent): run → reflect → (run +5 seeds) | (ask ⟂ → s
      "recovering session" → finished**, 9 stars, no duplicates.
   Replay: `GET /api/replay/demo?speed=4` re-streamed 1083 events in 14s; final snapshot 11 stars + abstract.
 
+- 2026-10-17 live end to end (`ses_da44e38d8c`, fresh seeds, topic-filtered import of 3 mixup claims): baseline 94.07 →
+  Mixup agent α=1 **refuted −1.48 [−1.79, −1.17]** → library search → LLM question with 3 options → answered → the agent
+  turned it into a 20-epoch α=0.2 option → dispatched → **inconclusive +0.06 [−0.02, +0.15] at n=10** (adaptive seeds).
+  Generated questions named the real numbers ("Why did Mixup lose 1.48 points at 10 epochs?"); the whole-research chat and
+  the abstract cited the real stars and highlights. 204.5 GPU-s.
+
 ## Frontend
 Vite + React 19 + TypeScript (strict), Tailwind v4, three.js via `@react-three/fiber` + `drei`, `motion`, zustand, d3 (scale/shape), Geist + Geist Mono (self-hosted via `@fontsource-variable`). Lives in `frontend/`.
 
