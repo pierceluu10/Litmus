@@ -1,3 +1,4 @@
+import '@fontsource-variable/geist'
 import { AbsoluteFill, interpolate, useCurrentFrame } from 'remotion'
 
 export const FPS = 30
@@ -7,7 +8,7 @@ export type Cue =
   | { kind: 'callout'; from: number; to: number; text: string; x: number; y: number }
   | { kind: 'credits'; from: number; to: number; lines: string[] }
 
-const FONT = 'Geist, Inter, system-ui, sans-serif'
+const FONT = '"Geist Variable", Inter, system-ui, sans-serif'
 // opacity ramps in and out over 0.3s so cues never pop
 const fade = (f: number, a: number, b: number) =>
   interpolate(f, [a * FPS, a * FPS + 9, b * FPS - 9, b * FPS], [0, 1, 1, 0], { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' })
