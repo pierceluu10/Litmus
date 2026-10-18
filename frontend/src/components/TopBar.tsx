@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useStore } from '../store'
 import { Whimsy } from './Whimsy'
 import { PapiersHighlights } from './PapiersHighlights'
+import { DEMO_ONLY } from '../transport/api'
 
 export function TopBar() {
   const { app, conn, generateAbstract, error, set, leave } = useStore()
@@ -15,7 +16,7 @@ export function TopBar() {
       {conn === 'reconnecting' && <span className="text-waiting">Reconnecting…</span>}
       {error && <span role="alert" className="min-w-0 truncate text-refuted">{error}</span>}
       <div className="ml-auto flex items-center gap-4">
-        <PapiersHighlights />
+        {!DEMO_ONLY && <PapiersHighlights />}
         {s.abstract && <button className="btn" onClick={() => set({ abstractOpen: true, selectedId: null, chatOpen: false })}>Read abstract</button>}
         <button className="btn btn-primary min-w-[170px]" disabled={!graded || writing} onClick={write}>
           {writing ? <Whimsy lead="Writing the abstract" /> : s.abstract ? 'Regenerate abstract' : 'Generate abstract'}

@@ -5,7 +5,7 @@ import { relevant } from '../lib/relevance'
 import { toneVar } from '../lib/format'
 import { claims as sampleClaims, documents as sampleDocuments } from '../mock/library'
 import { apiFor, useStore } from '../store'
-import type { Library, LibraryStage } from '../transport/api'
+import { DEMO_ONLY, type Library, type LibraryStage } from '../transport/api'
 import { ClaimCard } from './ClaimPicker'
 import { GOAL } from './Landing'
 import { Pillar, SceneBackdrop } from './LowPolyScene'
@@ -116,8 +116,10 @@ export function Upload() {
                 </button>
                 <p className="mb-0 mt-5 flex w-full items-center justify-center text-[13px] text-muted">
                   <button type="button" className={link} disabled={working} onClick={() => read('demo')}>Try the demo highlights</button>
-                  <span className="mx-2 text-faint" aria-hidden="true">·</span>
-                  <button type="button" className={link} disabled={working} onClick={() => read('saved')}>Use my saved Papiers login</button>
+                  {!DEMO_ONLY && <>
+                    <span className="mx-2 text-faint" aria-hidden="true">·</span>
+                    <button type="button" className={link} disabled={working} onClick={() => read('saved')}>Use my saved Papiers login</button>
+                  </>}
                 </p>
               </motion.form>
             )}

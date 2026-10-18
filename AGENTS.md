@@ -53,14 +53,14 @@ uv run litmus --help
    real session offline, flagged `replay: true`.
 5. A crashed or restarted server resumes every unfinished session on startup (verified with `kill -9`).
 
-## Deploying on Vercel (demo mode)
-`vercel.json` deploys both from the repo root as one project: `/api/*` goes to the FastAPI service (`backend/`,
-`[tool.vercel] entrypoint = "litmus.api:app"`, Python 3.12), everything else to the Vite build. A production build calls
-its own origin (`real.ts` `BASE`), so no `VITE_API_URL` is needed. On Vercel (`VERCEL` is set) the backend writes its
-SQLite and exports under `/tmp/litmus`. There is no Papiers CLI there: the library stream reports an error and the demo
-uses its snapshot, and the demo sends its library with every `/api/demo/*` call, so Litmus's chat, questions,
-autoresearch and the highlight preview work with only `OPENAI_API_KEY` and `OPENAI_MODEL` set. Live mode does not work on
-Vercel (no WebSockets, background sessions stop with the request, no Modal credentials); host the backend elsewhere for it.
+## Deploying on Vercel (demo only)
+Two Vercel projects deploy `main` from GitHub: **litmus-3494** (frontend, `frontend/`, Vite) and **litmus** (backend,
+`backend/`, FastAPI, `[tool.vercel] entrypoint`, Python 3.12). The frontend project sets `VITE_DEMO_ONLY=1`
+(`DEMO_ONLY` in `transport/api.ts`), which makes the hosted site demo-only: Demo mode is always on and its switch hidden,
+the library is the snapshot, Litmus's chat and autoresearch answer `DEMO_ONLY_ANSWER` (it cannot answer in the live demo),
+suggested questions are the rule-based ones, the abstract is the template, and Papiers writes are hidden. It makes no
+backend calls at all. Live mode needs a long-lived server (WebSockets, background sessions, Modal), so it is not hosted.
+`vercel.json` (both as one project) is kept for a single-project setup; on Vercel the backend writes under `/tmp/litmus`.
 
 ## Env vars (repo-root `.env` or `backend/.env`, gitignored)
 | Var | Purpose |

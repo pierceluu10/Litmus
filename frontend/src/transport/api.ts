@@ -7,6 +7,9 @@ export type ConnState = 'connecting' | 'live' | 'reconnecting' | 'closed'
 export type LibraryStage = 'papers' | 'highlights' | 'notes' | 'summaries'
 export type Library = { documents: Document[]; claims: Claim[] }
 export class LibraryUnavailable extends Error {}
+// The hosted site (VITE_DEMO_ONLY=1): always the demo, no LLM, no Papiers; Litmus says it cannot answer there.
+export const DEMO_ONLY = import.meta.env.VITE_DEMO_ONLY === '1'
+export const DEMO_ONLY_ANSWER = 'I can’t answer in this live demo. My chat runs on a language model that is only switched on when you run Litmus yourself; the experiments here are simulated so you can see how the research unfolds.'
 
 // One interface, two implementations: mock.ts (in-browser script) and real.ts (REST + WebSocket).
 export interface Api {

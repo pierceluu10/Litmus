@@ -1,7 +1,7 @@
 import { commonQuestions } from '../lib/questions'
 import { MockServer } from '../mock/server'
 import { claims, documents } from '../mock/library'
-import { DEFAULT_GOAL, LibraryUnavailable, type Api, type Library } from './api'
+import { DEFAULT_GOAL, DEMO_ONLY, DEMO_ONLY_ANSWER, LibraryUnavailable, type Api, type Library } from './api'
 import type { Provenance, ReadingItem } from '../types'
 import { call, realApi, streamLibrary } from './real'
 
@@ -14,7 +14,10 @@ const wait = <T,>(v: T, ms = RESPONSE_MS) => new Promise<T>((r) => setTimeout(()
 // (nothing is stored there). With the backend off it falls back to the offline answers.
 // The library goes with it, so the backend needs no Papiers of its own (it has none on Vercel).
 let library: Library = { documents, claims }
-const litmus = <T,>(path: string, body: object) => call<T>('POST', `/api/demo/${path}`, { session: { ...cur().state.session, library }, ...body })
+const litmus = <T,>(path: string, body: object) => DEMO_ONLY
+  ? Promise.reject(new Error('the live demo has no backend'))
+  : call<T>('POST', `/api/demo/${path}`, { session: { ...cur().state.session, library }, ...body })
+const demoOnlyAnswer = { answer: DEMO_ONLY_ANSWER, provenance: [], papers: [] }
 const offline = (what: string, e: Error) => console.warn(`${what}: the backend is unreachable, answering offline (${e.message})`)
 
 export const mockApi: Api = {
@@ -25,7 +28,7 @@ export const mockApi: Api = {
   // the practice backend has no Papiers to ask: any well-formed token connects, and the library is the recorded snapshot
   connectPapiers: async (token) => { await wait(undefined); if (!/^pap_live_\S+$/.test(token)) throw new Error('That does not look like a Papiers token. It starts with pap_live_.') },
   // The library is real even in the demo: read live through the backend, or its snapshot when the backend is off.
-  library: (onStage, signal) => streamLibrary(onStage, signal).catch((e) => {
+  library: (onStage, signal) => (DEMO_ONLY ? Promise.reject(new LibraryUnavailable('the live demo has no backend')) : streamLibrary(onStage, signal)).catch((e) => {
     if (!(e instanceof LibraryUnavailable)) throw e
     console.warn(`${e.message}; using the library snapshot`)
     return { documents, claims }
@@ -41,12 +44,12 @@ export const mockApi: Api = {
   dispatch: async (_s, b) => cur().dispatch(b.star_id, b.selections, b.instruction),
   answer: async (_s, b) => cur().answer(b.question_id, b.option_id, b.comment),
   feedback: async (_s, b) => cur().feedback(b.star_id, b.kind, b.text),
-  explain: (_s, b) => litmus<{ answer: string; provenance: Provenance[] }>('explain', b)
+  explain: (_s, b) => DEMO_ONLY ? wait(demoOnlyAnswer, THINK_MS) : litmus<{ answer: string; provenance: Provenance[] }>('explain', b)
     .catch((e) => { offline('chat', e); return wait(cur().chat(b.star_id, b.question ?? ''), THINK_MS) }),
   // the demo has no LLM: the rule-based questions, after a beat like a real call
   questions: (_s, b) => litmus<{ questions: string[] }>('questions', b).then((r) => r.questions)
-    .catch((e) => { offline('questions', e); return wait(commonQuestions(cur().state.session, b.star_id ?? null).filter((q) => !b.asked.includes(q)), THINK_MS) }),
-  autoresearch: (_s, b) => litmus<{ answer: string; papers: ReadingItem[] }>('autoresearch', b)
+    .catch((e) => { if (!DEMO_ONLY) offline('questions', e); return wait(commonQuestions(cur().state.session, b.star_id ?? null).filter((q) => !b.asked.includes(q)), THINK_MS) }),
+  autoresearch: (_s, b) => DEMO_ONLY ? wait(demoOnlyAnswer, THINK_MS) : litmus<{ answer: string; papers: ReadingItem[] }>('autoresearch', b)
     .catch((e) => { offline('autoresearch', e); return { answer: 'Autoresearch searches arXiv through the Litmus backend. Start it with ./dev.sh and ask again.', papers: [] } }),
   // the library is real, so these write to it; the backend marks every demo note as simulated
   verdictHighlights: (_s, b) => litmus('highlights', b),

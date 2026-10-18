@@ -4,6 +4,7 @@ import { agentName, knobText, pts } from '../lib/format'
 import { BASELINE_KNOBS, baselineGrade, grade, progressAccuracy, simulateRun } from './sim'
 import { claims, P } from './library'
 import { BASE } from '../transport/real'
+import { DEMO_ONLY } from '../transport/api'
 
 // In-browser stand-in for the backend: same events as shared/contract.md, numbers from the calibrated simulator.
 // Same shape as the real engine: the human picks where to start, each agent offers its own next steps when its verdict
@@ -376,7 +377,7 @@ export class MockServer {
   // The abstract is written by the backend's LLM (POST /api/abstract) from this session's snapshot; the template below
   // is only the fallback when the backend is unreachable.
   async generateAbstract() {
-    try {
+    if (!DEMO_ONLY) try {
       const r = await fetch(`${BASE}/api/abstract`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.session) })
       if (!r.ok) throw new Error(`${r.status} ${await r.text()}`)
       const { abstract: text, findings, citations } = await r.json() as { abstract: string; findings: string[]; citations: Provenance[] }

@@ -4,6 +4,7 @@ import { askLitmus, openAgent, sessionApi, useStarting, useStore } from '../stor
 import { agentDetail, agentName, pct, provLabel, pts, starTone, toneVar } from '../lib/format'
 import { AUTORESEARCH, commonQuestions } from '../lib/questions'
 import type { Provenance, ReadingItem } from '../types'
+import { DEMO_ONLY } from '../transport/api'
 import { PathChart } from './PathChart'
 import { ProvChip } from './Prov'
 import { ExternalIcon, SearchIcon } from './Icons'
@@ -153,7 +154,7 @@ function LitmusMessage({ text, provenance, papers, pending }: { text: string; pr
                   <span className="mt-0.5 block text-[11px] text-faint">{p.authors.join(', ')}{p.year ? ` · ${p.year}` : ''} · arXiv</span>
                   <span className="mt-1 block text-[12px] leading-snug text-muted">{p.why}</span>
                 </a>
-                <AddToPapiers url={p.pdf ?? p.url} />
+                {!DEMO_ONLY && <AddToPapiers url={p.pdf ?? p.url} />}
               </li>
             ))}
           </ol>

@@ -2,13 +2,13 @@ import { create } from 'zustand'
 import { applyEvent, initialState, type AppState } from './reducer'
 import { mockApi } from './transport/mock'
 import { realApi } from './transport/real'
-import type { Api, ConnState, Library, LibraryStage } from './transport/api'
+import { DEMO_ONLY, type Api, type ConnState, type Library, type LibraryStage } from './transport/api'
 import type { ChatTurn, Provenance, ReadingItem, Selection } from './types'
 import { AUTORESEARCH } from './lib/questions'
 
 // Live (the FastAPI backend, Modal A100s) unless Demo mode is on: the front page's switch (remembered), or ?demo=1.
 const DEMO_KEY = 'litmus.demo'
-const savedDemo = () => { try { return localStorage.getItem(DEMO_KEY) === '1' || /[?&]demo=1\b/.test(location.search) } catch { return false } }
+const savedDemo = () => { if (DEMO_ONLY) return true; try { return localStorage.getItem(DEMO_KEY) === '1' || /[?&]demo=1\b/.test(location.search) } catch { return false } }
 export const apiFor = (demo: boolean): Api => (demo ? mockApi : realApi)
 // A session keeps the backend it started on, even if the switch is flipped later.
 let current: Api = apiFor(savedDemo())
