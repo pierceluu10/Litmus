@@ -1,4 +1,4 @@
-import type { Document, Knobs, Provenance, SessionState, Star } from '../types'
+import type { Claim, Document, Knobs, Provenance, SessionState, Star } from '../types'
 
 export const pts = (x: number, digits = 2) => `${x >= 0 ? '+' : '−'}${Math.abs(x * 100).toFixed(digits)}`
 export const pct = (x: number, digits = 2) => `${(x * 100).toFixed(digits)}%`
@@ -60,6 +60,20 @@ export function provLabel(p: Provenance, docs: Document[]): string {
   return who ? `${what} ${who}${doc && doc.authors.length > 1 ? ' et al.' : ''}` : what.replace(/ (from|on)$/, '')
 }
 export const provMatches = (p: Provenance, claimId: string) => p.id === claimId || p.id.startsWith(`${claimId}#`)
+
+const SUMMARY_WORDS = 7
+// A claim the backend could not summarize falls back to its opening words.
+export const summarize = (c: Claim) => c.summary ?? c.text.split(/\s+/).slice(0, SUMMARY_WORDS).join(' ') + '…'
+// A claim's number: its place in the session's ranked library, so it stays the same wherever it is listed.
+export const claimNumber = (claims: Claim[], id: string) => claims.findIndex((c) => c.id === id) + 1
+// The claim a proposal or star is tied to (its first provenance that is one of the library's claims), with its number.
+export function claimOf(claims: Claim[], provenance: Provenance[]): { claim: Claim; n: number } | null {
+  for (const p of provenance) {
+    const i = claims.findIndex((c) => provMatches(p, c.id))
+    if (i >= 0) return { claim: claims[i], n: i + 1 }
+  }
+  return null
+}
 
 export type Tone = 'confirmed' | 'refuted' | 'inconclusive' | 'baseline' | 'running' | 'waiting'
 export function starTone(s: Star): Tone {

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
-import { agentDetail, agentName, knobText, pct, progressFraction, provMatches, pts, toneVar, VERDICT_TEXT } from '../lib/format'
+import { agentDetail, agentName, claimOf, knobText, summarize, pct, progressFraction, provMatches, pts, toneVar, VERDICT_TEXT } from '../lib/format'
 import type { Proposal, Star } from '../types'
 import { SceneBackdrop } from './LowPolyScene'
 import { Whimsy } from './Whimsy'
@@ -91,6 +91,7 @@ function Generating() {
 // "Where should I proceed?": the agent's own next steps; tick up to four and run them.
 function Proceed({ star, items }: { star: Star; items: Proposal[] }) {
   const { dispatch, set } = useStore()
+  const claims = useStore((s) => s.app.claims)
   const [sel, setSel] = useState<string[]>([])
   const [instr, setInstr] = useState('')
   const [steering, setSteering] = useState(false)
@@ -103,11 +104,13 @@ function Proceed({ star, items }: { star: Star; items: Proposal[] }) {
       <ul className="m-0 mt-2 flex list-none flex-col gap-1.5 p-0">
         {items.map((p) => {
           const on = sel.includes(p.id)
+          const target = claimOf(claims, p.provenance)
           return (
             <li key={p.id}>
               <label className="flex cursor-pointer items-start gap-2 rounded-lg border p-2 transition-colors" title={EXPECTS[p.predicted]} style={{ borderColor: on ? 'var(--color-ink)' : 'var(--color-rule)', background: on ? 'var(--color-marble)' : undefined }}>
                 <input type="checkbox" className="mt-0.5 accent-[var(--color-ink)]" checked={on} onChange={() => toggle(p.id)} disabled={!on && sel.length >= MAX_AGENTS} />
-                <span className="min-w-0"><span className="block font-medium leading-snug">{p.title}</span><span className="num block text-[11px] text-muted">{knobText(p.knob_changes)}</span></span>
+                <span className="min-w-0"><span className="block font-medium leading-snug">{p.title}</span><span className="num block text-[11px] text-muted">{knobText(p.knob_changes)}</span>
+                  {target && <span className="mt-0.5 block text-[11px] leading-snug text-faint">Claim {target.n}: {summarize(target.claim)}</span>}</span>
               </label>
             </li>
           )

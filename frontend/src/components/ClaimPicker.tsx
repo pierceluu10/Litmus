@@ -1,16 +1,13 @@
 import { useEffect, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { agentDetail, agentName, provMatches, pts, shortCite, starTone, toneVar } from '../lib/format'
+import { agentDetail, agentName, claimNumber, provMatches, pts, shortCite, starTone, summarize, toneVar } from '../lib/format'
 import { useStore } from '../store'
 import type { Claim, Document, Star } from '../types'
 import { ExternalIcon } from './Icons'
 import { SceneBackdrop } from './LowPolyScene'
 
-const SUMMARY_WORDS = 7
 const PICKER_FACETS = 53
 const reveal = { duration: 0.28, ease: [0.23, 1, 0.32, 1] as const }
-// A claim the backend could not summarize falls back to its opening words.
-const summarize = (c: Claim) => c.summary ?? c.text.split(/\s+/).slice(0, SUMMARY_WORDS).join(' ') + '…'
 
 type ClaimStatus = 'untested' | 'testing' | 'confirmed' | 'refuted' | 'inconclusive'
 type Tab = 'basis' | 'findings'
@@ -46,7 +43,7 @@ function Findings({ stars }: { stars: Star[] }) {
 
 // One highlight: its status, its short title (the backend's summary) and paper; open it for your note, the passage,
 // what the agents found, and the source.
-export function ClaimCard({ c, status, stars, doc, expanded, onToggle, onTest, busy, canTest, action = 'Test', showStatus = true }: { c: Claim; status: ClaimStatus; stars: Star[]; doc?: Document; expanded: boolean; onToggle: () => void; onTest: () => void; busy: boolean; canTest: boolean; action?: string; showStatus?: boolean }) {
+export function ClaimCard({ c, status, stars, doc, expanded, onToggle, onTest, busy, canTest, action = 'Test', showStatus = true, number }: { c: Claim; status: ClaimStatus; stars: Star[]; doc?: Document; expanded: boolean; onToggle: () => void; onTest: () => void; busy: boolean; canTest: boolean; action?: string; showStatus?: boolean; number?: number }) {
   const { set } = useStore()
   const [tab, setTab] = useState<Tab | null>(stars.length ? 'findings' : 'basis')
   const tabs: Tab[] = stars.length ? ['findings', 'basis'] : ['basis']
@@ -63,7 +60,7 @@ export function ClaimCard({ c, status, stars, doc, expanded, onToggle, onTest, b
             {stars.length > 1 && <span className="font-normal text-faint">· {stars.length} agents</span>}
           </span>
         )}
-        <span data-claim-title={c.id} className="block text-[13px] font-medium leading-snug tracking-[-0.01em] text-ink">{summarize(c)}</span>
+        <span data-claim-title={c.id} className="block text-[13px] font-medium leading-snug tracking-[-0.01em] text-ink">{number && <span className="num mr-1.5 font-normal text-faint">{number}.</span>}{summarize(c)}</span>
         <span className={`mt-0.5 text-[11.5px] leading-snug text-muted ${expanded ? 'block' : 'line-clamp-1'}`}>Paper: {c.doc_title}</span>
       </button>
       {/* only an untested claim can start a new agent; the rest keep a greyed-out button so the list stays aligned */}
@@ -138,7 +135,7 @@ export function ClaimPicker() {
             <div className="flex items-baseline justify-between px-3.5 pb-1 pt-3"><h2 className="m-0 text-[12px] font-semibold text-muted">Your claims</h2><span className="num text-[11px] text-faint">{rows.length - untested}/{rows.length} tested</span></div>
             <ul className="m-0 flex list-none flex-col gap-0.5 overflow-y-auto p-1.5 pt-0">
               {rows.map(({ c, status, stars: mine }) => (
-                <ClaimCard key={c.id} c={c} status={status} stars={mine} doc={app.documents.find((d) => d.id === c.doc_id)} expanded={expanded === c.id}
+                <ClaimCard key={c.id} c={c} number={claimNumber(app.claims, c.id)} status={status} stars={mine} doc={app.documents.find((d) => d.id === c.doc_id)} expanded={expanded === c.id}
                   canTest={live && status === 'untested'} busy={busy === c.id} onTest={() => go(c.id)}
                   onToggle={() => { setExpanded(expanded === c.id ? null : c.id); if (mine[0] && expanded !== c.id) select(mine[0].id) }} />
               ))}

@@ -1,16 +1,13 @@
 import { useEffect } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { agentDetail, agentName, progressFraction, provMatches, starTone, toneVar } from '../lib/format'
+import { agentDetail, agentName, progressFraction, provMatches, starTone, summarize, toneVar } from '../lib/format'
 import { useStore } from '../store'
 import { type LibraryStage } from '../transport/api'
-import type { Claim, Star } from '../types'
+import type { Star } from '../types'
 
 export const STAGE_TEXT: Record<LibraryStage, string> = { papers: 'Fetching papers', highlights: 'Fetching highlights', notes: 'Gathering notes', summaries: 'Summarizing each highlight' }
-const SUMMARY_WORDS = 7
 const MAX_ROWS = 4
 const reveal = { duration: 0.28, ease: [0.23, 1, 0.32, 1] as const }
-// A claim the backend could not summarize falls back to its opening words.
-const summarize = (c: Claim) => c.summary ?? c.text.split(/\s+/).slice(0, SUMMARY_WORDS).join(' ') + '…'
 
 // Which claim each running agent is testing right now (and the library loading stages before that).
 export function Researching({ inline = false }: { inline?: boolean }) {
