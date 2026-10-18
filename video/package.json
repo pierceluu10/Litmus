@@ -4,7 +4,8 @@
   "type": "module",
   "scripts": {
     "studio": "remotion studio src/index.ts",
-    "render": "remotion render src/index.ts Overlays out/overlays.mov --codec=prores --prores-profile=4444 --pixel-format=yuva444p10le --image-format=png"
+    "render": "remotion render src/index.ts Overlays out/overlays.mov --codec=prores --prores-profile=4444 --pixel-format=yuva444p10le --image-format=png",
+    "render:captions": "remotion render src/index.ts Captions out/captions.mov --props=assets/captions.json --codec=prores --prores-profile=4444 --pixel-format=yuva444p10le --image-format=png"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",
