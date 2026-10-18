@@ -30,7 +30,7 @@ Grader (pure stats) ◀── seeds ── results (cached by config hash in SQL
 |---|---|---|
 | `shared/contract.md` | shared | API + event contract. Source of truth. Additive changes only, on `main`. |
 | `shared/demo-session.json` | backend | Recorded real session for replay; calibrates the frontend's demo backend. |
-| `backend/` | backend agent | Python 3.11 package `litmus` (uv). Frontend agent never edits here. |
+| `backend/` | backend agent | Python 3.12 package `litmus` (uv; Vercel only offers 3.12, the Modal image stays 3.11). Frontend agent never edits here. |
 | `frontend/` | frontend agent | React + TS + Vite. Backend agent never edits here. |
 
 ## Running the backend

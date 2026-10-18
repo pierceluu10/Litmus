@@ -52,7 +52,7 @@ The REST API and event stream are specified in [`shared/contract.md`](shared/con
 | Area | Technologies |
 |---|---|
 | Frontend | React 19, TypeScript, Vite, Tailwind CSS v4, three.js (react-three-fiber, drei), Motion, zustand, d3 |
-| Backend | Python 3.11, FastAPI, Uvicorn, Pydantic, LangGraph with SQLite checkpoints, SQLite |
+| Backend | Python 3.12, FastAPI, Uvicorn, Pydantic, LangGraph with SQLite checkpoints, SQLite |
 | AI | OpenAI Responses API (structured outputs) |
 | Compute | Modal (A100), PyTorch, [airbench94](https://github.com/KellerJordan/cifar10-airbench) on CIFAR-10 |
 | Research data | Papiers CLI, arXiv API |
@@ -63,7 +63,7 @@ The REST API and event stream are specified in [`shared/contract.md`](shared/con
 ### Prerequisites
 
 - Node.js 22+ and npm
-- Python 3.11 with [uv](https://docs.astral.sh/uv/)
+- Python 3.12 with [uv](https://docs.astral.sh/uv/)
 - For live runs: an OpenAI API key, a [Modal](https://modal.com) account (`uv run modal setup`), and the Papiers CLI
   (`npm install -g papiers`, then `papiers auth login`)
 
