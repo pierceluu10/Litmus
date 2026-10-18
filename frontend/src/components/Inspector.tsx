@@ -1,7 +1,8 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { launchThought, sessionApi, useStarting, useStore } from '../store'
+import { askLitmus, sessionApi, useStarting, useStore } from '../store'
 import { agentDetail, agentName, pct, pts, starTone, toneVar } from '../lib/format'
+import { commonQuestions } from '../lib/questions'
 import type { Provenance } from '../types'
 import { PathChart } from './PathChart'
 import { ProvChip } from './Prov'
@@ -86,7 +87,6 @@ const RESULTS_FACETS = 23, LITMUS_FACETS = 61
 // The results card keeps one height whether or not the chat is open; the chat fills the room under it.
 const RESULTS_HEIGHT = 'h-[56%] flex-none'
 const MAX_CITED = 3
-const OPENERS = ['What have we learned so far?', 'Which result is most solid?', 'What should we test next?']
 
 // Litmus's face: the statue's bearded head, low poly (also the favicon). Nudged down so it sits level with the
 // bubble's first line.
@@ -153,18 +153,18 @@ function Thread() {
 // The Litmus card: its own card under the results, holding the whole conversation. Litmus answers about the agent you
 // have open, or the research as a whole.
 function AskBar() {
-  const { chat: turns, thinking, ask, selectedId, app, select } = useStore()
+  const { chat: turns, thinking, selectedId, app, select } = useStore()
   const [draft, setDraft] = useState('')
   const busy = !!thinking
   const about = app.session?.stars.find((x) => x.id === selectedId && x.parent_id)
   const send = (q: string, source: HTMLElement) => {
     if (!q.trim() || busy) return
-    const starId = selectedId ?? app.session?.stars[0]?.id
-    if (!starId) return
-    launchThought(source, q.trim(), starId)
+    askLitmus(source, q)
     setDraft('')
-    ask(q.trim())
   }
+  // the common questions for where the research is now, minus what you already asked
+  const asked = new Set(turns.filter((t) => t.role === 'human').map((t) => t.text))
+  const offers = commonQuestions(app.session, selectedId).filter((q) => !asked.has(q))
   return (
     <motion.section data-scene-obstacle aria-label="Ask Litmus" className={`${CARD} flex min-h-0 flex-1 flex-col gap-2 overflow-hidden p-3`}
       initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8, transition: { duration: 0.15 } }} transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}>
@@ -177,7 +177,7 @@ function AskBar() {
           : <span className="text-[11.5px] text-faint">about the whole research</span>}
       </div>
       <Thread />
-      {!turns.length && !busy && <div className="flex flex-wrap gap-1.5">{OPENERS.map((q) => <button key={q} className="chip hover:border-faint hover:text-ink" onClick={(e) => send(q, e.currentTarget)}>{q}</button>)}</div>}
+      {!busy && offers.length > 0 && <div className="flex flex-wrap gap-1.5">{offers.map((q) => <button key={q} className="chip hover:border-faint hover:text-ink" onClick={(e) => send(q, e.currentTarget)}>{q}</button>)}</div>}
       <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); send(draft, e.currentTarget.querySelector('input')!) }}>
         <label className="sr-only" htmlFor="ask-litmus">Ask Litmus</label>
         <input id="ask-litmus" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Ask Litmus" className="field min-w-0 flex-1" />

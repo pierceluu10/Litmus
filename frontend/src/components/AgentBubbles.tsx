@@ -1,50 +1,29 @@
-import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { useStore, useStarting } from '../store'
+import { commonQuestions } from '../lib/questions'
+import { askLitmus, useStarting, useStore } from '../store'
 import { SceneBackdrop } from './LowPolyScene'
 
-const SHOW_MS = 9000
-const MAX_QUEUED = 5
 const BUBBLE_FACETS = 89
-type Bubble = { seq: number; text: string }
 
-// Litmus's face sits under the results card and opens the chat with it. Whenever the agents do something, Litmus says
-// so in a speech bubble that rises above its face and fades away (not while the chat is open, where the
-// conversation already is). Your own actions (answers, notes) are not narrated back to you. While you choose where to
-// start, the face only speaks the start bubble: there is nothing to ask about yet.
+// Litmus's face sits under the results card and opens the chat with it. Litmus does not narrate each step (the research
+// log has that); above its face float the questions you would most likely ask right now, and clicking one asks it. Not
+// while the chat is open (it offers the same questions), and not while you choose where to start: nothing to ask yet.
 export function AgentBubbles() {
-  const feed = useStore((s) => s.app.feed)
-  const [queue, setQueue] = useState<Bubble[]>([])
-  const [shown, setShown] = useState<Bubble | null>(null)
-  const { chatOpen, set } = useStore()
+  const { chatOpen, set, app, selectedId, thinking } = useStore()
   const starting = useStarting()
-  const seen = useRef(feed.length)
-  useEffect(() => {
-    const fresh = feed.slice(seen.current).filter((f) => f.kind !== 'decision' && f.kind !== 'feedback')
-    seen.current = feed.length
-    if (fresh.length) setQueue((q) => [...q, ...fresh.map((f) => ({ seq: f.seq, text: f.kind === 'search' ? `Searching your library for “${f.text}”.` : f.text }))].slice(-MAX_QUEUED))
-  }, [feed])
-  // one bubble at a time, each long enough to read, so a result is never pushed off by the next step
-  useEffect(() => {
-    if (shown || !queue.length) return
-    const [next, ...rest] = queue
-    setQueue(rest); setShown(next)
-  }, [queue, shown])
-  useEffect(() => {
-    if (!shown) return
-    const timer = setTimeout(() => setShown(null), Math.min(SHOW_MS, 3200 + shown.text.length * 45))
-    return () => clearTimeout(timer)
-  }, [shown])
+  const offers = chatOpen || starting || thinking ? [] : commonQuestions(app.session, selectedId)
   return (
     <div className="relative mt-auto flex shrink-0 justify-end">
-      <ul aria-live="polite" className="pointer-events-none absolute bottom-[calc(100%+8px)] right-1 z-10 m-0 flex w-max max-w-[320px] list-none flex-col items-end gap-1.5 p-0">
+      <ul aria-label="Common questions" className="absolute bottom-[calc(100%+8px)] right-1 z-10 m-0 flex w-max max-w-[320px] list-none flex-col items-end gap-1.5 p-0">
         <AnimatePresence initial={false}>
-          {!chatOpen && !starting && shown && [shown].map((b) => (
-            <motion.li key={b.seq} initial={{ opacity: 0, scale: 0.9, x: 10 }} animate={{ opacity: 1, scale: 1, x: 0 }} exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.2 } }}
-              transition={{ type: 'spring', duration: 0.4, bounce: 0.18 }} style={{ transformOrigin: 'right bottom' }}
-              className="marble-edge relative isolate overflow-hidden rounded-2xl rounded-br-md border border-rule bg-surface px-3 py-2 text-[12.5px] leading-snug">
-              <SceneBackdrop seed={BUBBLE_FACETS} className="card-facets" />
-              <span className="line-clamp-4">{b.text}</span>
+          {offers.map((q, i) => (
+            <motion.li key={q} layout initial={{ opacity: 0, scale: 0.9, x: 10 }} animate={{ opacity: 1, scale: 1, x: 0, transition: { type: 'spring', duration: 0.4, bounce: 0.18, delay: i * 0.05 } }}
+              exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }} style={{ transformOrigin: 'right bottom' }}>
+              <button className="marble-edge relative isolate overflow-hidden rounded-2xl rounded-br-md border border-rule bg-surface px-3 py-1.5 text-left text-[12.5px] leading-snug transition-colors hover:border-faint"
+                onClick={(e) => askLitmus(e.currentTarget, q)}>
+                <SceneBackdrop seed={BUBBLE_FACETS + i} className="card-facets" />
+                {q}
+              </button>
             </motion.li>
           ))}
         </AnimatePresence>

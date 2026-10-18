@@ -62,6 +62,16 @@ export function launchThought(source: HTMLElement, text: string, starId: string,
     from: { left: r.left, top: r.top, width: r.width, height: r.height, padding: parseFloat(cs.paddingLeft), font: cs.font, letterSpacing: cs.letterSpacing } } }))
 }
 
+// Asks Litmus from wherever the question was typed or offered: opens the chat, sends the words flying, starts the request.
+export function askLitmus(source: HTMLElement, question: string) {
+  const st = useStore.getState()
+  const starId = st.selectedId ?? st.app.session?.stars[0]?.id
+  if (!question.trim() || st.thinking || !starId) return
+  launchThought(source, question.trim(), starId)
+  st.set({ chatOpen: true })
+  void st.ask(question.trim())
+}
+
 let unsub: (() => void) | null = null
 let libraryLoad: AbortController | null = null
 
