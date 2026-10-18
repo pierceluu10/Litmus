@@ -109,7 +109,7 @@ export function Upload() {
                 <div className="mb-3 mt-6 flex w-full items-center gap-3" aria-hidden><span className="h-px flex-1 bg-rule" /><span className="card-subtitle m-0">Your library</span><span className="h-px flex-1 bg-rule" /></div>
                 <div className="flex w-full flex-col gap-2">
                   <input type="password" autoComplete="off" spellCheck={false} aria-label="Papiers API token" value={token} onChange={(e) => setToken(e.target.value)} placeholder="Papiers API token" className="field h-11 text-[14px]" />
-                  <input aria-label="What are you researching?" value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="What are you researching? e.g. CIFAR-10 training optimization" className="field h-11 text-[14px]" />
+                  <input aria-label="What are you researching?" value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="What are you researching?" className="field h-11 text-[14px]" />
                 </div>
                 <button type="submit" className="btn btn-primary mt-4 h-10 w-full text-[14px]" disabled={!token.trim() || working}>
                   {working ? <span className="inline-flex items-center gap-2" aria-live="polite"><span className="dot live-dot" style={{ background: toneVar('running') }} />{stageText}…</span> : 'Find my highlights'}
