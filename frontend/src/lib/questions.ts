@@ -1,4 +1,8 @@
 import type { SessionState } from '../types'
+
+// Autoresearch: a question that is always offered, in both modes. Litmus searches arXiv for related papers the human
+// has not read, and brings back a short reading list (the human reads them: that is the point).
+export const AUTORESEARCH = 'Explore this topic further'
 import { agentName } from './format'
 
 // What you would most likely ask Litmus right now, read off the state of the research (instead of Litmus narrating every

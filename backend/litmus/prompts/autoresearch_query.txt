@@ -1,0 +1,11 @@
+# autoresearch_query v2
+Litmus tests claims from a researcher's papers as small CIFAR-10 training experiments (airbench94). The researcher asked
+Litmus to explore the topic further: find papers they have NOT read that would help them judge the claims and results
+below. Write 2 short arXiv search queries (2-5 plain keywords each, no quotes or boolean operators), the most promising
+first: one naming the technique as it appears in paper titles (e.g. "test-time augmentation", "mixup regularization"),
+one about the specific doubt or result (e.g. "test-time augmentation inference cost"). Leave out "CIFAR-10", "airbench"
+and "small CNN": they pull in benchmark papers instead of papers about the technique.
+
+Research goal: $goal
+Focus: $focus
+Results so far (each agent's change, verdict and what it found): $tree

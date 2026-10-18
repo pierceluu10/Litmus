@@ -2,10 +2,11 @@ import { Fragment, useEffect, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import { askLitmus, openAgent, sessionApi, useStarting, useStore } from '../store'
 import { agentDetail, agentName, pct, provLabel, pts, starTone, toneVar } from '../lib/format'
-import { commonQuestions } from '../lib/questions'
-import type { Provenance } from '../types'
+import { AUTORESEARCH, commonQuestions } from '../lib/questions'
+import type { Provenance, ReadingItem } from '../types'
 import { PathChart } from './PathChart'
 import { ProvChip } from './Prov'
+import { ExternalIcon, SearchIcon } from './Icons'
 import { Steering } from './Steering'
 import { SceneBackdrop } from './LowPolyScene'
 import { Whimsy } from './Whimsy'
@@ -97,7 +98,7 @@ function Face() {
 const HIDDEN_ANSWER = { clipPath: 'circle(0px at 12px 11px)', opacity: 0, filter: 'blur(4px)' }
 const SHOWN_ANSWER = { clipPath: 'circle(150% at 12px 11px)', opacity: 1, filter: 'blur(0px)' }
 
-function LitmusMessage({ text, provenance, pending }: { text: string; provenance?: Provenance[]; pending?: boolean }) {
+function LitmusMessage({ text, provenance, papers, pending }: { text: string; provenance?: Provenance[]; papers?: ReadingItem[]; pending?: boolean }) {
   const claims = useStore((st) => st.app.claims)
   const cited = (provenance ?? []).filter((p, i, all) => p.kind === 'highlight' && all.findIndex((q) => q.id === p.id) === i).slice(0, MAX_CITED)
   return (
@@ -109,6 +110,19 @@ function LitmusMessage({ text, provenance, pending }: { text: string; provenance
           {text}
         </motion.div>
         {!pending && cited.length > 0 && <div className="flex flex-wrap gap-1">{cited.map((p) => <ProvChip key={p.id} p={p} label={claims.find((c) => c.id === p.id)?.summary} />)}</div>}
+        {!pending && !!papers?.length && (
+          <ol aria-label="Papers to read" className="m-0 flex list-none flex-col gap-1.5 p-0">
+            {papers.map((p) => (
+              <li key={p.url}>
+                <a href={p.url} target="_blank" rel="noreferrer" className="plate block p-2.5 no-underline transition-colors hover:bg-paper">
+                  <span className="flex items-start gap-1.5 text-[12.5px] font-medium leading-snug text-ink">{p.title}<ExternalIcon /></span>
+                  <span className="mt-0.5 block text-[11px] text-faint">{p.authors.join(', ')}{p.year ? ` · ${p.year}` : ''} · arXiv</span>
+                  <span className="mt-1 block text-[12px] leading-snug text-muted">{p.why}</span>
+                </a>
+              </li>
+            ))}
+          </ol>
+        )}
       </div>
     </div>
   )
@@ -125,10 +139,10 @@ function Story() {
     <section aria-label="Conversation with Litmus" className="flex flex-col gap-3">
       {turns.map((t, i) => t.role === 'human'
         ? <p key={i} className="msg-human">{t.text}</p>
-        : <LitmusMessage key={i} text={t.text} provenance={t.provenance} pending={pending && i === turns.length - 1} />)}
+        : <LitmusMessage key={i} text={t.text} provenance={t.provenance} papers={t.papers} pending={pending && i === turns.length - 1} />)}
       {busy && !flying && (
         <div className="flex items-start gap-2" aria-live="polite" aria-label="Litmus is thinking">
-          <Face /><div className="msg-litmus thinking"><Whimsy lead="Thinking" className="thinking-text" /></div>
+          <Face /><div className="msg-litmus thinking"><Whimsy lead={turns.at(-1)?.text === AUTORESEARCH ? 'Searching arXiv' : 'Thinking'} className="thinking-text" /></div>
         </div>
       )}
     </section>
@@ -196,7 +210,13 @@ function AskBar() {
           : <span className="text-[11.5px] text-faint">about the whole research</span>}
       </div>
       <Thread />
-      {!busy && offers.length > 0 && <div className="flex flex-wrap gap-1.5">{offers.map((q) => <button key={q} className="chip hover:border-faint hover:text-ink" onClick={(e) => send(q, e.currentTarget)}>{q}</button>)}</div>}
+      {!busy && (
+        <div className="flex flex-wrap gap-1.5">
+          {/* autoresearch is always on offer; the rest follow the state of the research */}
+          <button className="chip gap-1.5 border-ink/40 text-ink hover:border-ink" onClick={(e) => send(AUTORESEARCH, e.currentTarget)}><SearchIcon />{AUTORESEARCH}</button>
+          {offers.filter((q) => q !== AUTORESEARCH).map((q) => <button key={q} className="chip hover:border-faint hover:text-ink" onClick={(e) => send(q, e.currentTarget)}>{q}</button>)}
+        </div>
+      )}
       <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); send(draft, e.currentTarget.querySelector('input')!) }}>
         <label className="sr-only" htmlFor="ask-litmus">Ask Litmus</label>
         <input id="ask-litmus" value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Ask Litmus" className="field min-w-0 flex-1" />

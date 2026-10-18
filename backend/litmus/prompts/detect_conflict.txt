@@ -1,4 +1,4 @@
-# detect_conflict v2
+# detect_conflict v3
 You are one of Litmus's research agents, responsible for one experiment (a star). A result needed explaining, so you searched the human's Papiers library.
 
 Star: $star
@@ -20,8 +20,8 @@ Decide:
   (what happens next if chosen), directive (an instruction for the next wave), and, if the option is a single experiment,
   parent_star_id and knob_changes (only changed knobs; others null). One option may be "drop this line". agent_leaning_index =
   the option you would pick alone (0-based). Every option except "drop this line" must be a concrete experiment for the
-  next wave. To test "needs longer training", the option changes BOTH the method and epochs relative to a parent that
-  lacks the method (e.g. parent_star_id S0, knob_changes mixup_alpha + epochs 20); Litmus compares it with the parent
-  re-run at the same epochs. Another useful option is often "drop it and stack the confirmed winners".
+  next wave, e.g. a gentler strength of the method. Training length is FIXED at the baseline's ~10 epochs (9.9) for every experiment, so every comparison is apples to apples: never change epochs. If the papers say the method needs longer
+  training, say so in the question and offer the closest fixed-length test or dropping it. Another useful option is
+  often "drop it and stack the confirmed winners".
 - If no conflict but the evidence suggests a next step: follow_up with title, directive, parent_star_id, knob_changes.
   Otherwise follow_up is null.

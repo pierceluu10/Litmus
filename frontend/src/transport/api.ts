@@ -1,4 +1,4 @@
-import type { Abstract, ChatTurn, Claim, Document, LitmusEvent, Provenance, Selection } from '../types'
+import type { Abstract, ChatTurn, Claim, Document, LitmusEvent, Provenance, Selection, ReadingItem } from '../types'
 
 export type Health = { ok: boolean; modal_warm: boolean; papiers_ok: boolean; openai_ok: boolean }
 export const DEFAULT_GOAL = 'Which of the training tricks I highlighted hold for a ~10-epoch CIFAR-10 run?'
@@ -30,6 +30,8 @@ export interface Api {
   explain(sid: string, body: { star_id?: string; question?: string; history?: ChatTurn[] }): Promise<{ answer: string; provenance: Provenance[] }>
   // the questions the human would most want to ask right now, about the open agent or the whole research
   questions(sid: string, body: { star_id?: string; asked: string[] }): Promise<string[]>
+  // "Explore this topic further": papers on arXiv the human has not read, about the open agent or the whole research
+  autoresearch(sid: string, body: { star_id?: string }): Promise<{ answer: string; papers: ReadingItem[] }>
   pause(sid: string): Promise<void>
   resume(sid: string): Promise<void>
   stopBranch(sid: string, star_id: string): Promise<void>

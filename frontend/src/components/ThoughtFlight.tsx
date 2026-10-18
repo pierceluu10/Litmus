@@ -3,6 +3,7 @@ import { animate, AnimatePresence, motion, useAnimationFrame } from 'motion/reac
 import { useStore, type Thought } from '../store'
 import { statueAnchor, type Point } from '../lib/statueAnchor'
 import { Whimsy } from './Whimsy'
+import { AUTORESEARCH } from '../lib/questions'
 
 // A question's trip: the typed words fold into a pearl of marble light, which flies to the statue trailing a thin comet
 // tail, rests there while Litmus thinks, then flies back and opens into the answer. Seconds, not ms (motion's unit).
@@ -172,7 +173,7 @@ function Flight({ thought }: { thought: Thought }) {
           {thinking && (
             <motion.div className="thinking-pill" initial={{ opacity: 0, y: 6, filter: 'blur(4px)' }} animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
               exit={{ opacity: 0, y: -4, filter: 'blur(3px)' }} transition={{ duration: 0.3, ease: [0.23, 1, 0.32, 1] }}>
-              <Spark /><Whimsy lead="Thinking" className="thinking-text" />
+              <Spark /><Whimsy lead={thought.text === AUTORESEARCH ? 'Searching arXiv' : 'Thinking'} className="thinking-text" />
             </motion.div>
           )}
         </AnimatePresence>

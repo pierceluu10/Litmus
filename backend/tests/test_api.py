@@ -176,3 +176,48 @@ def test_chat_about_the_whole_research_and_generated_questions(engine, monkeypat
         # case-insensitive duplicates, blanks, over-long ones and already-asked ones are dropped; at most three
         assert got == ["Why did mixup lose?", "Which is solid?", "One too many?"]
         assert client.post(f"/api/sessions/{sid}/questions", json={"star_id": "S99"}).status_code == 404
+
+
+FEED = """<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">
+<entry><id>http://arxiv.org/abs/2001.00001v1</id><published>2020-01-01T00:00:00Z</published><title>mixup</title>
+<summary>Already read.</summary><author><name>H. Zhang</name></author></entry>
+<entry><id>http://arxiv.org/abs/2001.00002v1</id><published>2021-03-04T00:00:00Z</published><title>Mixup  under
+short schedules</title><summary>Short runs.</summary><author><name>A. B</name></author><author><name>C. D</name></author></entry>
+</feed>"""
+
+
+def test_arxiv_feed_parses_into_papers():
+    from litmus import arxiv
+    papers = arxiv.parse(FEED)
+    assert [(p.id, p.title, p.year, p.url) for p in papers] == [
+        ("2001.00001v1", "mixup", 2020, "https://arxiv.org/abs/2001.00001v1"),
+        ("2001.00002v1", "Mixup under short schedules", 2021, "https://arxiv.org/abs/2001.00002v1")]
+    with pytest.raises(arxiv.ArxivError):
+        arxiv.parse("<not xml")
+
+
+def test_autoresearch_and_the_demo_chat(engine, monkeypatch):  # noqa: F811
+    from litmus import arxiv
+    from litmus.engine import agent
+    queries = []
+
+    async def fake_search(query, limit=8):
+        queries.append(query)
+        return arxiv.parse(FEED)
+    monkeypatch.setattr(agent.arxiv, "search", fake_search)
+    monkeypatch.setattr(api, "_imported", None)
+    with TestClient(api.app) as client:
+        sid = client.post("/api/sessions", json={}).json()["session_id"]
+        snap = wait(client, sid, lambda s: s["status"] == "waiting_human")
+        got = client.post(f"/api/sessions/{sid}/autoresearch", json={}).json()
+        assert queries == ["mixup short training", "label smoothing"]  # blanks dropped, at most two
+        # the library's own "mixup" paper and an invented id are never offered
+        assert [p["title"] for p in got["papers"]] == ["Mixup under short schedules"]
+        assert got["papers"][0]["authors"] == ["A. B", "C. D"] and got["answer"].startswith("These would tell you")
+        # demo mode: the page sends its own session; Litmus answers from it and nothing is stored
+        before = store.list_sessions()
+        demo = {"session": {**snap, "id": "ses_demo"}, "question": "Where are we?"}
+        assert client.post("/api/demo/explain", json=demo).json()["answer"].startswith("Across agents")
+        assert len(client.post("/api/demo/questions", json=demo).json()["questions"]) == 3
+        assert client.post("/api/demo/autoresearch", json=demo).json()["papers"]
+        assert store.list_sessions() == before

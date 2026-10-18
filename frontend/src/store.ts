@@ -3,7 +3,8 @@ import { applyEvent, initialState, type AppState } from './reducer'
 import { mockApi } from './transport/mock'
 import { realApi } from './transport/real'
 import type { Api, ConnState, Library, LibraryStage } from './transport/api'
-import type { ChatTurn, Provenance, Selection } from './types'
+import type { ChatTurn, Provenance, ReadingItem, Selection } from './types'
+import { AUTORESEARCH } from './lib/questions'
 
 // Live (the FastAPI backend, Modal A100s) unless Demo mode is on: the front page's switch (remembered), or ?demo=1.
 const DEMO_KEY = 'litmus.demo'
@@ -30,7 +31,7 @@ type Store = {
   abstractOpen: boolean
   cardFor: string | null // the node whose card (about it, and where it should proceed) is open over it
   chatOpen: boolean // the right panel shows the Litmus chat tab instead of the results
-  chat: (ChatTurn & { provenance?: Provenance[] })[] // the conversation with Litmus, oldest first
+  chat: (ChatTurn & { provenance?: Provenance[]; papers?: ReadingItem[] })[] // the conversation with Litmus, oldest first
   offers: { key: string; questions: string[] } | null // the questions Litmus generated for the research state `key`
   loadOffers: (key: string, asked: string[]) => Promise<void>
   thinking: string | null // the agent Litmus is answering about (or THINKING_ABOUT_ALL) while the chat waits
@@ -152,6 +153,10 @@ export const useStore = create<Store>((set, get) => {
       const history = chat.map(({ role, text }) => ({ role, text }))
       set((st) => ({ thinking: star_id ?? THINKING_ABOUT_ALL, chat: [...st.chat, { role: 'human', text: question }] }))
       await act(async (sid) => {
+        if (question === AUTORESEARCH) {
+          const r = await current.autoresearch(sid, { star_id })
+          return set((st) => ({ chat: [...st.chat, { role: 'litmus', text: r.answer, papers: r.papers }] }))
+        }
         const r = await current.explain(sid, { star_id, question, history })
         set((st) => ({ chat: [...st.chat, { role: 'litmus', text: r.answer, provenance: r.provenance }] }))
       })

@@ -10,15 +10,14 @@ from typing import Literal
 
 from pydantic import BaseModel, ValidationError
 
-from litmus import papiers_client, store
+from litmus import arxiv, papiers_client, store
 from litmus.engine import ops
 from litmus.experiments.knobs import BASELINE_KNOBS, config_hash
 from litmus.llm import structured
-from litmus.models import ChatTurn, Claim, Proposal, Provenance, SessionState, Star, apply_changes
+from litmus.models import ChatTurn, Claim, Document, Proposal, Provenance, SessionState, Star, apply_changes
 
 MAX_PROPOSALS = 4
 MAX_SEEDS = 10
-MIN_EPOCH_CHANGE = 2
 MAX_SUGGESTIONS = 3
 POINTS = 100  # grader works in fractions; prompts and prose use accuracy points
 
@@ -29,7 +28,6 @@ AGENT_NAMES = {"label_smoothing": "Smoothing", "epochs": "Long training", "tta_l
 
 KNOB_SCHEMA = {
     "label_smoothing": f"float 0..0.5 (baseline {BASELINE_KNOBS['label_smoothing']})",
-    "epochs": f"float 1..40 (baseline {BASELINE_KNOBS['epochs']})",
     "tta_level": "0 none | 1 mirror | 2 mirror+translate (baseline 2)",
     "flip": "'random' | 'alternating' | 'none' (baseline 'alternating', the airbench paper's trick)",
     "mixup_alpha": "float 0..2, 0 = off (baseline 0)",
@@ -222,9 +220,9 @@ def _validate_proposals(drafts: ProposalSet | AgentSuggestions, state: SessionSt
             problems.append(f"'{draft.title}': invalid knob values: {error.errors()[0]['msg']}")
             continue
         key = config_hash(knobs)
-        if "epochs" in changes and abs(changes["epochs"] - parent.knobs.epochs) < MIN_EPOCH_CHANGE:
-            problems.append(f"'{draft.title}': an epoch change under {MIN_EPOCH_CHANGE} is a near-duplicate; "
-                            "more seeds on an existing star happen automatically, never via a new proposal")
+        if "epochs" in changes:
+            problems.append(f"'{draft.title}': training length is fixed at {BASELINE_KNOBS['epochs']} epochs for every "
+                            "experiment (apples-to-apples comparisons); change a method knob instead")
             continue
         if ops.existing_config(state, knobs) or key in seen:
             problems.append(f"'{draft.title}': this configuration was already run or proposed")
@@ -319,9 +317,20 @@ async def detect_conflict(state: SessionState, s: Star, query: str, hits: list[P
     check = await structured("detect_conflict", ConflictCheck, knob_schema=KNOB_SCHEMA, star=star_summary(state, s), grade=grade_summary(s),
                              provenance=provenance_text(s.provenance), query=query, hits=hit_lines,
                              tree=tree(state), may_ask=str(may_ask).lower())
+    drop_epoch_options(check)
     if check.conflict and (not may_ask or not check.question or len(check.options) < 2):
         demote_to_follow_up(check)
     return check
+
+
+def drop_epoch_options(check: ConflictCheck) -> None:
+    """Training length is fixed: an option (or follow-up) that changes epochs is not offered."""
+    changes_epochs = lambda kc: kc is not None and kc.epochs is not None
+    leaning = check.options[check.agent_leaning_index] if check.agent_leaning_index in range(len(check.options)) else None
+    check.options = [o for o in check.options if not changes_epochs(o.knob_changes)]
+    check.agent_leaning_index = check.options.index(leaning) if leaning in check.options else 0
+    if check.follow_up and changes_epochs(check.follow_up.knob_changes):
+        check.follow_up = None
 
 
 def demote_to_follow_up(check: ConflictCheck) -> None:
@@ -413,6 +422,45 @@ async def suggest_questions(state: SessionState, s: Star | None, asked: list[str
             seen.add(q.lower())
             out.append(q)
     return out[:MAX_SUGGESTED]
+
+
+class AutoresearchQueries(BaseModel):
+    queries: list[str]
+
+
+class Pick(BaseModel):
+    id: str
+    why_read: str
+
+
+class ReadingList(BaseModel):
+    intro: str
+    picks: list[Pick]
+
+
+MAX_QUERIES = 2
+MAX_READING = 3
+
+
+async def autoresearch(state: SessionState, s: Star | None, documents: list[Document]) -> tuple[str, list[dict]]:
+    """Explore the topic further: search arXiv for papers the human has not read, and pick the few worth reading next."""
+    focus = (f"{agent_name(state, s)} ({s.id}): {s.title}" if s and s.parent_id else "the research as a whole")
+    drafted = await structured("autoresearch_query", AutoresearchQueries, goal=state.goal, focus=focus, tree=tree(state))
+    found: dict[str, arxiv.Paper] = {}
+    for query in [q.strip() for q in drafted.queries if q.strip()][:MAX_QUERIES]:
+        for paper in await arxiv.search(query):
+            found.setdefault(paper.id, paper)
+    read = {d.title.strip().lower() for d in documents}
+    fresh = [p for p in found.values() if p.title.strip().lower() not in read]
+    if not fresh:
+        return "I searched arXiv but found nothing new beyond what is already in your library.", []
+    results = "\n".join(f"{p.id} | {p.title} | {p.year} | {p.abstract}" for p in fresh)
+    picked = await structured("autoresearch_pick", ReadingList, goal=state.goal, focus=focus, tree=tree(state),
+                              library=[d.title for d in documents], results=results)
+    by_id = {p.id: p for p in fresh}
+    papers = [{"title": by_id[k.id].title, "url": by_id[k.id].url, "authors": by_id[k.id].authors[:3],
+               "year": by_id[k.id].year, "why": k.why_read.strip()} for k in picked.picks if k.id in by_id][:MAX_READING]
+    return picked.intro.strip(), papers
 
 
 CITATION = re.compile(r"\[([A-Za-z0-9_#:\-]+)\]")

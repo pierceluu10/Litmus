@@ -75,7 +75,8 @@ async def fake_structured(prompt_name, schema, **values):
     if prompt_name == "suggest":  # each agent's own next steps; a human answer about its star must be implemented
         SUGGEST_PROMPTS.append(values)
         star, agenda = values["star"], [a["id"] for a in values["agenda"]] if values["agenda"] != "(empty)" else []
-        options = {"Mixup": [draft("Mixup + longer", "S0", "improves", ["hl_mixup"], agenda, mixup_alpha=0.2, epochs=20),
+        options = {"Mixup": [draft("Mixup at 20 epochs", "S0", "improves", ["hl_mixup"], agenda, mixup_alpha=0.3, epochs=20),  # fixed length: rejected
+                             draft("Gentler mixup", "S0", "improves", ["hl_mixup"], agenda, mixup_alpha=0.1),
                              draft("Cutout", "S0", "improves", ["hl_tta"], cutout=8),
                              draft("No TTA", "S0", "hurts", ["hl_tta"], tta_level=0)]}
         return agent.AgentSuggestions(take=f"{values['agent']} would go on.", proposals=options.get(
@@ -86,11 +87,13 @@ async def fake_structured(prompt_name, schema, **values):
         return agent.ConflictCheck(
             explanation="Bag of Tricks says mixup needs more epochs.", cited_hit_ids=["hl_bot"], conflict=True,
             question="Test mixup with longer training, or drop it?", agent_leaning_index=1, follow_up=None,
-            options=[agent.OptionDraft(label="Longer training", consequence="run mixup at 20 epochs",
-                                       directive="Test mixup at 20 epochs vs baseline at 20", parent_star_id="S0",
-                                       knob_changes=agent.KnobChanges(mixup_alpha=0.2, epochs=20)),
+            options=[agent.OptionDraft(label="Gentler mixup", consequence="run mixup at alpha 0.1",
+                                       directive="Test mixup at alpha 0.1 vs baseline", parent_star_id="S0",
+                                       knob_changes=agent.KnobChanges(mixup_alpha=0.1)),
                      agent.OptionDraft(label="Drop mixup", consequence="stop", directive="Drop mixup",
-                                       parent_star_id=None, knob_changes=None)])
+                                       parent_star_id=None, knob_changes=None),
+                     agent.OptionDraft(label="Longer training", consequence="run mixup at 20 epochs", directive="20 epochs",
+                                       parent_star_id="S0", knob_changes=agent.KnobChanges(mixup_alpha=0.2, epochs=20))])
     if prompt_name == "write_abstract":
         return agent.AbstractDraft(text="Mixup failed at 10 epochs [S1][hl_mixup][bogus_id].", findings=["S1 refuted [S1]"])
     if prompt_name == "chat_research":
@@ -99,6 +102,13 @@ async def fake_structured(prompt_name, schema, **values):
     if prompt_name == "suggest_questions":
         return agent.SuggestedQuestions(questions=["Why did mixup lose?", "why did mixup lose?", "What next?", "", "x" * 200,
                                                    "Which is solid?", "One too many?"])
+    if prompt_name == "autoresearch_query":
+        return agent.AutoresearchQueries(queries=["mixup short training", "", "label smoothing", "a third query is ignored"])
+    if prompt_name == "autoresearch_pick":
+        return agent.ReadingList(intro="These would tell you whether mixup needs longer training.", picks=[
+            agent.Pick(id="2001.00002v1", why_read="Directly tests mixup under short schedules."),
+            agent.Pick(id="9999.99999v1", why_read="Invented: must be dropped."),
+            agent.Pick(id="2001.00001v1", why_read="Already in the library: was never offered.")])
     if prompt_name == "chat_star":
         CHAT_PROMPTS.append(values)
         return agent.Explanation(answer="Five paired seeds against the baseline.", cited_ids=["hl_bot", "hl_invented"])
@@ -185,7 +195,7 @@ async def test_session_starts_from_one_claim_and_agents_suggest_their_own_next_s
         picks = [p for p in card if p.title in ("Cutout", "No TTA")]
         driver.dispatch(sid, mixup.id, [{"proposal_id": p.id} for p in picks], None)
         state = store.get(sid)
-        assert next(p for p in state.proposals if p.title == "Mixup + longer").status == "skipped"
+        assert next(p for p in state.proposals if p.title == "Gentler mixup").status == "skipped"
         wave2 = [x for x in state.stars if x.wave == 2]
         assert {x.title for x in wave2} == {"Cutout", "No TTA"}
 
@@ -251,9 +261,9 @@ async def test_chat_about_a_star_carries_history_and_searches_the_library_once(e
         star = next(s for s in state.stars if s.parent_id)
         SEARCHES.clear()
         CHAT_PROMPTS.clear()
-        answer, cited = await driver.explain(state.id, star.id, "What did you run?", [])
+        answer, cited = await driver.explain(store.get(state.id), star.id, "What did you run?", [])
         history = [ChatTurn(role="human", text="What did you run?"), ChatTurn(role="litmus", text=answer)]
-        await driver.explain(state.id, star.id, "Is that enough seeds?", history)
+        await driver.explain(store.get(state.id), star.id, "Is that enough seeds?", history)
         assert [p.id for p in cited] == ["hl_bot"], "ids the model invents must be dropped"
         assert SEARCHES == [star.title], "the library is searched once per star, then reused"
         assert CHAT_PROMPTS[0]["history"] == "(this is the first message)"
@@ -263,20 +273,16 @@ async def test_chat_about_a_star_carries_history_and_searches_the_library_once(e
         await driver.shutdown()
 
 
-async def test_long_training_child_reruns_parent_at_same_epochs(engine, monkeypatch):
-    # auto mode answers with the agent's leaning: lean to "Longer training" here (a dropped line proposes nothing)
-    async def lean_longer(prompt_name, schema, **values):
-        result = await fake_structured(prompt_name, schema, **values)
-        return result.model_copy(update={"agent_leaning_index": 0}) if prompt_name == "detect_conflict" else result
-    monkeypatch.setattr(agent, "structured", lean_longer)
+async def test_training_length_is_fixed_for_every_experiment(engine):
     await driver.startup()
     try:
         state = driver.create_session(None, 1800, auto_mode=True, auto_timeout_seconds=None, max_waves=2)
         state = await wait_for(state.id, lambda s: s.status == "done", timeout=30)
-        longer = next(s for s in state.stars if s.title == "Mixup + longer")
-        # Parent runs are the baseline at 20 epochs (fake +0.002 for long training), not the 9.9-epoch baseline.
-        assert all(r.tta_val_acc > 0.9405 for r in longer.parent_runs)
-        assert longer.grade.delta == pytest.approx(-0.004, abs=0.001)
+        # agents asked for "Mixup at 20 epochs" and offered "Longer training": neither may run or be offered
+        assert {s.knobs.epochs for s in state.stars} == {BASELINE_KNOBS["epochs"]}
+        assert not any("epochs" in p.knob_changes for p in state.proposals)
+        assert all(o.label != "Longer training" for q in state.questions for o in q.options)
+        assert any(o.label == "Gentler mixup" for q in state.questions for o in q.options)
     finally:
         await driver.shutdown()
 

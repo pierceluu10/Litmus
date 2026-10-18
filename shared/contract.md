@@ -5,6 +5,11 @@ or remove fields, every change gets a Changelog line (newest first) and lands on
 `docs(contract): ...`.
 
 ## Changelog
+- 2026-10-18 — Additive: `POST /api/sessions/{id}/autoresearch {star_id?}` → `{answer, papers: {title, url, authors,
+  year, why}[]}` (Litmus's "Explore this topic further": up to 3 arXiv papers the human has not read; 503 if arXiv or the
+  LLM fails). Demo mode: `POST /api/demo/explain|questions|autoresearch` take `{session: SessionState, star_id?,
+  question?, history?, asked?}` and answer about that snapshot (nothing stored). Training length is fixed: proposals
+  and question options never change `epochs` (every star trains the baseline's 9.9).
 - 2026-10-17 — Additive: `POST /explain` `star_id` is optional (none: Litmus answers about the whole research);
   `POST /api/sessions/{id}/questions {star_id?, asked: string[]}` → `{questions: string[]}` (up to 3 suggested questions
   for the current state, never one in `asked`; 503 if the LLM fails).
@@ -62,6 +67,8 @@ All JSON is snake_case. Timestamps are ISO 8601 UTC strings. IDs are stable stri
 | POST | `/api/sessions/{id}/answer` | `{question_id, option_id, comment?}` | `{ok}` |
 | POST | `/api/sessions/{id}/feedback` | `{star_id, kind:"challenge"\|"suggest"\|"prioritize", text}` | `{ok}` |
 | POST | `/api/sessions/{id}/explain` | `{star_id?, question?, history?: ChatTurn[]}` (no star: the whole research) | `{answer, provenance: Provenance[]}` |
+| POST | `/api/sessions/{id}/autoresearch` | `{star_id?}` | `{answer, papers: {title, url, authors, year, why}[]}` (≤3 arXiv papers not in the library) |
+| POST | `/api/demo/explain` · `/api/demo/questions` · `/api/demo/autoresearch` | `{session: SessionState, star_id?, question?, history?, asked?}` | same as the session routes, about that snapshot |
 | POST | `/api/sessions/{id}/questions` | `{star_id?, asked: string[]}` | `{questions: string[]}` (≤3, none from `asked`) |
 | POST | `/api/sessions/{id}/pause` | | `{ok}` |
 | POST | `/api/sessions/{id}/resume` | | `{ok}` |

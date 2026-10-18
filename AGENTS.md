@@ -151,7 +151,12 @@ branch subgraph (one agent): run → reflect → (run +5 seeds) | (ask ⟂ → s
   from the snapshot (`_resume_values`). So answers that arrive while other branches are still running are
   applied as soon as that superstep ends, and a restarted server resumes exactly where it was.
 - A question interrupt pauses only its branch; sibling branches finish (verified in `tests/test_engine.py`).
-- Fair comparison: `ops.comparison_knobs` = parent at the child's epochs, unless the change is epochs alone.
+- **Training length is fixed** (user decision, 2026-10-18): every star trains the baseline's 9.9 epochs, so every
+  comparison is apples to apples. `epochs` is not in the knob menu the LLM sees, `_validate_proposals` rejects any
+  proposal that changes it (one repair round), and `drop_epoch_options` removes question options and follow-ups that
+  do. "Needs longer training" claims are tested at their gentlest fixed-length form (e.g. mixup α=0.2) or dropped.
+- Fair comparison: `ops.comparison_knobs` = parent at the child's epochs, unless the change is epochs alone (legacy:
+  with fixed epochs the parent re-runs as it was).
 - Adaptive seeds: inconclusive + |delta| ≥ 0.05 pts + n < 10 → 5 more paired seeds automatically, explained.
 - Refuted → always searches the library; conflicts → one question per wave; answers/feedback land on the
   session `agenda`; the agent whose star it is implements them in its card, and Litmus's `propose` implements any
@@ -171,6 +176,15 @@ branch subgraph (one agent): run → reflect → (run +5 seeds) | (ask ⟂ → s
 ### Abstract, explain, write-back (`engine/agent.py`, `writeback.py`)
 - Chat (`POST /explain` with `history`): one turn of the human's chat, about a star (`prompts/chat_star.txt`) or, with no
   `star_id`, the research as a whole (`prompts/chat_research.txt`: tree, decisions, open questions, the session's claims).
+- **Autoresearch** (`POST /autoresearch {star_id?}`, `agent.autoresearch`, `litmus/arxiv.py`): Litmus's "Explore this topic
+  further", always offered in the chat in both modes. One cheap call (`autoresearch_query`, effort none) writes 2 arXiv
+  queries naming the technique; the public arXiv API (no key) returns candidates; papers already in the library are
+  dropped; `autoresearch_pick` (effort low) chooses up to 3 with one sentence each on why to read it. Ids the model
+  invents are dropped. It adds reading to the human's loop: the papers are for them to read.
+- **Demo mode chats for real**: `POST /api/demo/explain|questions|autoresearch` take the in-browser session's snapshot
+  (`{session, star_id?, ...}`) and run the same Litmus calls on it, nothing stored; the demo backend (`transport/mock.ts`)
+  falls back to its offline answers when the backend is unreachable. Demo mode is the main way to show Litmus without
+  GPU time: experiments are simulated, Litmus is the real LLM.
 - Suggested questions (`POST /questions {star_id?, asked}`, `prompts/suggest_questions.txt`, effort `none`): the 3 questions
   the human would most want to ask now, about the open agent or the whole research; deduped, capped, never one already asked.
 - Chat about a star: context is
@@ -267,7 +281,7 @@ npm test             # reducer, layout, simulator + grader-port tests
 
 **The library is always real**: on launch the claims rail streams `GET /api/library/stream` from the backend (Fetching papers… Fetching highlights… Gathering notes… Summarizing each highlight…, shown in the start bubble; each claim card's title is that summary), in the demo too, so run `uv run litmus serve`. If the backend is unreachable the demo falls back to `src/mock/library.json`, a snapshot of `backend/data/library_cache.json` with the same ids (refresh it by copying the cache).
 
-**The demo backend** (`src/mock/`): `sim.ts` is a simulated airbench94 whose knob effects are calibrated from the recorded real session (`shared/demo-session.json`: mixup α=1 −1.44, α=0.2 +0.22 at 30 epochs, no TTA −0.75, no whitening −1.48, …) with seed-paired noise, plus a port of the locked grader (paired t-interval, verdict relative to prediction). `server.ts` emits the contract's events: any star can be branched (a catalog of moves tied to library highlights), there is no agent's pick and no shadow runs, inconclusive results get 5 more seeds, the first mixup refutation triggers library search + a question, the session waits for "Where should we start?" (one claim, one first agent), each agent offers its own card with a short take when its verdict lands, and Litmus plans from the best star only when no card is open. `library.ts` maps the demo's moves onto highlights in that snapshot by their real ids.
+**The demo backend** (`src/mock/`): `sim.ts` is a simulated airbench94 whose knob effects are calibrated from the recorded real session (`shared/demo-session.json`: mixup α=1 −1.44, α=0.2 +0.22 at 30 epochs, no TTA −0.75, no whitening −1.48, …) with seed-paired noise, plus a port of the locked grader (paired t-interval, verdict relative to prediction). `server.ts` emits the contract's events: any star can be branched (a catalog of moves tied to library highlights; none changes training length), there is no agent's pick and no shadow runs, inconclusive results get 5 more seeds, the first mixup refutation triggers library search + a question, the session waits for "Where should we start?" (one claim, one first agent), each agent offers its own card with a short take when its verdict lands, and Litmus plans from the best star only when no card is open. `library.ts` maps the demo's moves onto highlights in that snapshot by their real ids.
 
 **Folder map** (`frontend/src`)
 | Path | What |

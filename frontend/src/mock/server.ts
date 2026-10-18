@@ -16,8 +16,6 @@ const MAX_PROPOSALS = 3
 const SUGGEST_MS = 2400 // how long an agent takes to write its card, like the real backend's LLM call
 const EPOCH_TICKS = 6
 const TICK_MS = 380
-const MAX_TICK_STRETCH = 2.5 // long-epoch runs take visibly longer, up to this factor
-const MAX_EPOCHS = 40
 
 type Move = { key: string; title: (k: Knobs) => string; hypothesis: string; predicted: Predicted; changes: (k: Knobs) => Partial<Knobs> | null; prov: Provenance[]; note: string }
 
@@ -25,8 +23,6 @@ type Move = { key: string; title: (k: Knobs) => string; hypothesis: string; pred
 const MOVES: Move[] = [
   { key: 'mixup', title: () => 'Mixup at the paper’s α = 1', hypothesis: 'Mixup improves accuracy even in a short run.', predicted: 'improves',
     changes: (k) => (k.mixup_alpha ? null : { mixup_alpha: 1 }), prov: [P.mix, P.mixNote], note: 'Paper: 200 epochs. Here: the parent’s budget.' },
-  { key: 'longer', title: (k) => `Train ${nextEpochs(k.epochs)} epochs`, hypothesis: 'More training lets this configuration converge.', predicted: 'improves',
-    changes: (k) => (k.epochs >= MAX_EPOCHS ? null : { epochs: nextEpochs(k.epochs) }), prov: [P.bot, P.botNote], note: 'Costs proportionally more GPU time.' },
   { key: 'gentle', title: () => 'Mixup at Bag of Tricks α = 0.2', hypothesis: 'A gentler mixup keeps the regularisation without the short-run penalty.', predicted: 'improves',
     changes: (k) => (k.mixup_alpha === 0.2 ? null : { mixup_alpha: 0.2 }), prov: [P.bot, P.mix], note: 'Bag of Tricks used α = 0.2.' },
   { key: 'tta', title: () => 'Turn off test-time augmentation', hypothesis: 'A real share of the accuracy comes from multi-crop TTA.', predicted: 'hurts',
@@ -41,7 +37,6 @@ const MOVES: Move[] = [
     changes: (k) => (k.dirac_init ? { dirac_init: false } : null), prov: [P.dirac], note: 'Default PyTorch init instead.' },
 ]
 
-function nextEpochs(e: number) { return Math.min(MAX_EPOCHS, e < 20 ? 20 : e + 10) }
 const uid = (() => { let n = 0; return (p: string) => `${p}_${++n}` })()
 const sameChanges = (a: Partial<Knobs>, b: Partial<Knobs>) => JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort())
 
@@ -152,8 +147,8 @@ export class MockServer {
     const taken = this.stars.filter((c) => c.parent_id === starId).map((c) => c.knob_changes)
     const options = moves.flatMap((m) => { const changes = m.changes(s.knobs); return changes && !taken.some((t) => sameChanges(t, changes)) ? [{ m, changes }] : [] })
     if (!options.length) { this.think(`Nothing left to test from ${s.title} with the claims in your library.`, starId); return [] }
-    // an agent's first follow-up is its own idea at longer training: the cheapest way to tell "wrong" from "not converged"
-    if (s.parent_id) options.sort((a, b) => Number(b.m.key === 'longer') - Number(a.m.key === 'longer'))
+    // a mixup agent's first follow-up is a gentler strength of its own idea (training length is fixed for every test)
+    if (s.parent_id) options.sort((a, b) => Number(b.m.key === 'gentle') - Number(a.m.key === 'gentle'))
     const proposals: Proposal[] = options.slice(0, MAX_PROPOSALS).map(({ m, changes }) => ({
       id: uid('prop'), star_id: starId, title: m.title(s.knobs), hypothesis: m.hypothesis, predicted: m.predicted, knob_changes: changes,
       condition_notes: m.note, provenance: because ? [...m.prov, { kind: 'human', id: uid('hum'), text: because }] : m.prov, agent_recommended: false, status: 'open',
@@ -207,7 +202,7 @@ export class MockServer {
     if (option_id !== 'O1') { this.later(() => this.settle(), 600); return }
     const human: Provenance = { kind: 'human', id: decision.id, text: comment || chosen.label }
     this.later(() => {
-      const st = this.newStar('S0', 'Mixup α = 0.2 with 30 epochs', 'Mixup pays off once training is long enough to converge.', { mixup_alpha: 0.2, epochs: 30 }, [P.bot, P.botNote, human], 'human', 'improves')
+      const st = this.newStar('S0', 'Mixup at Bag of Tricks α = 0.2', 'A gentler mixup keeps the regularisation without the short-run penalty.', { mixup_alpha: 0.2 }, [P.bot, P.botNote, human], 'human', 'improves')
       this.later(() => this.run(st.id, SEEDS), 500)
     }, 500)
   }
@@ -228,16 +223,14 @@ export class MockServer {
   // ---- experiments ----
   private comparisonKnobs(s: Star): Knobs | null {
     if (!s.parent_id) return null
-    const parent = this.star(s.parent_id).knobs
-    const onlyEpochs = Object.keys(s.knob_changes).every((k) => k === 'epochs')
-    return onlyEpochs ? parent : { ...parent, epochs: s.knobs.epochs } // the method is isolated at the child's training budget
+    return this.star(s.parent_id).knobs // training length is fixed, so the parent re-runs exactly as it was
   }
 
   private run(id: string, seeds: number[], done?: () => void) {
     if (this.stopped.has(id)) return
     const s = this.star(id)
     const results = seeds.map((seed) => simulateRun(s.knobs, seed))
-    const tick = TICK_MS * Math.min(MAX_TICK_STRETCH, Math.max(1, s.knobs.epochs / BASELINE_KNOBS.epochs))
+    const tick = TICK_MS
     this.emit('experiment.started', { star_id: id, seeds })
     let k = 0
     const step = () => {
@@ -271,7 +264,7 @@ export class MockServer {
     const d = `${pts(g.delta)} pts vs ${vs}`
     if (g.verdict === 'inconclusive') return `${d}, but the interval crosses zero at ${g.n} seeds.`
     if (g.verdict === 'confirmed') return `${d}, as predicted. The interval clears zero.`
-    return `${d}: the opposite of the prediction.${s.knob_changes.mixup_alpha && s.knobs.epochs < 20 ? ' The paper trained 200 epochs; this ran ' + s.knobs.epochs + '.' : ''}`
+    return `${d}: the opposite of the prediction.${s.knob_changes.mixup_alpha ? ' The paper trained 200 epochs; this ran ' + s.knobs.epochs + '.' : ''}`
   }
 
   private afterGrade(id: string, g: Grade) {
@@ -296,10 +289,10 @@ export class MockServer {
       this.later(() => {
         const q: Question = {
           id: uid('q'), star_id: s.id, status: 'open',
-          text: `Mixup lost ${pts(s.grade!.delta)} pts at ${s.knobs.epochs} epochs. Zhang et al. trained 200, and your Bag of Tricks note says mixup needs long training. Test it at 30 epochs, or drop it?`,
+          text: `Mixup lost ${pts(s.grade!.delta)} pts at ${s.knobs.epochs} epochs. Zhang et al. trained 200, and your Bag of Tricks note says mixup needs long training, but every test here trains the same ~10 epochs. Try the gentler α = 0.2, or drop it?`,
           evidence: [P.mix, P.mixNote, P.bot, P.botNote],
           options: [
-            { id: 'O1', label: 'Mixup α = 0.2 at 30 epochs', consequence: 'About 3× the GPU of a normal branch.' },
+            { id: 'O1', label: 'Mixup at Bag of Tricks α = 0.2', consequence: 'Same ~10 epochs as every other test: a fair comparison.', knob_changes: { mixup_alpha: 0.2 }, parent_star_id: 'S0' },
             { id: 'O2', label: 'Drop mixup', consequence: 'Cheap. Leaves the claim untested at its own conditions.' },
           ],
           agent_leaning: 'O2',

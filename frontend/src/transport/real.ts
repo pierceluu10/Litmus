@@ -3,7 +3,7 @@ import type { LitmusEvent } from '../types'
 
 const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8000'
 
-async function call<T>(method: string, path: string, body?: unknown, text = false): Promise<T> {
+export async function call<T>(method: string, path: string, body?: unknown, text = false): Promise<T> {
   const r = await fetch(BASE + path, { method, headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined })
   if (!r.ok) throw new Error((await r.json().catch(() => ({ detail: r.statusText }))).detail ?? r.statusText)
   return (text ? r.text() : r.json()) as Promise<T>
@@ -63,6 +63,7 @@ export const realApi: Api = {
   feedback: (sid, b) => call('POST', sp(sid, '/feedback'), b),
   explain: (sid, b) => call('POST', sp(sid, '/explain'), b),
   questions: async (sid, b) => (await call<{ questions: string[] }>('POST', sp(sid, '/questions'), b)).questions,
+  autoresearch: (sid, b) => call('POST', sp(sid, '/autoresearch'), b),
   pause: (sid) => call('POST', sp(sid, '/pause')),
   resume: (sid) => call('POST', sp(sid, '/resume')),
   stopBranch: (sid, star_id) => call('POST', sp(sid, '/stop_branch'), { star_id }),

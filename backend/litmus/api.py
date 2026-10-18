@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from litmus import llm, papiers_client, replay, store, writeback
+from litmus import arxiv, llm, papiers_client, replay, store, writeback
 from litmus.config import budget_gpu_seconds
 from litmus.engine import driver
 from litmus.experiments import runner
@@ -260,28 +260,70 @@ class QuestionsBody(BaseModel):
     asked: list[str] = []  # questions already asked in the chat, so none repeat
 
 
+class AutoresearchBody(BaseModel):
+    star_id: str | None = None  # explore around the open agent, else the research as a whole
+
+
+class DemoChat(BaseModel):
+    """Demo mode runs its experiments in the browser; Litmus still chats about them with the real LLM from the
+    snapshot the page sends (nothing is stored)."""
+    session: SessionState
+    star_id: str | None = None
+    question: str | None = None
+    history: list[ChatTurn] = []
+    asked: list[str] = []
+
+
+async def _litmus(call):
+    """Litmus's chat, questions and autoresearch, with their failures mapped to HTTP."""
+    try:
+        return await call
+    except KeyError as error:
+        raise HTTPException(404, f"unknown id {error}") from None
+    except (llm.LLMError, arxiv.ArxivError) as error:
+        raise HTTPException(503, str(error)) from error
+
+
+def _answer(result: tuple[str, list]) -> dict:
+    answer_text, provenance = result
+    return {"answer": answer_text, "provenance": [p.model_dump() for p in provenance]}
+
+
+def _reading(result: tuple[str, list[dict]]) -> dict:
+    answer_text, papers = result
+    return {"answer": answer_text, "papers": papers}
+
+
 @app.post("/api/sessions/{session_id}/questions")
 async def questions(session_id: str, body: QuestionsBody):
     """The questions the human would most want to ask Litmus right now (one-tap chips)."""
-    _session(session_id)
-    try:
-        return {"questions": await driver.suggest_questions(session_id, body.star_id, body.asked)}
-    except KeyError as error:
-        raise HTTPException(404, f"unknown id {error}") from None
-    except llm.LLMError as error:
-        raise HTTPException(503, str(error)) from error
+    return {"questions": await _litmus(driver.suggest_questions(_session(session_id), body.star_id, body.asked))}
 
 
 @app.post("/api/sessions/{session_id}/explain")
 async def explain(session_id: str, body: ExplainBody):
-    _session(session_id)
-    try:
-        answer_text, provenance = await driver.explain(session_id, body.star_id, body.question, body.history)
-    except KeyError as error:
-        raise HTTPException(404, f"unknown id {error}") from None
-    except llm.LLMError as error:
-        raise HTTPException(503, str(error)) from error
-    return {"answer": answer_text, "provenance": [p.model_dump() for p in provenance]}
+    return _answer(await _litmus(driver.explain(_session(session_id), body.star_id, body.question, body.history)))
+
+
+@app.post("/api/sessions/{session_id}/autoresearch")
+async def autoresearch(session_id: str, body: AutoresearchBody):
+    """Explore this topic further: papers from arXiv the human has not read, each with why it is worth reading."""
+    return _reading(await _litmus(driver.autoresearch(_session(session_id), body.star_id)))
+
+
+@app.post("/api/demo/explain")
+async def demo_explain(body: DemoChat):
+    return _answer(await _litmus(driver.explain(body.session, body.star_id, body.question, body.history)))
+
+
+@app.post("/api/demo/questions")
+async def demo_questions(body: DemoChat):
+    return {"questions": await _litmus(driver.suggest_questions(body.session, body.star_id, body.asked))}
+
+
+@app.post("/api/demo/autoresearch")
+async def demo_autoresearch(body: DemoChat):
+    return _reading(await _litmus(driver.autoresearch(body.session, body.star_id)))
 
 
 @app.post("/api/sessions/{session_id}/pause")

@@ -2,13 +2,18 @@ import { commonQuestions } from '../lib/questions'
 import { MockServer } from '../mock/server'
 import { claims, documents } from '../mock/library'
 import { DEFAULT_GOAL, LibraryUnavailable, type Api } from './api'
-import { streamLibrary } from './real'
+import type { Provenance, ReadingItem } from '../types'
+import { call, streamLibrary } from './real'
 
 let srv: MockServer | null = null
 const cur = () => { if (!srv) throw new Error('No mock session'); return srv }
 const RESPONSE_MS = 150
 const THINK_MS = 1600 // about as long as a real chat answer, so the Thinking indicator is seen
 const wait = <T,>(v: T, ms = RESPONSE_MS) => new Promise<T>((r) => setTimeout(() => r(v), ms))
+// Litmus in the demo talks with the real LLM about the simulated agents: the backend gets this session's snapshot
+// (nothing is stored there). With the backend off it falls back to the offline answers.
+const litmus = <T,>(path: string, body: object) => call<T>('POST', `/api/demo/${path}`, { session: cur().state.session, ...body })
+const offline = (what: string, e: Error) => console.warn(`${what}: the backend is unreachable, answering offline (${e.message})`)
 
 export const mockApi: Api = {
   mock: true,
@@ -34,9 +39,13 @@ export const mockApi: Api = {
   dispatch: async (_s, b) => cur().dispatch(b.star_id, b.selections, b.instruction),
   answer: async (_s, b) => cur().answer(b.question_id, b.option_id, b.comment),
   feedback: async (_s, b) => cur().feedback(b.star_id, b.kind, b.text),
-  explain: (_s, b) => wait(cur().chat(b.star_id, b.question ?? ''), THINK_MS),
+  explain: (_s, b) => litmus<{ answer: string; provenance: Provenance[] }>('explain', b)
+    .catch((e) => { offline('chat', e); return wait(cur().chat(b.star_id, b.question ?? ''), THINK_MS) }),
   // the demo has no LLM: the rule-based questions, after a beat like a real call
-  questions: (_s, b) => wait(commonQuestions(cur().state.session, b.star_id ?? null).filter((q) => !b.asked.includes(q)), THINK_MS),
+  questions: (_s, b) => litmus<{ questions: string[] }>('questions', b).then((r) => r.questions)
+    .catch((e) => { offline('questions', e); return wait(commonQuestions(cur().state.session, b.star_id ?? null).filter((q) => !b.asked.includes(q)), THINK_MS) }),
+  autoresearch: (_s, b) => litmus<{ answer: string; papers: ReadingItem[] }>('autoresearch', b)
+    .catch((e) => { offline('autoresearch', e); return { answer: 'Autoresearch searches arXiv through the Litmus backend. Start it with ./dev.sh and ask again.', papers: [] } }),
   pause: async () => cur().pause(),
   resume: async () => cur().resume(),
   stopBranch: async (_s, id) => cur().stopBranch(id),
