@@ -378,6 +378,43 @@ async def chat(state: SessionState, s: Star, question: str, history: list[ChatTu
     return result.answer, [known[i] for i in result.cited_ids if i in known]
 
 
+async def chat_research(state: SessionState, claims: list[Claim], question: str,
+                        history: list[ChatTurn]) -> tuple[str, list[Provenance]]:
+    """One turn of the human's chat about the whole research (no star open)."""
+    turns = "\n".join(f"{'Human' if t.role == 'human' else 'Litmus'}: {t.text}" for t in history[-MAX_CHAT_TURNS:])
+    decisions = [d.model_dump(include={"kind", "star_id", "human_choice", "note"}) for d in state.decisions]
+    open_questions = [q.text for q in state.questions if q.status == "open"]
+    result = await structured("chat_research", Explanation, goal=state.goal, tree=tree(state), decisions=decisions,
+                              questions=open_questions or "(none)", claims=[claim_summary(c) for c in claims],
+                              history=turns or "(this is the first message)", question=question)
+    known = {p.id: p for s in state.stars for p in s.provenance} | {c.id: c.provenance[0] for c in claims if c.provenance}
+    return result.answer, [known[i] for i in result.cited_ids if i in known]
+
+
+class SuggestedQuestions(BaseModel):
+    questions: list[str]
+
+
+MAX_SUGGESTED = 3
+MAX_QUESTION_CHARS = 90
+
+
+async def suggest_questions(state: SessionState, s: Star | None, asked: list[str]) -> list[str]:
+    """The questions the human would most want to ask right now, about the open agent or the whole research."""
+    focus = (f"The human has {agent_name(state, s)} ({s.id}) open: ask about that agent." if s and s.parent_id
+             else "No agent is open: ask about the research as a whole.")
+    result = await structured("suggest_questions", SuggestedQuestions, focus=focus, goal=state.goal, tree=tree(state),
+                              questions=[q.text for q in state.questions if q.status == "open"] or "(none)",
+                              asked=asked or "(nothing yet)")
+    seen = {a.strip().lower() for a in asked}
+    out: list[str] = []
+    for q in (q.strip() for q in result.questions):
+        if q and len(q) <= MAX_QUESTION_CHARS and q.lower() not in seen:
+            seen.add(q.lower())
+            out.append(q)
+    return out[:MAX_SUGGESTED]
+
+
 CITATION = re.compile(r"\[([A-Za-z0-9_#:\-]+)\]")
 
 

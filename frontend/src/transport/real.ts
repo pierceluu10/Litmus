@@ -62,6 +62,7 @@ export const realApi: Api = {
   answer: (sid, b) => call('POST', sp(sid, '/answer'), b),
   feedback: (sid, b) => call('POST', sp(sid, '/feedback'), b),
   explain: (sid, b) => call('POST', sp(sid, '/explain'), b),
+  questions: async (sid, b) => (await call<{ questions: string[] }>('POST', sp(sid, '/questions'), b)).questions,
   pause: (sid) => call('POST', sp(sid, '/pause')),
   resume: (sid) => call('POST', sp(sid, '/resume')),
   stopBranch: (sid, star_id) => call('POST', sp(sid, '/stop_branch'), { star_id }),

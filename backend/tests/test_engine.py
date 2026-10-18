@@ -93,6 +93,12 @@ async def fake_structured(prompt_name, schema, **values):
                                        parent_star_id=None, knob_changes=None)])
     if prompt_name == "write_abstract":
         return agent.AbstractDraft(text="Mixup failed at 10 epochs [S1][hl_mixup][bogus_id].", findings=["S1 refuted [S1]"])
+    if prompt_name == "chat_research":
+        CHAT_PROMPTS.append(values)
+        return agent.Explanation(answer="Across agents, mixup is the only refutation so far.", cited_ids=["hl_mixup", "hl_invented"])
+    if prompt_name == "suggest_questions":
+        return agent.SuggestedQuestions(questions=["Why did mixup lose?", "why did mixup lose?", "What next?", "", "x" * 200,
+                                                   "Which is solid?", "One too many?"])
     if prompt_name == "chat_star":
         CHAT_PROMPTS.append(values)
         return agent.Explanation(answer="Five paired seeds against the baseline.", cited_ids=["hl_bot", "hl_invented"])

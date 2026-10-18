@@ -326,7 +326,8 @@ export class MockServer {
   }
 
   // The demo's chat: answers from the star's own record, routed by what the question asks about.
-  chat(star_id: string, question: string) {
+  chat(star_id: string | undefined, question: string) {
+    if (!star_id) return this.overview()
     const s = this.star(star_id), g = s.grade, q = question.toLowerCase()
     const parent = s.parent_id ? this.star(s.parent_id) : null
     const seeds = s.runs.map((r) => r.seed)
@@ -340,6 +341,17 @@ export class MockServer {
         ? `It tests "${claim.text.slice(0, 140)}${claim.text.length > 140 ? '…' : ''}"${note ? `, and your note asked: ${note.text}` : ''}. ${result}`
         : result
     return { answer, provenance: s.provenance }
+  }
+
+  // The demo's answer about the research as a whole: what is graded, the best result, and what goes against the papers.
+  private overview() {
+    const graded = this.stars.filter((s) => s.parent_id && s.grade)
+    if (!graded.length) return { answer: `Nothing is graded yet. ${this.stars.filter((s) => s.parent_id).map((s) => `${agentName(s)} is testing ${knobText(s.knob_changes)}`).join('; ') || 'No agent has started.'}.`, provenance: [] }
+    const best = graded.reduce((a, b) => (b.grade!.delta > a.grade!.delta ? b : a))
+    const refuted = graded.filter((s) => s.grade!.verdict === 'refuted')
+    const answer = `${graded.length} of ${this.stars.length - 1} experiments are graded. The best is ${agentName(best)} at ${pts(best.grade!.delta)} pts (${best.grade!.verdict}).`
+      + (refuted.length ? ` ${refuted.map((s) => agentName(s)).join(' and ')} went against the paper${refuted.length > 1 ? 's' : ''}.` : ' Nothing has gone against the papers yet.')
+    return { answer, provenance: [] }
   }
 
   generateAbstract() {

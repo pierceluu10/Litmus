@@ -5,6 +5,9 @@ or remove fields, every change gets a Changelog line (newest first) and lands on
 `docs(contract): ...`.
 
 ## Changelog
+- 2026-10-17 — Additive: `POST /explain` `star_id` is optional (none: Litmus answers about the whole research);
+  `POST /api/sessions/{id}/questions {star_id?, asked: string[]}` → `{questions: string[]}` (up to 3 suggested questions
+  for the current state, never one in `asked`; 503 if the LLM fails).
 - 2026-10-17 — Additive: `POST /api/library/connect {token}` (a user's own Papiers API token: kept in server memory for
   the Papiers CLI, never logged or stored; `{}`, 401 if Papiers rejects it, 503 if the CLI is missing or times out) and
   `POST /api/library/import {documents, claims}` (the library the next session works from instead of Papiers, e.g.
@@ -58,7 +61,8 @@ All JSON is snake_case. Timestamps are ISO 8601 UTC strings. IDs are stable stri
 | POST | `/api/sessions/{id}/pivot` | `{claim_id}` | `{ok}` (409 already tested / not started / no waves left) |
 | POST | `/api/sessions/{id}/answer` | `{question_id, option_id, comment?}` | `{ok}` |
 | POST | `/api/sessions/{id}/feedback` | `{star_id, kind:"challenge"\|"suggest"\|"prioritize", text}` | `{ok}` |
-| POST | `/api/sessions/{id}/explain` | `{star_id, question?, history?: ChatTurn[]}` | `{answer, provenance: Provenance[]}` |
+| POST | `/api/sessions/{id}/explain` | `{star_id?, question?, history?: ChatTurn[]}` (no star: the whole research) | `{answer, provenance: Provenance[]}` |
+| POST | `/api/sessions/{id}/questions` | `{star_id?, asked: string[]}` | `{questions: string[]}` (≤3, none from `asked`) |
 | POST | `/api/sessions/{id}/pause` | | `{ok}` |
 | POST | `/api/sessions/{id}/resume` | | `{ok}` |
 | POST | `/api/sessions/{id}/stop_branch` | `{star_id}` | `{ok}` |

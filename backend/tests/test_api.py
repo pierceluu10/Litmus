@@ -162,3 +162,17 @@ def test_an_imported_library_is_what_the_next_session_works_from(engine, monkeyp
         # the import is used once: the next session reads the whole library again
         other = client.post("/api/sessions", json={}).json()["session_id"]
         assert wait(client, other, lambda s: s["status"] == "waiting_human")["library"] is None
+
+
+def test_chat_about_the_whole_research_and_generated_questions(engine, monkeypatch):  # noqa: F811
+    monkeypatch.setattr(api, "_imported", None)
+    with TestClient(api.app) as client:
+        sid = client.post("/api/sessions", json={}).json()["session_id"]
+        wait(client, sid, lambda s: s["status"] == "waiting_human")
+        whole = client.post(f"/api/sessions/{sid}/explain", json={"question": "Where are we?"}).json()
+        assert whole["answer"].startswith("Across agents")
+        assert [p["id"] for p in whole["provenance"]] == ["hl_mixup"]  # invented ids are dropped
+        got = client.post(f"/api/sessions/{sid}/questions", json={"asked": ["What next?"]}).json()["questions"]
+        # case-insensitive duplicates, blanks, over-long ones and already-asked ones are dropped; at most three
+        assert got == ["Why did mixup lose?", "Which is solid?", "One too many?"]
+        assert client.post(f"/api/sessions/{sid}/questions", json={"star_id": "S99"}).status_code == 404

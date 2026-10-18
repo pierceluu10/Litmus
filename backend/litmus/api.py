@@ -70,7 +70,7 @@ class FeedbackBody(BaseModel):
 
 
 class ExplainBody(BaseModel):
-    star_id: str
+    star_id: str | None = None  # none: Litmus answers about the whole research
     question: str | None = None
     history: list[ChatTurn] = []  # earlier turns of this star's chat, oldest first
 
@@ -253,6 +253,23 @@ async def answer(session_id: str, body: AnswerBody):
 async def feedback(session_id: str, body: FeedbackBody):
     _session(session_id)
     return _act(driver.feedback, session_id, body.star_id, body.kind, body.text)
+
+
+class QuestionsBody(BaseModel):
+    star_id: str | None = None  # the agent the human has open, if any
+    asked: list[str] = []  # questions already asked in the chat, so none repeat
+
+
+@app.post("/api/sessions/{session_id}/questions")
+async def questions(session_id: str, body: QuestionsBody):
+    """The questions the human would most want to ask Litmus right now (one-tap chips)."""
+    _session(session_id)
+    try:
+        return {"questions": await driver.suggest_questions(session_id, body.star_id, body.asked)}
+    except KeyError as error:
+        raise HTTPException(404, f"unknown id {error}") from None
+    except llm.LLMError as error:
+        raise HTTPException(503, str(error)) from error
 
 
 @app.post("/api/sessions/{session_id}/explain")

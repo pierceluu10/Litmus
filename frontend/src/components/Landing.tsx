@@ -348,6 +348,16 @@ function StackedStory({ cta }: { cta: ReactNode }) {
   )
 }
 
+// Off: the real backend trains on Modal. On: the in-browser simulation, no backend or keys needed.
+function DemoSwitch() {
+  const { demo, setDemo } = useStore()
+  return (
+    <button role="switch" aria-checked={demo} className="switch" onClick={() => setDemo(!demo)}>
+      <span className="switch-track" aria-hidden="true"><span className="switch-thumb" /></span>Demo mode
+    </button>
+  )
+}
+
 export function Landing() {
   const { set, error, demo } = useStore()
   const main = useRef<HTMLElement>(null)
@@ -362,7 +372,7 @@ export function Landing() {
   const textOpacity = useTransform(scrollY, [0, vh * 0.32], [1, 0])
   useEffect(() => {
     if (demo) return
-    apiFor(false).health().catch((e: Error) => set({ error: `Could not reach the backend (${e.message}). Start it with ./dev.sh.` }))
+    apiFor(false).health().catch((e: Error) => set({ error: `Could not reach the backend (${e.message}). Start it with ./dev.sh, or turn on Demo mode.` }))
   }, [demo, set])
   const start = () => nav('#/upload')
   const cta = <Cta onStart={start} />
@@ -381,6 +391,7 @@ export function Landing() {
       <nav className={`sticky top-0 z-30 flex items-center justify-between px-[clamp(20px,4vw,56px)] py-3.5 transition-colors ${scrolled ? 'border-b border-rule bg-surface/95' : 'border-b border-transparent'}`}>
         <button className="inline-flex items-center gap-2 border-0 bg-transparent p-0 text-[20px] font-bold tracking-tight" onClick={() => main.current?.scrollTo({ top: 0, behavior: 'smooth' })}><img src="/litmus-face.svg" alt="" width={28} height={28} />Litmus</button>
         <div className="flex items-center gap-2">
+          <DemoSwitch />
           {user ? (
             <>
               <button className="btn" onClick={logout}>Log out</button>

@@ -1,0 +1,10 @@
+# suggest_questions v1
+You write the 3 questions a researcher would most want to ask Litmus (the lead researcher) right now, shown as one-tap
+chips in a chat. Base them on the actual state below: name agents and real results ("Why did the Mixup agent lose
+1.4 points?"), not generic wording. Each under 60 characters, a plain question ending in "?", no ids in brackets, no
+duplicates. $focus
+
+Research goal: $goal
+Research tree (every star, with each agent's verdict, what it found and suggests): $tree
+Questions waiting on the human: $questions
+Already asked in the chat (do not repeat): $asked

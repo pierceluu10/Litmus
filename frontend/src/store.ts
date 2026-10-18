@@ -31,7 +31,9 @@ type Store = {
   cardFor: string | null // the node whose card (about it, and where it should proceed) is open over it
   chatOpen: boolean // the Litmus chat under the results card, opened from Litmus's face
   chat: (ChatTurn & { provenance?: Provenance[] })[] // the conversation with Litmus, oldest first
-  thinking: string | null // the star Litmus is answering about while the chat waits
+  offers: { key: string; questions: string[] } | null // the questions Litmus generated for the research state `key`
+  loadOffers: (key: string, asked: string[]) => Promise<void>
+  thinking: string | null // the agent Litmus is answering about (or THINKING_ABOUT_ALL) while the chat waits
   thought: Thought | null // the question's trip to the statue and back; the answer stays hidden until it lands
   begin: (replay: boolean, goal?: string, claimId?: string) => Promise<void> // claimId: start there at once (chosen on the Connect page)
   startClaim: string | null // the claim chosen before the session existed: no "Where should we start?" for it
@@ -62,12 +64,19 @@ export function launchThought(source: HTMLElement, text: string, starId: string,
     from: { left: r.left, top: r.top, width: r.width, height: r.height, padding: parseFloat(cs.paddingLeft), font: cs.font, letterSpacing: cs.letterSpacing } } }))
 }
 
+// `thinking` while Litmus answers about the research as a whole rather than one agent
+export const THINKING_ABOUT_ALL = 'all'
+// The agent the human has open (the baseline is not an agent): Litmus's chat and its suggested questions are about it.
+export const openAgent = (st: Pick<Store, 'selectedId' | 'app'>) => {
+  const s = st.app.session?.stars.find((x) => x.id === st.selectedId)
+  return s?.parent_id ? s.id : undefined
+}
+
 // Asks Litmus from wherever the question was typed or offered: opens the chat, sends the words flying, starts the request.
 export function askLitmus(source: HTMLElement, question: string) {
   const st = useStore.getState()
-  const starId = st.selectedId ?? st.app.session?.stars[0]?.id
-  if (!question.trim() || st.thinking || !starId) return
-  launchThought(source, question.trim(), starId)
+  if (!question.trim() || st.thinking || !st.app.session) return
+  launchThought(source, question.trim(), openAgent(st) ?? THINKING_ABOUT_ALL)
   st.set({ chatOpen: true })
   void st.ask(question.trim())
 }
@@ -84,7 +93,7 @@ export const useStore = create<Store>((set, get) => {
   }
   return {
     app: initialState, sid: null, conn: 'closed', libraryStage: 'papers', demo: savedDemo(), error: null, selectedId: null, hoveredClaim: null, imported: null,
-    follow: true, focusId: null, fitAll: false, abstractOpen: false, chatOpen: false, cardFor: null, chat: [], thinking: null, thought: null, startClaim: null,
+    follow: true, focusId: null, fitAll: false, abstractOpen: false, chatOpen: false, cardFor: null, chat: [], thinking: null, thought: null, startClaim: null, offers: null,
     set: (p) => set(p),
     setDemo(demo) {
       try { localStorage.setItem(DEMO_KEY, demo ? '1' : '0') } catch { /* private window: the switch still works for this visit */ }
@@ -97,11 +106,11 @@ export const useStore = create<Store>((set, get) => {
     leave() {
       unsub?.(); unsub = null
       libraryLoad?.abort(); libraryLoad = null
-      set({ app: initialState, sid: null, conn: 'closed', selectedId: null, focusId: null, fitAll: false, abstractOpen: false, chatOpen: false, cardFor: null, chat: [], thought: null, error: null, demo: savedDemo(), imported: null, startClaim: null })
+      set({ app: initialState, sid: null, conn: 'closed', selectedId: null, focusId: null, fitAll: false, abstractOpen: false, chatOpen: false, cardFor: null, chat: [], thought: null, error: null, demo: savedDemo(), imported: null, startClaim: null, offers: null })
     },
     async begin(replay, goal, claimId) {
       unsub?.()
-      set({ app: initialState, libraryStage: 'papers', selectedId: null, focusId: null, fitAll: false, follow: true, error: null, abstractOpen: false, chatOpen: false, cardFor: null, chat: [], thought: null, startClaim: claimId ?? null })
+      set({ app: initialState, libraryStage: 'papers', selectedId: null, focusId: null, fitAll: false, follow: true, error: null, abstractOpen: false, chatOpen: false, cardFor: null, chat: [], thought: null, startClaim: claimId ?? null, offers: null })
       libraryLoad?.abort()
       const api = current = apiFor(get().demo)
       const load = libraryLoad = new AbortController()
@@ -135,18 +144,27 @@ export const useStore = create<Store>((set, get) => {
     dispatch: (star_id, selections, instruction) => { set({ follow: true }); return act((sid) => current.dispatch(sid, { star_id, selections, instruction })) },
     answer: (question_id, option_id, comment) => { set({ follow: true }); return act((sid) => current.answer(sid, { question_id, option_id, comment })) },
     feedback: (star_id, kind, text) => act((sid) => current.feedback(sid, { star_id, kind, text })),
-    // One conversation with Litmus; it answers about the selected experiment, or the baseline (it sees the whole tree either way).
+    // One conversation with Litmus; it answers about the agent you have open, or the research as a whole.
     async ask(question) {
-      const { chat, selectedId, app } = get()
-      const star_id = selectedId ?? app.session?.stars[0]?.id
-      if (!star_id) return
+      const { chat, app } = get()
+      if (!app.session) return
+      const star_id = openAgent(get())
       const history = chat.map(({ role, text }) => ({ role, text }))
-      set((st) => ({ thinking: star_id, chat: [...st.chat, { role: 'human', text: question }] }))
+      set((st) => ({ thinking: star_id ?? THINKING_ABOUT_ALL, chat: [...st.chat, { role: 'human', text: question }] }))
       await act(async (sid) => {
         const r = await current.explain(sid, { star_id, question, history })
         set((st) => ({ chat: [...st.chat, { role: 'litmus', text: r.answer, provenance: r.provenance }] }))
       })
       set({ thinking: null })
+    },
+    // Generated questions are a nicety: when the call fails the rule-based ones stay up.
+    async loadOffers(key, asked) {
+      const { sid } = get()
+      if (!sid) return
+      try {
+        const questions = await current.questions(sid, { star_id: openAgent(get()), asked })
+        if (questions.length) set({ offers: { key, questions } })
+      } catch (e) { console.warn(`suggested questions unavailable: ${(e as Error).message}`) }
     },
     togglePause: () => act((sid) => (get().app.session?.status === 'paused' ? current.resume(sid) : current.pause(sid))),
     stopBranch: (star_id) => act((sid) => current.stopBranch(sid, star_id)),

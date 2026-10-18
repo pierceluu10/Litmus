@@ -20,6 +20,7 @@ from litmus.engine import agent, graph, ops
 from litmus.experiments.knobs import DEFAULT_SEEDS, EXTRA_SEEDS
 from litmus.experiments.service import estimate_gpu_seconds
 from litmus.llm import LLMError
+from litmus.library import session_library
 from litmus.models import ChatTurn, Library, Proposal, Provenance, SessionState, apply_changes
 
 log = logging.getLogger(__name__)
@@ -369,8 +370,17 @@ async def finish(session_id: str) -> SessionState:
     return store.get(session_id)
 
 
-async def explain(session_id: str, star_id: str, question: str | None,
+async def explain(session_id: str, star_id: str | None, question: str | None,
                   history: list[ChatTurn]) -> tuple[str, list[Provenance]]:
+    """Litmus's chat: about one star when one is open, else about the whole research."""
     state = store.get(session_id)
+    if star_id is None:
+        _, claims = await session_library(state)
+        return await agent.chat_research(state, claims, question or "Where does the research stand?", history)
     s = ops.star(state, star_id)
     return await agent.chat(state, s, question or "Why did this come out the way it did, and what does it mean?", history)
+
+
+async def suggest_questions(session_id: str, star_id: str | None, asked: list[str]) -> list[str]:
+    state = store.get(session_id)
+    return await agent.suggest_questions(state, ops.star(state, star_id) if star_id else None, asked)

@@ -2,13 +2,13 @@ import { Fragment, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { askLitmus, sessionApi, useStarting, useStore } from '../store'
 import { agentDetail, agentName, pct, pts, starTone, toneVar } from '../lib/format'
-import { commonQuestions } from '../lib/questions'
 import type { Provenance } from '../types'
 import { PathChart } from './PathChart'
 import { ProvChip } from './Prov'
 import { Steering } from './Steering'
 import { SceneBackdrop } from './LowPolyScene'
-import { AgentBubbles } from './AgentBubbles'
+import { AgentBubbles, useOffers } from './AgentBubbles'
+import { Whimsy } from './Whimsy'
 import { StartBubble } from './StartBubble'
 
 const H = ({ children, aside }: { children: React.ReactNode; aside?: React.ReactNode }) => (
@@ -129,7 +129,7 @@ function Story() {
         : <LitmusMessage key={i} text={t.text} provenance={t.provenance} pending={pending && i === turns.length - 1} />)}
       {busy && !flying && (
         <div className="flex items-start gap-2" aria-live="polite" aria-label="Litmus is thinking">
-          <Face /><div className="msg-litmus thinking"><span className="thinking-text">Thinking</span><span className="typing"><span /><span /><span /></span></div>
+          <Face /><div className="msg-litmus thinking"><Whimsy lead="Thinking" className="thinking-text" /></div>
         </div>
       )}
     </section>
@@ -153,7 +153,7 @@ function Thread() {
 // The Litmus card: its own card under the results, holding the whole conversation. Litmus answers about the agent you
 // have open, or the research as a whole.
 function AskBar() {
-  const { chat: turns, thinking, selectedId, app, select } = useStore()
+  const { thinking, selectedId, app, select } = useStore()
   const [draft, setDraft] = useState('')
   const busy = !!thinking
   const about = app.session?.stars.find((x) => x.id === selectedId && x.parent_id)
@@ -162,9 +162,7 @@ function AskBar() {
     askLitmus(source, q)
     setDraft('')
   }
-  // the common questions for where the research is now, minus what you already asked
-  const asked = new Set(turns.filter((t) => t.role === 'human').map((t) => t.text))
-  const offers = commonQuestions(app.session, selectedId).filter((q) => !asked.has(q))
+  const offers = useOffers().questions
   return (
     <motion.section data-scene-obstacle aria-label="Ask Litmus" className={`${CARD} flex min-h-0 flex-1 flex-col gap-2 overflow-hidden p-3`}
       initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8, transition: { duration: 0.15 } }} transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}>

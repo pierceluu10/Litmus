@@ -26,7 +26,10 @@ export interface Api {
   dispatch(sid: string, body: { star_id: string; selections: Selection[]; instruction?: string }): Promise<void>
   answer(sid: string, body: { question_id: string; option_id: string; comment?: string }): Promise<void>
   feedback(sid: string, body: { star_id: string; kind: 'challenge' | 'suggest' | 'prioritize'; text: string }): Promise<void>
-  explain(sid: string, body: { star_id: string; question?: string; history?: ChatTurn[] }): Promise<{ answer: string; provenance: Provenance[] }>
+  // no star_id: Litmus answers about the whole research
+  explain(sid: string, body: { star_id?: string; question?: string; history?: ChatTurn[] }): Promise<{ answer: string; provenance: Provenance[] }>
+  // the questions the human would most want to ask right now, about the open agent or the whole research
+  questions(sid: string, body: { star_id?: string; asked: string[] }): Promise<string[]>
   pause(sid: string): Promise<void>
   resume(sid: string): Promise<void>
   stopBranch(sid: string, star_id: string): Promise<void>

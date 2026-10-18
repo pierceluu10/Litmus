@@ -21,7 +21,7 @@ SDK_RETRIES = 3  # the SDK retries rate limits and 5xx with exponential backoff
 # effort and 4.1s at "none" with the same quality, so lookups and plain-language answers skip reasoning; planning,
 # grading follow-ups and the abstract keep the model default. Prompts not listed use the default.
 EFFORT = {"summarize_claims": "none", "extract_conditions": "none", "chat_star": "low", "detect_conflict": "low",
-          "suggest": "low"}
+          "suggest": "low", "chat_research": "low", "suggest_questions": "none"}
 
 log = logging.getLogger(__name__)
 

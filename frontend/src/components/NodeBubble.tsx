@@ -3,6 +3,7 @@ import { useStore } from '../store'
 import { agentDetail, agentName, knobText, pct, progressFraction, provMatches, pts, toneVar } from '../lib/format'
 import type { Proposal, Star } from '../types'
 import { SceneBackdrop } from './LowPolyScene'
+import { Whimsy } from './Whimsy'
 
 const MAX_AGENTS = 4
 const EXPECTS = { improves: 'expects a gain', hurts: 'expects a loss', no_effect: 'expects no change' }
@@ -70,7 +71,7 @@ function About({ star }: { star: Star }) {
 function Generating() {
   return (
     <div aria-busy="true">
-      <p className="m-0 flex items-center gap-2 text-muted" aria-live="polite"><span className="dot live-dot" style={{ background: toneVar('running') }} />Generating next steps…</p>
+      <p className="m-0 flex items-center gap-2 text-muted" aria-live="polite"><span className="dot live-dot" style={{ background: toneVar('running') }} /><Whimsy lead="Generating next steps" /></p>
       <div className="mt-2 flex flex-col gap-1.5" aria-hidden>
         <span className="h-2.5 w-full animate-pulse rounded-full bg-rule" />
         <span className="h-2.5 w-3/5 animate-pulse rounded-full bg-rule" />

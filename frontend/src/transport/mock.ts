@@ -1,3 +1,4 @@
+import { commonQuestions } from '../lib/questions'
 import { MockServer } from '../mock/server'
 import { claims, documents } from '../mock/library'
 import { DEFAULT_GOAL, LibraryUnavailable, type Api } from './api'
@@ -34,6 +35,8 @@ export const mockApi: Api = {
   answer: async (_s, b) => cur().answer(b.question_id, b.option_id, b.comment),
   feedback: async (_s, b) => cur().feedback(b.star_id, b.kind, b.text),
   explain: (_s, b) => wait(cur().chat(b.star_id, b.question ?? ''), THINK_MS),
+  // the demo has no LLM: the rule-based questions, after a beat like a real call
+  questions: (_s, b) => wait(commonQuestions(cur().state.session, b.star_id ?? null).filter((q) => !b.asked.includes(q)), THINK_MS),
   pause: async () => cur().pause(),
   resume: async () => cur().resume(),
   stopBranch: async (_s, id) => cur().stopBranch(id),
