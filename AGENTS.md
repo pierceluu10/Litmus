@@ -119,6 +119,12 @@ uv run litmus --help
   `auth_invalid` (the library then falls back to the cache), so leave it unset if you are logged in.
 - Papiers.app registers `papiers://highlight/<uuid>` deep links, but the CLI only exposes public ids (`hl_…`), not
   those uuids, so "Source" links to the paper's URL.
+- `POST /api/library/connect {token}`: a user's own Papiers token, checked with one `papiers list` call and then kept in
+  memory (`papiers_client._token`, passed to every CLI call as `PAPIERS_TOKEN`; never logged or stored); 401 when Papiers
+  rejects it (the previous login stays), 503 when the CLI is missing or times out.
+- `POST /api/library/import {documents, claims}`: the next session created works from this library instead of Papiers
+  (`SessionState.library`; `library.session_library(state)` is what the engine, `/start` and `/pivot` read). The sign-in
+  page sends the highlights that match the person's topic. One pending import per server (fine for one person at a time).
 - **No write-back via CLI**: v0.1.5 has no write command (`supports_write()` checks `papiers help --all`).
   Papiers is a desktop app with no web deep links, so `papiers_url` = the paper's source URL (arXiv).
 
@@ -311,6 +317,4 @@ graph, the baseline through the fingertip. The floating cards carry the landing'
 **Known gaps**: three.js makes the bundle ~1 MB (fine locally, not code-split); below 1024px the rails stack under the canvas; star labels can still touch when a cousin's subtree lands on the same height.
 
 ### Contract requests
-- `POST /api/library/connect` body `{token: string}` (a user's own Papiers API token, `pap_live_…`). The upload page's "Connect Papiers" card sends it once; the backend should keep it in memory only (never log or persist it), run the Papiers CLI with `PAPIERS_TOKEN` set to it for `GET /api/library/stream` and for the sessions that follow, and answer `200 {}` or `401` with a `detail` the page shows. The frontend then calls `GET /api/library/stream` to read the library (and again on Refresh). The practice backend accepts any well-formed token and serves the recorded snapshot.
-- `POST /api/library/import` body `{documents: Document[], claims: Claim[]}` (the shape `GET /api/library` returns). The upload page (`components/Upload.tsx`, `lib/importLibrary.ts`) sends the library the person uploaded before it creates a session; the backend should use it as the library for sessions (skip the Papiers CLI) and may still fill in `summary` and `conditions` with its LLM calls. Until it exists, live sessions fail with the backend's 404 and only the practice backend uses an uploaded library.
 - `GET /api/sessions/{id}` should include the highest applied `seq`, so a client can load the snapshot and then subscribe from `seq + 1` instead of replaying everything.

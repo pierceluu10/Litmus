@@ -5,6 +5,11 @@ or remove fields, every change gets a Changelog line (newest first) and lands on
 `docs(contract): ...`.
 
 ## Changelog
+- 2026-10-17 — Additive: `POST /api/library/connect {token}` (a user's own Papiers API token: kept in server memory for
+  the Papiers CLI, never logged or stored; `{}`, 401 if Papiers rejects it, 503 if the CLI is missing or times out) and
+  `POST /api/library/import {documents, claims}` (the library the next session works from instead of Papiers, e.g.
+  only the highlights about the person's topic; `{claims: n}`, 422 if it has no claims). `SessionState.library?:
+  {documents, claims}` holds it; `library.loaded`, `/start` and `/pivot` then use only those claims.
 - 2026-10-17 — Additive: `POST /api/sessions/{id}/pivot {claim_id}`: Litmus drafts the plain test of a claim no star has
   tested yet and runs it as a new agent from the baseline (queued for the next wave if one is running; 409 if the
   claim is already on the tree, the session has not started, or no waves are left).
@@ -43,6 +48,8 @@ All JSON is snake_case. Timestamps are ISO 8601 UTC strings. IDs are stable stri
 | POST | `/api/warmup` | | `{ok}` (warms Modal container) |
 | GET | `/api/library` | | `{documents: Document[], claims: Claim[]}` ranked, with provenance |
 | GET | `/api/library/stream` | | `text/event-stream`: `{stage: "papers"\|"highlights"\|"notes"\|"summaries"}` as each stage starts, then `{stage: "done", documents, claims}` or `{stage: "error", message}` |
+| POST | `/api/library/connect` | `{token}` | `{}` (401 rejected by Papiers, 503 CLI unavailable) |
+| POST | `/api/library/import` | `{documents: Document[], claims: Claim[]}` | `{claims: n}`; the next session created uses it (422 if empty) |
 | POST | `/api/sessions` | `{goal?, budget_gpu_seconds?, auto_mode?, auto_timeout_seconds?, max_waves?, fresh?}` | `{session_id}` |
 | GET | `/api/sessions` | | `{sessions: {id, goal, status, created_at, replay}[]}` newest first |
 | GET | `/api/sessions/{id}` | | full `SessionState` snapshot |
@@ -137,7 +144,7 @@ SessionState = { id, goal, status:"running"|"paused"|"waiting_human"|"done", sta
                  replay?: boolean, created_at,
                  wave: number,                     // current wave
                  agenda: AgendaItem[],             // what the agent committed to consider next wave, and why
-                 finish_requested: boolean, start_claim_ids: string[],
+                 finish_requested: boolean, start_claim_ids: string[], library?: {documents, claims} | null,
                  last_seq: number }                // open the WS with from_seq = last_seq
 
 AgendaItem = { id, source: "reflection"|"answer"|"feedback", star_id?, text, knob_changes,

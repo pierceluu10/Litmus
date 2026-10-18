@@ -24,7 +24,7 @@ from litmus import grader, papiers_client, store, writeback
 from litmus.engine import agent, ops
 from litmus.experiments.knobs import DEFAULT_SEEDS, EXTRA_SEEDS
 from litmus.experiments.service import estimate_gpu_seconds
-from litmus.library import get_library
+from litmus.library import session_library
 from litmus.llm import LLMError
 from litmus.models import Abstract, Proposal, Provenance, QuestionOption
 
@@ -64,7 +64,7 @@ def research_stars(state) -> list:
 async def intake(es: EngineState) -> dict:
     state = store.get(es["session_id"])
     ops.think(state, "Reading your Papiers library: highlights, your notes on them, and conversations.")
-    documents, claims = await get_library()
+    documents, claims = await session_library(state)
     store.emit(state.id, "library.loaded", {"documents": [d.model_dump() for d in documents],
                                             "claims": [c.model_dump() for c in claims]})
     annotated = [c for c in claims if c.annotation]
@@ -96,7 +96,7 @@ async def start(es: EngineState) -> dict:
     state = store.get(es["session_id"])
     if state.finish_requested or state.wave > 0:
         return {}  # already started (re-run after a restart)
-    _, claims = await get_library()
+    _, claims = await session_library(state)
     if not state.start_claim_ids:
         if session_config(state.id)["auto_mode"]:
             state.start_claim_ids = [claims[0].id]
@@ -144,7 +144,7 @@ async def propose(es: EngineState) -> dict:
     anchor = ops.best_star(state)
     ops.think(state, f"Wave {state.wave}: no agent has an open option for this, so I'm planning from everything they found.", anchor.id)
     slots = min(MAX_BRANCHES, MAX_STARS - len(research_stars(state)))
-    _, claims = await get_library()
+    _, claims = await session_library(state)
     instruction = next((d.note for d in reversed(state.decisions) if "Instruction:" in d.note), None)
     try:
         proposals, thinking = await agent.propose(state, claims, instruction, session_config(state.id)["max_waves"], slots)
@@ -275,7 +275,7 @@ async def reflect(bs: BranchState) -> dict:
     if s.reflection and not bs.get("extra_seeds"):
         return {"next": "end"}  # already reflected before a restart
     ops.think(state, f"Interpreting {s.id}: {s.grade.verdict}, delta {agent.points(s.grade.delta):+.2f} points.", s.id)
-    _, claims = await get_library()
+    _, claims = await session_library(state)
     try:
         r = await agent.reflect(state, s, _conditions(claims, s), ops.budget_left(state))
     except LLMError as error:
@@ -389,7 +389,7 @@ async def suggest(bs: BranchState) -> dict:
         return {}
     name = agent.agent_name(state, s)
     ops.think(state, f"{name}: reading the other agents' results to decide where to go next.", s.id)
-    _, claims = await get_library()
+    _, claims = await session_library(state)
     try:
         proposals, take = await agent.suggest(state, s, claims, _conditions(claims, s))
     except LLMError as error:

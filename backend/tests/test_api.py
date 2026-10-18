@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from litmus import api, store
 from litmus.models import (Abstract, Decision, Document, Claim, Event, Grade, Proposal, Provenance, Question, RunResult,
                            SessionState, Star)
-from tests.test_engine import engine, fake_library  # noqa: F401  (fixture: fake trainer + fake LLM, temp DB)
+from tests.test_engine import CLAIMS, engine, fake_library  # noqa: F401  (fixture: fake trainer + fake LLM, temp DB)
 
 PAYLOAD_MODELS = {
     "star.created": {"star": Star}, "star.updated": {"star": Star}, "shadow.created": {"star": Star},
@@ -118,3 +118,47 @@ def test_replay_restreams_a_recording_with_the_replay_flag(engine, tmp_path, mon
         assert replayed[0].payload["replay"] is True and all(e.session_id == rid for e in replayed)
         with client.websocket_connect(f"/ws/sessions/{rid}?from_seq=0") as ws:
             assert Event.model_validate_json(ws.receive_text()).type == "session.started"
+
+
+def test_connect_keeps_a_good_token_in_memory_and_rejects_a_bad_one(engine, monkeypatch):  # noqa: F811
+    from litmus import papiers_client
+    monkeypatch.setattr(papiers_client, "_token", None)
+    tried: list[str | None] = []
+
+    async def fake_cli(*args, stdin=None, token=None):
+        tried.append(token)
+        if token == "pap_down":
+            raise papiers_client.PapiersUnavailable("papiers list timed out after 30s")
+        if token != "pap_live_good":
+            raise papiers_client.PapiersError("papiers list exited 1: 401 auth_invalid")
+        return {"items": []}
+    monkeypatch.setattr(papiers_client, "run_cli", fake_cli)
+    with TestClient(api.app) as client:
+        bad = client.post("/api/library/connect", json={"token": "pap_live_bad"})
+        assert bad.status_code == 401 and "pap_live_bad" not in bad.text
+        assert papiers_client._token is None
+        assert client.post("/api/library/connect", json={"token": "pap_down"}).status_code == 503
+        assert client.post("/api/library/connect", json={"token": ""}).status_code == 422
+        assert client.post("/api/library/connect", json={"token": " pap_live_good "}).json() == {}
+    assert tried == ["pap_live_bad", "pap_down", "pap_live_good"]
+    assert papiers_client._env(None)["PAPIERS_TOKEN"] == "pap_live_good"
+
+
+def test_an_imported_library_is_what_the_next_session_works_from(engine, monkeypatch):  # noqa: F811
+    monkeypatch.setattr(api, "_imported", None)
+    only_tta = next(c for c in CLAIMS if c.id == "hl_tta")
+    with TestClient(api.app) as client:
+        assert client.post("/api/library/import", json={"documents": [], "claims": []}).status_code == 422
+        body = {"documents": [Document(id="doc_a", title="airbench").model_dump()], "claims": [only_tta.model_dump()]}
+        assert client.post("/api/library/import", json=body).json() == {"claims": 1}
+        sid = client.post("/api/sessions", json={}).json()["session_id"]
+        snap = wait(client, sid, lambda s: s["status"] == "waiting_human")
+        assert [c["id"] for c in snap["library"]["claims"]] == ["hl_tta"]
+        loaded = next(e for e in store.events_after(sid, 0) if e.type == "library.loaded")
+        assert [c["id"] for c in loaded.payload["claims"]] == ["hl_tta"]
+        # a claim outside the imported library cannot start this session; one inside can
+        assert client.post(f"/api/sessions/{sid}/start", json={"claim_ids": ["hl_mixup"]}).status_code == 409
+        assert client.post(f"/api/sessions/{sid}/start", json={"claim_ids": ["hl_tta"]}).json() == {"ok": True}
+        # the import is used once: the next session reads the whole library again
+        other = client.post("/api/sessions", json={}).json()["session_id"]
+        assert wait(client, other, lambda s: s["status"] == "waiting_human")["library"] is None

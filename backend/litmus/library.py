@@ -10,7 +10,7 @@ from pydantic import BaseModel
 
 from litmus import papiers_client
 from litmus.llm import LLMError, structured
-from litmus.models import Claim, Document
+from litmus.models import Claim, Document, SessionState
 
 log = logging.getLogger(__name__)
 
@@ -96,3 +96,10 @@ async def get_library(refresh: bool = False,
     papiers_client.save_cache(documents, claims)
     _memory = (documents, claims)
     return _memory
+
+
+async def session_library(state: SessionState) -> tuple[list[Document], list[Claim]]:
+    """What a session works from: the library imported for it (POST /api/library/import), else the whole Papiers library."""
+    if state.library:
+        return state.library.documents, state.library.claims
+    return await get_library()

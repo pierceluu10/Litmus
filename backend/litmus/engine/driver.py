@@ -20,7 +20,7 @@ from litmus.engine import agent, graph, ops
 from litmus.experiments.knobs import DEFAULT_SEEDS, EXTRA_SEEDS
 from litmus.experiments.service import estimate_gpu_seconds
 from litmus.llm import LLMError
-from litmus.models import ChatTurn, Proposal, Provenance, SessionState, apply_changes
+from litmus.models import ChatTurn, Library, Proposal, Provenance, SessionState, apply_changes
 
 log = logging.getLogger(__name__)
 
@@ -66,8 +66,8 @@ def _thread(session_id: str) -> dict:
 # ---------------------------------------------------------------- graph driving
 
 def create_session(goal: str | None, budget: float, auto_mode: bool, auto_timeout_seconds: float | None,
-                   max_waves: int = graph.MAX_WAVES, fresh: bool = False) -> SessionState:
-    state = SessionState(id=f"ses_{uuid.uuid4().hex[:10]}", goal=goal or DEFAULT_GOAL, budget_total=budget)
+                   max_waves: int = graph.MAX_WAVES, fresh: bool = False, library: Library | None = None) -> SessionState:
+    state = SessionState(id=f"ses_{uuid.uuid4().hex[:10]}", goal=goal or DEFAULT_GOAL, budget_total=budget, library=library)
     seed_offset = random.randrange(1, FRESH_SEED_BUCKETS) * FRESH_SEED_STRIDE if fresh else 0
     store.create_session(state, {"auto_mode": auto_mode, "auto_timeout_seconds": auto_timeout_seconds,
                                  "max_waves": max_waves, "seed_offset": seed_offset})

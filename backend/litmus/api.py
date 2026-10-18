@@ -11,14 +11,14 @@ import modal.exception
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from litmus import llm, papiers_client, replay, store, writeback
 from litmus.config import budget_gpu_seconds
 from litmus.engine import driver
 from litmus.experiments import runner
-from litmus.library import get_library
-from litmus.models import ChatTurn, SessionState
+from litmus.library import get_library, session_library
+from litmus.models import ChatTurn, Library, SessionState
 
 log = logging.getLogger(__name__)
 
@@ -140,6 +140,37 @@ def _sse(payload: dict) -> str:
     return f"data: {json.dumps(payload)}\n\n"
 
 
+class ConnectBody(BaseModel):
+    token: str = Field(min_length=1)
+
+
+@app.post("/api/library/connect")
+async def connect_library(body: ConnectBody):
+    """A user's own Papiers token: kept in memory for the CLI (never logged or stored); 401 if Papiers rejects it."""
+    try:
+        await papiers_client.connect(body.token.strip())
+    except papiers_client.PapiersUnavailable as error:
+        raise HTTPException(503, str(error)) from error
+    except papiers_client.PapiersError:
+        raise HTTPException(401, "Papiers did not accept that token. Check it under Settings, API tokens.") from None
+    return {}
+
+
+# shortcut: one pending import, taken by the next session created; fine for one person per server, key it by client if
+# several people share one
+_imported: Library | None = None
+
+
+@app.post("/api/library/import")
+async def import_library(body: Library):
+    """The library the next session works from (e.g. only the highlights about the person's topic), instead of Papiers."""
+    global _imported
+    if not body.claims:
+        raise HTTPException(422, "an imported library needs at least one claim")
+    _imported = body
+    return {"claims": len(body.claims)}
+
+
 @app.get("/api/library/stream")
 async def library_stream():
     """Server-sent events: each stage as Papiers is read live ({stage}), then {stage: "done", documents, claims}."""
@@ -171,8 +202,10 @@ async def library_stream():
 
 @app.post("/api/sessions")
 async def create_session(body: CreateSession):
+    global _imported
+    library, _imported = _imported, None
     state = driver.create_session(body.goal, body.budget_gpu_seconds or budget_gpu_seconds(), body.auto_mode,
-                                  body.auto_timeout_seconds, body.max_waves or driver.graph.MAX_WAVES, body.fresh)
+                                  body.auto_timeout_seconds, body.max_waves or driver.graph.MAX_WAVES, body.fresh, library)
     return {"session_id": state.id}
 
 
@@ -197,15 +230,13 @@ async def dispatch(session_id: str, body: Dispatch):
 
 @app.post("/api/sessions/{session_id}/start")
 async def start(session_id: str, body: StartBody):
-    _session(session_id)
-    _, claims = await get_library()
+    _, claims = await session_library(_session(session_id))
     return _act(driver.start, session_id, body.claim_ids, {c.id for c in claims})
 
 
 @app.post("/api/sessions/{session_id}/pivot")
 async def pivot(session_id: str, body: ClaimRef):
-    _session(session_id)
-    _, claims = await get_library()
+    _, claims = await session_library(_session(session_id))
     claim = next((c for c in claims if c.id == body.claim_id), None)
     if claim is None:
         raise HTTPException(409, f"unknown claim {body.claim_id}")

@@ -5,7 +5,7 @@ import random
 
 import pytest
 
-from litmus import store
+from litmus import library, store
 from litmus.engine import agent, driver, graph, ops
 from litmus.experiments import service
 from litmus.experiments.knobs import BASELINE_KNOBS
@@ -129,7 +129,7 @@ def engine(tmp_path, monkeypatch):
     async def no_write():
         return False
     monkeypatch.setattr(graph.papiers_client, "supports_write", no_write)
-    monkeypatch.setattr(graph, "get_library", fake_library)
+    monkeypatch.setattr(library, "get_library", fake_library)  # graph and api read it through session_library
     monkeypatch.setattr(graph.writeback, "EXPORTS_DIR", tmp_path / "exports")
 
 

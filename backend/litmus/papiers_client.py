@@ -39,15 +39,31 @@ class PapiersError(RuntimeError):
     """The Papiers CLI failed, timed out, or returned something unparseable."""
 
 
-async def run_cli(*args: str, stdin: str | None = None) -> dict:
+class PapiersUnavailable(PapiersError):
+    """The CLI is missing or did not answer: nothing was learned about the request itself."""
+
+
+# A user's own token from POST /api/library/connect. Memory only: never logged, persisted, or returned; it overrides
+# PAPIERS_TOKEN and `papiers auth login` until the server restarts.
+_token: str | None = None
+
+
+def _env(token: str | None) -> dict[str, str]:
+    env = os.environ.copy()
+    if token or _token:
+        env["PAPIERS_TOKEN"] = token or _token
+    return env
+
+
+async def run_cli(*args: str, stdin: str | None = None, token: str | None = None) -> dict:
     """Run `papiers <args> --json` and return parsed JSON. Raises PapiersError with the CLI's stderr."""
     binary = shutil.which("papiers")
     if not binary:
-        raise PapiersError("papiers CLI not found on PATH (npm install -g papiers)")
+        raise PapiersUnavailable("papiers CLI not found on PATH (npm install -g papiers)")
     process = await asyncio.create_subprocess_exec(
         binary, *args, "--json",
         stdin=asyncio.subprocess.PIPE if stdin is not None else asyncio.subprocess.DEVNULL,
-        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=os.environ.copy(),
+        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=_env(token),
     )
     try:
         stdout, stderr = await asyncio.wait_for(
@@ -55,7 +71,7 @@ async def run_cli(*args: str, stdin: str | None = None) -> dict:
     except TimeoutError:
         process.kill()
         await process.wait()
-        raise PapiersError(f"papiers {args[0]} timed out after {CLI_TIMEOUT_SECONDS}s") from None
+        raise PapiersUnavailable(f"papiers {args[0]} timed out after {CLI_TIMEOUT_SECONDS}s") from None
     if process.returncode != 0:
         raise PapiersError(f"papiers {' '.join(args[:2])} exited {process.returncode}: "
                            f"{stderr.decode().strip() or stdout.decode().strip()[:500]}")
@@ -139,6 +155,13 @@ def rank_claims(claims: list[Claim], documents: list[Document]) -> list[Claim]:
     for i, claim in enumerate(ranked, 1):
         claim.rank = i
     return ranked
+
+
+async def connect(token: str) -> None:
+    """Use this token for every later CLI call, once a cheap listing proves Papiers accepts it."""
+    global _token
+    await run_cli("list", "--kind", "document", "--limit", "1", token=token)
+    _token = token
 
 
 async def _read_all(listing: dict) -> dict:

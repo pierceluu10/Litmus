@@ -200,6 +200,12 @@ class AgendaItem(BaseModel):
     consumed: bool = False
 
 
+class Library(BaseModel):
+    """A library as GET /api/library returns it; also what POST /api/library/import accepts."""
+    documents: list[Document]
+    claims: list[Claim]
+
+
 class SessionState(BaseModel):
     id: str
     goal: str
@@ -217,6 +223,7 @@ class SessionState(BaseModel):
     agenda: list[AgendaItem] = []
     finish_requested: bool = False
     start_claim_ids: list[str] = []  # the claims the human chose to start from ("Where should we start?")
+    library: Library | None = None  # imported before the session was created: it reads this instead of Papiers
     last_seq: int = 0  # seq of the last event this snapshot reflects; open the WS with from_seq=last_seq
 
 
