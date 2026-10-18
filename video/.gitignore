@@ -1,0 +1,9 @@
+node_modules
+out
+assets
+*.mp4
+*.mov
+*.webm
+*.wav
+*.mp3
+*.m4a
