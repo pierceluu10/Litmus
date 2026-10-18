@@ -11,15 +11,15 @@ import json
 import os
 import shutil
 from collections.abc import Awaitable, Callable
-from pathlib import Path
 
+from litmus.config import DATA_DIR
 from litmus.models import Claim, Document, Provenance
 
 CLI_TIMEOUT_SECONDS = 30
 LIST_LIMIT = 50
 PAGE_CHARS = 6000
 SEARCH_LIMIT = 6
-CACHE_PATH = Path(__file__).resolve().parent.parent / "data" / "library_cache.json"
+CACHE_PATH = DATA_DIR / "library_cache.json"
 
 # Judgment weights: the human's doubts first, then their highlights, then what they merely saved.
 WEIGHT_ANNOTATED_HIGHLIGHT = 3.0

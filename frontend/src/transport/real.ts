@@ -1,7 +1,8 @@
 import { LibraryUnavailable, type Api, type Library, type LibraryStage } from './api'
 import type { LitmusEvent } from '../types'
 
-export const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8000'
+export // a production build is served next to the backend (vercel.json routes /api to it), so it calls its own origin
+const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? (import.meta.env.PROD ? '' : 'http://localhost:8000')
 
 export async function call<T>(method: string, path: string, body?: unknown, text = false): Promise<T> {
   const r = await fetch(BASE + path, { method, headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined })

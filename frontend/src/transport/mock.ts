@@ -1,7 +1,7 @@
 import { commonQuestions } from '../lib/questions'
 import { MockServer } from '../mock/server'
 import { claims, documents } from '../mock/library'
-import { DEFAULT_GOAL, LibraryUnavailable, type Api } from './api'
+import { DEFAULT_GOAL, LibraryUnavailable, type Api, type Library } from './api'
 import type { Provenance, ReadingItem } from '../types'
 import { call, realApi, streamLibrary } from './real'
 
@@ -12,14 +12,16 @@ const THINK_MS = 1600 // about as long as a real chat answer, so the Thinking in
 const wait = <T,>(v: T, ms = RESPONSE_MS) => new Promise<T>((r) => setTimeout(() => r(v), ms))
 // Litmus in the demo talks with the real LLM about the simulated agents: the backend gets this session's snapshot
 // (nothing is stored there). With the backend off it falls back to the offline answers.
-const litmus = <T,>(path: string, body: object) => call<T>('POST', `/api/demo/${path}`, { session: cur().state.session, ...body })
+// The library goes with it, so the backend needs no Papiers of its own (it has none on Vercel).
+let library: Library = { documents, claims }
+const litmus = <T,>(path: string, body: object) => call<T>('POST', `/api/demo/${path}`, { session: { ...cur().state.session, library }, ...body })
 const offline = (what: string, e: Error) => console.warn(`${what}: the backend is unreachable, answering offline (${e.message})`)
 
 export const mockApi: Api = {
   mock: true,
   health: () => wait({ ok: true, modal_warm: true, papiers_ok: true, openai_ok: true }),
   warmup: () => wait(undefined),
-  importLibrary: async () => {},
+  importLibrary: async (lib) => { library = lib },
   // the practice backend has no Papiers to ask: any well-formed token connects, and the library is the recorded snapshot
   connectPapiers: async (token) => { await wait(undefined); if (!/^pap_live_\S+$/.test(token)) throw new Error('That does not look like a Papiers token. It starts with pap_live_.') },
   // The library is real even in the demo: read live through the backend, or its snapshot when the backend is off.
@@ -27,7 +29,7 @@ export const mockApi: Api = {
     if (!(e instanceof LibraryUnavailable)) throw e
     console.warn(`${e.message}; using the library snapshot`)
     return { documents, claims }
-  }),
+  }).then((lib) => (library = lib)),
   createSession: async (b) => { srv = new MockServer(b.goal || DEFAULT_GOAL, false); return srv.sid },
   replayDemo: async () => { srv = new MockServer(DEFAULT_GOAL, true); return srv.sid },
   subscribe(_sid, fromSeq, onEvent, onConn) {

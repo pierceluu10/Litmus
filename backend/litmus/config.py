@@ -7,8 +7,10 @@ from dotenv import load_dotenv
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 REPO_DIR = BACKEND_DIR.parent
-DATA_DIR = BACKEND_DIR / "data"
-EXPORTS_DIR = BACKEND_DIR / "exports"
+# Vercel's filesystem is read-only outside /tmp (and /tmp does not outlive the instance)
+RUNTIME_DIR = Path("/tmp/litmus") if os.environ.get("VERCEL") else BACKEND_DIR
+DATA_DIR = RUNTIME_DIR / "data"
+EXPORTS_DIR = RUNTIME_DIR / "exports"
 SHARED_DIR = REPO_DIR / "shared"
 
 load_dotenv(BACKEND_DIR / ".env")
