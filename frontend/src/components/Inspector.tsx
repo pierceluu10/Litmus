@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { askLitmus, sessionApi, useStarting, useStore } from '../store'
-import { agentDetail, agentName, pct, pts, starTone, toneVar } from '../lib/format'
+import { agentDetail, agentName, pct, provLabel, pts, starTone, toneVar } from '../lib/format'
 import type { Provenance } from '../types'
 import { PathChart } from './PathChart'
 import { ProvChip } from './Prov'
@@ -187,16 +187,18 @@ function AskBar() {
 
 // ---------------------------------------------------------------- abstract
 
+const citeText = 'border-0 bg-transparent p-0 text-muted underline decoration-rule underline-offset-[3px] hover:text-ink hover:decoration-ink'
+
 function AbstractView() {
   const { app, sid, select, set } = useStore()
   const a = app.session!.abstract!
   const cite = (id: string, i: number) => {
     if (/^S\d+$/.test(id)) {
       const star = app.session!.stars.find((x) => x.id === id)
-      return <button key={i} className="chip mx-0.5 align-baseline hover:border-faint" onClick={() => select(id)}>{star ? agentName(star) : id}</button>
+      return <button key={i} className={citeText} onClick={() => select(id)}>({star ? agentName(star) : id})</button>
     }
     const p = a.citations.find((c) => c.id === id || c.id.startsWith(id)) ?? app.claims.find((c) => c.id === id)?.provenance[0]
-    return p ? <ProvChip key={i} p={p} /> : null
+    return p ? <button key={i} className={citeText} title={`“${p.text}”`} onClick={() => p.papiers_url && window.open(p.papiers_url, '_blank', 'noreferrer')}>({provLabel(p, app.documents)})</button> : null
   }
   const render = (text: string) => text.split(/\[((?:S\d+)|(?:hl_[\w-]+))\]/g).map((part, i) => (i % 2 ? cite(part, i) : <Fragment key={i}>{part}</Fragment>))
   const download = async () => {
@@ -207,7 +209,10 @@ function AbstractView() {
   return (
     <article className="flex flex-col gap-4 p-4" aria-label="Abstract">
       <button className="btn btn-quiet -ml-2 h-7 self-start px-2" onClick={() => set({ abstractOpen: false })}>← All results</button>
-      <h2 className="m-0 text-[17px] font-semibold tracking-[-0.02em]">Abstract</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="m-0 text-[17px] font-semibold tracking-[-0.02em]">Abstract</h2>
+        <button type="button" aria-label="Close abstract" title="Close" className="btn btn-quiet h-7 w-7 justify-center p-0 text-[18px] leading-none" onClick={() => set({ abstractOpen: false })}>×</button>
+      </div>
       <p className="m-0 text-[13.5px] leading-relaxed">{render(a.text)}</p>
       <section>
         <H>Findings</H>
