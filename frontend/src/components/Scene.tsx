@@ -5,7 +5,7 @@ import { Box3, MathUtils, Vector3, type Group, type Mesh } from 'three'
 import type { Line2 } from 'three-stdlib'
 import { useStarting, useStore } from '../store'
 import { FIRST_STEP, layoutStars, UNITS_PER_POINT, type Pos } from '../lib/layout'
-import { agentName, progressFraction, provMatches, starTone, type Tone } from '../lib/format'
+import { agentName, dropped, progressFraction, provMatches, starTone, type Tone } from '../lib/format'
 import type { Star } from '../types'
 import { NodeCard, PlacedCard } from './NodeBubble'
 import { statueAnchor, type Point } from '../lib/statueAnchor'
@@ -161,9 +161,11 @@ function StarBlob({ star, target, live, dim, selected }: { star: Star; target: P
   const fitAll = useStore((s) => s.fitAll)
   const proposals = useStore((s) => s.app.session?.proposals) // the store's own array: filtering inside the selector would return a new one every render
   const options = useMemo(() => (proposals ?? []).filter((p) => p.star_id === star.id && p.status === 'open'), [proposals, star.id])
-  const hasOptions = options.length > 0 && star.status === 'done'
+  // a line you dropped (its question answered "drop") proposes nothing, even if options were already drafted
+  const closed = useStore((st) => dropped(st.app.session, star.id))
+  const hasOptions = options.length > 0 && star.status === 'done' && !closed
   // graded, but its agent has not written its take and options yet (an LLM call on the real backend)
-  const generating = useStore((st) => !!star.parent_id && star.status === 'done' && !!star.grade && !star.suggestion
+  const generating = useStore((st) => !!star.parent_id && star.status === 'done' && !!star.grade && !star.suggestion && !closed
     && st.app.session?.status !== 'done' && !(proposals ?? []).some((p) => p.star_id === star.id))
   const group = useRef<import('three').Group>(null)
   const body = useRef<Mesh>(null)

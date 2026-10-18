@@ -1,4 +1,4 @@
-import type { Document, Knobs, Provenance, Star } from '../types'
+import type { Document, Knobs, Provenance, SessionState, Star } from '../types'
 
 export const pts = (x: number, digits = 2) => `${x >= 0 ? '+' : '−'}${Math.abs(x * 100).toFixed(digits)}`
 export const pct = (x: number, digits = 2) => `${(x * 100).toFixed(digits)}%`
@@ -79,4 +79,12 @@ export function progressFraction(s: Star): number {
   let sum = s.runs.length
   latest.forEach((ep, seed) => { if (!done.has(seed)) sum += Math.min(1, ep / s.knobs.epochs) })
   return Math.min(1, sum / seeds)
+}
+
+// The human answered this agent's question with an option that changes nothing ("Drop mixup"): its line is closed, so it
+// offers no next steps. Mirrors `graph.dropped` on the backend.
+export function dropped(session: SessionState | null, starId: string): boolean {
+  const q = session?.questions.find((x) => x.star_id === starId && x.status === 'answered' && x.answer)
+  const chosen = q?.options.find((o) => o.id === q.answer!.option_id)
+  return !!chosen && !Object.keys(chosen.knob_changes ?? {}).length
 }

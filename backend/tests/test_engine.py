@@ -263,7 +263,12 @@ async def test_chat_about_a_star_carries_history_and_searches_the_library_once(e
         await driver.shutdown()
 
 
-async def test_long_training_child_reruns_parent_at_same_epochs(engine):
+async def test_long_training_child_reruns_parent_at_same_epochs(engine, monkeypatch):
+    # auto mode answers with the agent's leaning: lean to "Longer training" here (a dropped line proposes nothing)
+    async def lean_longer(prompt_name, schema, **values):
+        result = await fake_structured(prompt_name, schema, **values)
+        return result.model_copy(update={"agent_leaning_index": 0}) if prompt_name == "detect_conflict" else result
+    monkeypatch.setattr(agent, "structured", lean_longer)
     await driver.startup()
     try:
         state = driver.create_session(None, 1800, auto_mode=True, auto_timeout_seconds=None, max_waves=2)
@@ -292,3 +297,17 @@ async def test_concurrent_requests_for_the_same_star_train_once(engine, monkeypa
     first, second = await asyncio.gather(ops.run_star("ses_x", root.id), ops.run_star("ses_x", root.id))
     assert calls == [(0, 1, 2, 3, 4)] and first.grade and len(first.runs) == 5
     assert len([e for e in store.events_after("ses_x", 0) if e.type == "experiment.run_done"]) == 5
+
+
+def test_an_agent_whose_line_the_human_dropped_offers_no_next_steps():
+    from litmus.models import Answer, Question, QuestionOption, SessionState
+    options = [QuestionOption(id="O1", label="Mixup at 30 epochs", consequence="3x GPU", knob_changes={"epochs": 30}),
+               QuestionOption(id="O2", label="Drop mixup", consequence="cheap", knob_changes=None)]
+    state = SessionState(id="s", goal="g", budget_total=100, stars=[Star.model_construct(id="S1")])
+    star = state.stars[0]
+    assert not graph.dropped(state, star)
+    state.questions = [Question(id="q", star_id="S1", text="?", evidence=[], options=options, status="answered",
+                                answer=Answer(option_id="O1"))]
+    assert not graph.dropped(state, star)
+    state.questions[0].answer = Answer(option_id="O2")
+    assert graph.dropped(state, star)

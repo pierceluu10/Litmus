@@ -26,7 +26,7 @@ from litmus.experiments.knobs import DEFAULT_SEEDS, EXTRA_SEEDS
 from litmus.experiments.service import estimate_gpu_seconds
 from litmus.library import session_library
 from litmus.llm import LLMError
-from litmus.models import Abstract, Proposal, Provenance, QuestionOption
+from litmus.models import Abstract, Proposal, Provenance, QuestionOption, SessionState, Star
 
 log = logging.getLogger(__name__)
 
@@ -379,13 +379,29 @@ def after_reflect(bs: BranchState) -> str:
     return {"more_seeds": "more_seeds", "ask": "ask"}.get(bs.get("next", "end"), "suggest")
 
 
+DROPPED_TAKE = "Dropped at your call: I won't take this line further."
+
+
+def dropped(state: SessionState, s: Star) -> bool:
+    """The human answered this agent's question with an option that changes nothing: drop this line."""
+    for q in state.questions:
+        if q.star_id == s.id and q.status == "answered" and q.answer:
+            chosen = next((o for o in q.options if o.id == q.answer.option_id), None)
+            return chosen is not None and not chosen.knob_changes
+    return False
+
+
 async def suggest(bs: BranchState) -> dict:
-    """The agent's own next steps, offered the moment its verdict is in."""
+    """The agent's own next steps, offered the moment its verdict is in (none once the human dropped its line)."""
     state = store.get(bs["session_id"])
     s = ops.star(state, bs["star_id"])
     final_wave = state.wave >= session_config(state.id)["max_waves"]
     if (s.status != "done" or not s.grade or s.suggestion or state.finish_requested or final_wave
             or len(research_stars(state)) >= MAX_STARS):
+        return {}
+    if dropped(state, s):
+        s.suggestion = DROPPED_TAKE
+        ops.update_star(state, s)
         return {}
     name = agent.agent_name(state, s)
     ops.think(state, f"{name}: reading the other agents' results to decide where to go next.", s.id)

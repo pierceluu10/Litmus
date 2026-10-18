@@ -1,13 +1,13 @@
 import { Fragment, useEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
-import { askLitmus, sessionApi, useStarting, useStore } from '../store'
+import { motion } from 'motion/react'
+import { askLitmus, openAgent, sessionApi, useStarting, useStore } from '../store'
 import { agentDetail, agentName, pct, provLabel, pts, starTone, toneVar } from '../lib/format'
+import { commonQuestions } from '../lib/questions'
 import type { Provenance } from '../types'
 import { PathChart } from './PathChart'
 import { ProvChip } from './Prov'
 import { Steering } from './Steering'
 import { SceneBackdrop } from './LowPolyScene'
-import { AgentBubbles, useOffers } from './AgentBubbles'
 import { Whimsy } from './Whimsy'
 import { StartBubble } from './StartBubble'
 
@@ -85,7 +85,6 @@ function Activity() {
 const CARD = 'marble-edge relative isolate rounded-2xl border border-rule bg-surface'
 const RESULTS_FACETS = 23, LITMUS_FACETS = 61
 // The results card keeps one height whether or not the chat is open; the chat fills the room under it.
-const RESULTS_HEIGHT = 'h-[56%] flex-none'
 const MAX_CITED = 3
 
 // Litmus's face: the statue's bearded head, low poly (also the favicon). Nudged down so it sits level with the
@@ -150,6 +149,21 @@ function Thread() {
   )
 }
 
+const OFFERS_DEBOUNCE_MS = 700 // a burst of events (a wave finishing) asks for questions once
+
+// The questions to offer right now: the ones Litmus generated for this exact state of the research when they have
+// arrived, else the rule-based ones, never one already asked. `key` changes whenever the state they describe does.
+export function useOffers() {
+  const st = useStore()
+  const session = st.app.session
+  const agent = openAgent(st)
+  const asked = st.chat.filter((t) => t.role === 'human').map((t) => t.text)
+  const key = session ? [session.status, agent, session.questions.filter((q) => q.status === 'open').length, asked.length,
+    session.stars.map((s) => `${s.id}${s.status}${s.grade?.verdict ?? ''}`).join()].join('|') : ''
+  const fresh = st.offers?.key === key ? st.offers.questions : commonQuestions(session, agent ?? null)
+  return { key, asked, questions: fresh.filter((q) => !asked.includes(q)) }
+}
+
 // The Litmus card: its own card under the results, holding the whole conversation. Litmus answers about the agent you
 // have open, or the research as a whole.
 function AskBar() {
@@ -162,7 +176,14 @@ function AskBar() {
     askLitmus(source, q)
     setDraft('')
   }
-  const offers = useOffers().questions
+  const { key, asked, questions: offers } = useOffers()
+  const loadOffers = useStore((s) => s.loadOffers)
+  // asks Litmus for questions about this state of the research once it settles (one request per state)
+  useEffect(() => {
+    if (!key) return
+    const timer = setTimeout(() => void loadOffers(key, asked), OFFERS_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [key]) // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <motion.section data-scene-obstacle aria-label="Ask Litmus" className={`${CARD} flex min-h-0 flex-1 flex-col gap-2 overflow-hidden p-3`}
       initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8, transition: { duration: 0.15 } }} transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}>
@@ -226,26 +247,39 @@ function AbstractView() {
 
 // On wide screens the panel floats over the scene as a card with space around it; on narrow ones it sits below the scene.
 export function Inspector({ floating }: { floating: boolean }) {
-  const { app, abstractOpen, chatOpen } = useStore()
+  const { app, abstractOpen, chatOpen, set } = useStore()
   const starting = useStarting()
   const showAbstract = abstractOpen && !!app.session?.abstract
-  // The results card and the Litmus chat are two cards stacked in one column: what you're looking at, and who you ask.
+  // Two tabs over the whole right side: the results, or the conversation with Litmus (`chatOpen`).
   const column = floating ? 'absolute bottom-3 right-3 top-3 z-20 flex w-[348px] flex-col gap-2.5' : 'flex flex-col gap-2.5 border-t border-rule bg-paper p-3'
+  if (starting) {
+    return (
+      <div className={column}>
+        <div className="flex min-h-0 flex-1 flex-col justify-end"><StartBubble /></div>
+        <img src="/litmus-face.svg" alt="Litmus" width={44} height={44} className="self-end rounded-full border border-rule bg-surface p-1 shadow-[0_8px_24px_-10px_rgba(43,58,82,0.3)]" />
+      </div>
+    )
+  }
   return (
     <div className={column}>
-      {starting
-        ? <div className="flex min-h-0 flex-1 flex-col justify-end"><StartBubble /></div>
-        : <>
-          <motion.aside data-scene-obstacle className={`${CARD} flex min-h-0 flex-col overflow-hidden ${floating ? RESULTS_HEIGHT : ''}`} aria-label="Results" style={{ transformOrigin: 'top right' }}
-          {...(floating ? { initial: { opacity: 0, scale: 0.96, y: -6 }, animate: { opacity: 1, scale: 1, y: 0 }, exit: { opacity: 0, scale: 0.97, transition: { duration: 0.15 } }, transition: { duration: 0.22, ease: [0.23, 1, 0.32, 1] as const } } : {})}>
-          <SceneBackdrop seed={RESULTS_FACETS} className="card-facets" />
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            {showAbstract ? <AbstractView /> : <Overview />}
-          </div>
-        </motion.aside>
-        <AnimatePresence initial={false}>{chatOpen && !showAbstract && <AskBar key="chat" />}</AnimatePresence>
-        </>}
-      <AgentBubbles />
+      <div role="tablist" aria-label="Right panel" className="marble-edge flex shrink-0 gap-1 rounded-full border border-rule bg-surface p-1">
+        {([['Results', false], ['Litmus chat', true]] as const).map(([label, chat]) => (
+          <button key={label} role="tab" aria-selected={chatOpen === chat} onClick={() => set({ chatOpen: chat })}
+            className={`flex h-8 flex-1 items-center justify-center gap-1.5 rounded-full text-[13px] font-medium transition-colors ${chatOpen === chat ? 'bg-ink text-surface' : 'text-muted hover:text-ink'}`}>
+            {chat && <img src="/litmus-face.svg" alt="" width={18} height={18} />}{label}
+          </button>
+        ))}
+      </div>
+      {chatOpen
+        ? <AskBar />
+        : (
+          <aside data-scene-obstacle className={`${CARD} flex min-h-0 flex-1 flex-col overflow-hidden`} aria-label="Results">
+            <SceneBackdrop seed={RESULTS_FACETS} className="card-facets" />
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {showAbstract ? <AbstractView /> : <Overview />}
+            </div>
+          </aside>
+        )}
     </div>
   )
 }

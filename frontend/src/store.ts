@@ -29,7 +29,7 @@ type Store = {
   fitAll: boolean // frame the whole tree; off returns to the default view
   abstractOpen: boolean
   cardFor: string | null // the node whose card (about it, and where it should proceed) is open over it
-  chatOpen: boolean // the Litmus chat under the results card, opened from Litmus's face
+  chatOpen: boolean // the right panel shows the Litmus chat tab instead of the results
   chat: (ChatTurn & { provenance?: Provenance[] })[] // the conversation with Litmus, oldest first
   offers: { key: string; questions: string[] } | null // the questions Litmus generated for the research state `key`
   loadOffers: (key: string, asked: string[]) => Promise<void>
@@ -169,7 +169,7 @@ export const useStore = create<Store>((set, get) => {
     togglePause: () => act((sid) => (get().app.session?.status === 'paused' ? current.resume(sid) : current.pause(sid))),
     stopBranch: (star_id) => act((sid) => current.stopBranch(sid, star_id)),
     // Branching from any star, refuted ones included, goes through feedback "suggest": the agent replans from it.
-    generateAbstract: async () => { await act((sid) => current.abstract(sid)); if (get().app.session?.abstract) set({ abstractOpen: true, selectedId: null }) },
+    generateAbstract: async () => { await act((sid) => current.abstract(sid)); if (get().app.session?.abstract) set({ abstractOpen: true, selectedId: null, chatOpen: false }) },
   }
 })
 
