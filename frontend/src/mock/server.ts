@@ -3,6 +3,7 @@ import type { Decision, Grade, Knobs, LitmusEvent, Predicted, Proposal, Provenan
 import { agentName, knobText, pts } from '../lib/format'
 import { BASELINE_KNOBS, baselineGrade, grade, progressAccuracy, simulateRun } from './sim'
 import { P } from './library'
+import { BASE } from '../transport/real'
 
 // In-browser stand-in for the backend: same events as shared/contract.md, numbers from the calibrated simulator.
 // Same shape as the real engine: the human picks where to start, each agent offers its own next steps when its verdict
@@ -348,7 +349,17 @@ export class MockServer {
     return { answer, provenance: [] }
   }
 
-  generateAbstract() {
+  // The abstract is written by the backend's LLM (POST /api/abstract) from this session's snapshot; the template below
+  // is only the fallback when the backend is unreachable.
+  async generateAbstract() {
+    try {
+      const r = await fetch(`${BASE}/api/abstract`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.session) })
+      if (!r.ok) throw new Error(`${r.status} ${await r.text()}`)
+      const { abstract: text, findings, citations } = await r.json() as { abstract: string; findings: string[]; citations: Provenance[] }
+      this.emit('abstract.ready', { abstract: { text, findings, citations } })
+      this.emit('papiers.export_ready', { path: `exports/${this.sid}/findings.md`, instructions: 'Paste findings.md into a Papiers note; the next session’s library search will find it.' })
+      return
+    } catch (e) { console.warn(`abstract from the backend unavailable, using the template: ${(e as Error).message}`) }
     const graded = this.stars.filter((s) => s.grade && s.grade.verdict !== 'baseline' && s.chosen_by !== 'shadow')
     const base = this.stars[0]?.grade
     const cite = (s: Star) => `[${s.id}]${s.provenance.find((p) => p.kind === 'highlight') ? `[${s.provenance.find((p) => p.kind === 'highlight')!.id}]` : ''}`
@@ -357,11 +368,11 @@ export class MockServer {
     const best = graded.slice().sort((a, b) => b.grade!.mean_child - a.grade!.mean_child)[0]
     const steered = this.session.decisions.filter((d) => d.changed_trajectory).length
     const text = [
-      `We tested ${graded.length} claims from your library on airbench94 (CIFAR-10, ${base ? `baseline ${(base.mean_child * 100).toFixed(2)}%` : 'baseline pending'}) with paired seeds and a locked t-interval grader [S0].`,
+      `We ran ${graded.length} experiment${graded.length === 1 ? '' : 's'} from your library on airbench94 (CIFAR-10, ${base ? `baseline ${(base.mean_child * 100).toFixed(2)}%` : 'baseline pending'}) with paired seeds and a locked t-interval grader [S0].`,
       by('confirmed').length ? `${by('confirmed').length} held: ${by('confirmed').map((s) => `${s.title.toLowerCase()} ${cite(s)}`).join('; ')}.` : '',
       by('refuted').length ? `${by('refuted').length} went against the paper under short training: ${by('refuted').map((s) => `${s.title.toLowerCase()} ${cite(s)}`).join('; ')}.` : '',
       by('inconclusive').length ? `${by('inconclusive').length} stayed inside the noise even with extra seeds ${by('inconclusive').map(cite).join('')}.` : '',
-      best ? `The most accurate configuration was ${best.title.toLowerCase()} at ${(best.grade!.mean_child * 100).toFixed(2)}% ${cite(best)}.` : '',
+      best && best.grade!.mean_child > (base?.mean_child ?? 0) ? `The most accurate configuration was ${best.title.toLowerCase()} at ${(best.grade!.mean_child * 100).toFixed(2)}% ${cite(best)}.` : best ? 'Nothing beat the baseline [S0].' : '',
       steered ? `You overruled the agents ${steered} time${steered === 1 ? '' : 's'}.` : '',
     ].filter(Boolean).join(' ')
     const citations = [...new Map(graded.flatMap((s) => s.provenance.filter((p) => p.kind === 'highlight')).map((p) => [p.id, p])).values()]

@@ -273,10 +273,10 @@ function AbstractView() {
       const star = app.session!.stars.find((x) => x.id === id)
       return <button key={i} className={citeText} onClick={() => select(id)}>({star ? agentName(star) : id})</button>
     }
-    const p = a.citations.find((c) => c.id === id || c.id.startsWith(id)) ?? app.claims.find((c) => c.id === id)?.provenance[0]
+    const p = a.citations.find((c) => c.id === id || c.id.startsWith(id) || id.startsWith(c.id)) ?? app.claims.find((c) => c.id === id)?.provenance[0]
     return p ? <button key={i} className={citeText} title={`“${p.text}”`} onClick={() => p.papiers_url && window.open(p.papiers_url, '_blank', 'noreferrer')}>({provLabel(p, app.documents)})</button> : null
   }
-  const render = (text: string) => text.split(/\[((?:S\d+)|(?:hl_[\w-]+))\]/g).map((part, i) => (i % 2 ? cite(part, i) : <Fragment key={i}>{part}</Fragment>))
+  const render = (text: string) => text.split(/\[((?:S\d+)|(?:hl_[\w-]+(?:#\w+)?))\]/g).map((part, i) => (i % 2 ? cite(part, i) : <Fragment key={i}>{part}</Fragment>))
   const download = async () => {
     const md = sid ? await sessionApi().exportMarkdown(sid) : ''
     const url = URL.createObjectURL(new Blob([md], { type: 'text/markdown' }))

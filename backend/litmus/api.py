@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from litmus import arxiv, llm, papiers_client, replay, store, writeback
 from litmus.config import budget_gpu_seconds
 from litmus.engine import driver
+from litmus.engine.agent import write_abstract
 from litmus.experiments import runner
 from litmus.library import get_library, session_library
 from litmus.models import ChatTurn, Library, SessionState
@@ -413,6 +414,13 @@ async def abstract(session_id: str):
     except driver.ActionError as error:
         raise HTTPException(409, str(error)) from None
     return {"abstract": state.abstract.text, "findings": state.abstract.findings}
+
+
+@app.post("/api/abstract")
+async def abstract_for(state: SessionState):
+    """Write the abstract for a session the server does not hold (the frontend's demo backend), with the same LLM call."""
+    text, findings, citations = await write_abstract(state)
+    return {"abstract": text, "findings": findings, "citations": [c.model_dump() for c in citations]}
 
 
 @app.get("/api/sessions/{session_id}/export", response_class=PlainTextResponse)

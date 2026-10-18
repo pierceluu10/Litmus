@@ -1,11 +1,7 @@
-<p align="center"><img src="devpost/litmus-banner.png" alt="Litmus" width="720"></p>
-
 # Litmus
 
-Turn the claims you highlighted in research papers into real experiments, run them with parallel AI agents, and steer
+Turn the claims you highlighted in research papers into real experiments, run them with parallel agents, and steer
 the research at every step.
-
-Built for the Papiers Human-Centred Autoresearch Challenge at Hack the Valley 11.
 
 ## What it does
 
@@ -112,4 +108,3 @@ Contributor notes, design decisions and the verification log are in [`AGENTS.md`
 - The papers in the demo library: Jordan, *94% on CIFAR-10 in 3.29 Seconds on a Single GPU*; Szegedy et al.,
   *Rethinking the Inception Architecture*; Müller, Kornblith and Hinton, *When Does Label Smoothing Help?*; Zhang et al.,
   *mixup: Beyond Empirical Risk Minimization*; He et al., *Bag of Tricks for Image Classification*
-- The statue is the Artemision Bronze, from the public-domain 3D scan by SMK, the National Gallery of Denmark
