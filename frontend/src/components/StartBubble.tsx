@@ -28,7 +28,7 @@ export function StartBubble() {
         <div className="px-3.5 pb-2 pt-3">
           <h2 className="m-0 text-[14px] font-semibold">Where should we start?</h2>
           {libraryStage === 'ready'
-            ? <p className="m-0 mt-0.5 text-[12px] text-muted">Pick the claim you doubt most. Open one to read it first.</p>
+            ? <p className="m-0 mt-0.5 text-[12px] text-muted">Select the one to experiment on. Open one to read it first.</p>
             : <p className="m-0 mt-1 flex items-center gap-2 text-[12px] text-muted" aria-live="polite"><span className="dot live-dot" style={{ background: toneVar('running') }} />{STAGE_TEXT[libraryStage]}…</p>}
         </div>
         {libraryStage === 'ready' && (

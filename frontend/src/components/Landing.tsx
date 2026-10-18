@@ -238,7 +238,7 @@ function WriteupMock() {
 type Slide = { key: string; title: string; body: string; mock?: ReactNode }
 const SLIDES: Slide[] = [
   { key: 'read', title: 'Start with what you’ve read', body: 'Litmus reads the highlights and notes you saved in Papiers. Each highlight is a claim from a paper, and your notes are where you doubted it.', mock: <ClaimsMock /> },
-  { key: 'suggest', title: 'You choose where to start', body: 'Litmus asks where to start, and you pick the claim you doubt most. It gets the first agent, with a quick experiment tied to the sentence you highlighted.', mock: <DockMock /> },
+  { key: 'suggest', title: 'You choose where to start', body: 'Litmus asks where to start, and you select the one to experiment on. It gets the first agent, with a quick experiment tied to the sentence you highlighted.', mock: <DockMock /> },
   { key: 'run', title: 'Agents run them side by side', body: 'Each agent runs one experiment, repeated several times so one lucky result can’t fool you. When it finishes, it reads what the other agents found and asks you: where should I proceed?', mock: <TreeMock /> },
   { key: 'compare', title: 'Everything comes from your reading', body: 'Every agent’s experiment starts from something you read, and they’re all measured against each other on the same scale, so you can see which ideas actually helped.', mock: <BoardMock /> },
   { key: 'call', title: 'You make the calls that matter', body: 'When a result surprises an agent, it stops and asks you, with the evidence attached. Litmus keeps a record of every time you overruled one, so you can see whether your judgment paid off.', mock: <CallMock /> },

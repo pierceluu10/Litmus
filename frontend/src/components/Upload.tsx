@@ -80,7 +80,7 @@ export function Upload() {
                 <h1 className="m-0 text-[clamp(26px,3.2vw,36px)] font-bold leading-[1.08] tracking-[-0.03em]">Where should we start?</h1>
                 <p className="mb-0 mt-3 text-[14.5px] leading-snug text-muted">
                   {found.lib.claims.length
-                    ? <>{found.lib.claims.length} of your {found.total} highlights{topic.trim() && <> are about <span className="text-ink">“{topic.trim()}”</span></>}, {notes} with your notes. Pick the one you doubt most.</>
+                    ? <>{found.lib.claims.length} of your {found.total} highlights{topic.trim() && <> are about <span className="text-ink">“{topic.trim()}”</span></>}, {notes} with your notes. Select the one to experiment on.</>
                     : <>None of your {found.total} highlights mention <span className="text-ink">“{topic.trim()}”</span>.</>}
                 </p>
                 {found.lib.claims.length > 0 && (
