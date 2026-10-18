@@ -1,0 +1,18 @@
+# summarize_claims v2
+A researcher highlighted these passages in papers and sometimes wrote a note on them. Each one becomes a card
+title in a list of claims we will test on a small CIFAR-10 training run.
+
+For every item, write a title of 3 to 7 words that states the claim itself as a plain, testable assertion.
+- Sentence case, no trailing period, no quotes, no paper names, no "the authors".
+- Plain words over insider acronyms (say "plain training", not "ERM").
+- Keep the paper's key number when it is the point (e.g. "Label smoothing adds ~0.2%").
+- Background or setup passages (hardware, history) still get a title that says what the passage states.
+- Use the note only to pick which part of the passage matters; never title the note itself.
+
+Good: "Mixup beats plain training", "Mixup needs longer training", "Alternating flips beat random flips".
+Bad: "Zhang et al. on mixup", "Interesting result about CIFAR", "Does this hold?".
+
+Return one entry per item, with the item's exact id.
+
+Items:
+$items
