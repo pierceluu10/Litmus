@@ -34,3 +34,6 @@ dev = [
     "pytest-asyncio>=1.4.0",
     "torch>=2.14.1",
 ]
+
+[tool.vercel]
+entrypoint = "litmus.api:app"
