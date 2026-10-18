@@ -18,7 +18,7 @@ function Verdict({ s }: { s: Star }) {
     const latest = (s.progress ?? []).reduce<{ epoch: number; val_acc: number } | null>((m, p) => (!m || p.epoch > m.epoch ? p : m), null)
     return (
       <div>
-        <div className="flex items-baseline justify-between"><span className="font-medium" style={{ color: toneVar('running') }}>Training</span><span className="num text-[11px] text-muted">{latest ? `epoch ${latest.epoch}/${s.knobs.epochs} · ${pct(latest.val_acc)}` : 'starting'}</span></div>
+        <div className="flex items-baseline justify-between"><span className="font-medium" style={{ color: toneVar('running') }}>Training</span><span className="num text-[11px] text-muted">{latest ? `epoch ${Math.min(latest.epoch, s.knobs.epochs)}/${s.knobs.epochs} · ${pct(latest.val_acc)}` : 'starting'}</span></div>
         <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-rule"><div className="h-full rounded-full transition-[width] duration-300" style={{ width: `${progressFraction(s) * 100}%`, background: toneVar('running') }} /></div>
       </div>
     )
@@ -28,7 +28,7 @@ function Verdict({ s }: { s: Star }) {
   const color = toneVar(g.verdict)
   return (
     <div title={`${g.n} paired seeds · p ${g.p_value < 0.001 ? '< 0.001' : g.p_value.toFixed(3)}`}>
-      <div className="flex items-baseline justify-between"><span><span className="font-medium" style={{ color }}>{VERDICT_TEXT[g.verdict]}</span>{s.predicted && g.verdict !== 'baseline' && <span className="text-[11px] text-muted"> · the claim {EXPECTS[s.predicted]}</span>}</span><span className="text-[11px] text-muted">{g.n} runs</span></div>
+      <div className="flex items-baseline justify-between"><span><span className="font-medium" style={{ color }}>{VERDICT_TEXT[g.verdict]}</span>{s.predicted && g.verdict !== 'baseline' && <span className="text-[11px] text-muted"> · the claim {EXPECTS[s.predicted]}</span>}</span><span className="text-[11px] text-muted">{g.n} seeds</span></div>
       <div className="num mt-0.5 text-[22px] font-medium leading-none tracking-[-0.03em]" style={{ color: g.verdict === 'baseline' ? undefined : color }}>
         {g.verdict === 'baseline' ? pct(g.mean_child) : <>{pts(g.delta)} <span className="text-[12px]">pts</span></>}
       </div>
