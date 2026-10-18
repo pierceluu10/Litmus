@@ -2,7 +2,7 @@ import { applyEvent, initialState, type AppState } from '../reducer'
 import type { Decision, Grade, Knobs, LitmusEvent, Predicted, Proposal, Provenance, Question, Selection, Star } from '../types'
 import { agentName, knobText, pts } from '../lib/format'
 import { BASELINE_KNOBS, baselineGrade, grade, progressAccuracy, simulateRun } from './sim'
-import { P } from './library'
+import { claims, P } from './library'
 import { BASE } from '../transport/real'
 
 // In-browser stand-in for the backend: same events as shared/contract.md, numbers from the calibrated simulator.
@@ -42,6 +42,10 @@ const MOVES: Move[] = [
     changes: (k) => (k.dirac_init ? { dirac_init: false } : null), prov: [P.dirac], note: 'Default PyTorch init instead.' },
 ]
 
+// Claims with no test of their own on airbench that another move tests directly. Any other claim without a move (e.g. the
+// P100 setup) cannot run here: the demo says so instead of starting an unrelated agent.
+const SHARED_MOVE: Record<string, Move['key']> = { [P.lsGeneral.id]: 'smoothing', [P.lsCalib.id]: 'smoothing', [P.mixLarge.id]: 'gentle' }
+
 const uid = (() => { let n = 0; return (p: string) => `${p}_${++n}` })()
 const sameChanges = (a: Partial<Knobs>, b: Partial<Knobs>) => JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort())
 
@@ -58,6 +62,7 @@ export class MockServer {
   asking = false // between deciding to ask and the question arriving, no new wave may be proposed
   early: string[] | null = null // chosen before session.started
   opening: string | null = null // chosen before the baseline was graded
+  drafting: Partial<Knobs>[] = [] // baseline tests scheduled but not created yet, so a quick second pivot cannot repeat one
   writing = 0 // agents still writing their cards: Litmus waits for them before planning on its own
   goal: string
   replay: boolean
@@ -123,15 +128,22 @@ export class MockServer {
     this.openClaim(claim_id)
   }
 
-  // The move whose leading provenance is the claim (any untried one if the demo has no move for it).
+  // The move whose leading provenance is the claim, or the one that tests it too; never an unrelated claim's move.
   private openClaim(claim_id: string) {
     const base = this.star('S0')
-    const taken = this.stars.filter((s) => s.parent_id === 'S0').map((s) => s.knob_changes)
-    const fresh = (m: Move) => { const c = m.changes(base.knobs); return c && !taken.some((t) => sameChanges(t, c)) }
-    const m = MOVES.find((x) => x.prov[0].id === claim_id && fresh(x)) ?? MOVES.find(fresh)
-    if (!m) { this.think('Every test the demo knows from the baseline has already run.'); return }
+    const m = MOVES.find((x) => x.prov[0].id === claim_id) ?? MOVES.find((x) => x.key === SHARED_MOVE[claim_id])
+    if (!m) { this.think('The demo has no airbench test for that claim, so no agent was started.'); return }
+    const changes = m.changes(base.knobs)
+    const planned = [...this.stars.filter((s) => s.parent_id === 'S0').map((s) => s.knob_changes), ...this.drafting]
+    if (!changes || planned.some((t) => sameChanges(t, changes))) {
+      this.think(`“${m.title(base.knobs)}” already ran from the baseline; its result covers this claim too.`); return
+    }
+    const claim = claims.find((c) => c.id === claim_id)
+    const prov = m.prov[0].id === claim_id || !claim ? m.prov : [claim.provenance[0], ...m.prov]
+    this.drafting.push(changes)
     this.later(() => {
-      const st = this.newStar('S0', m.title(base.knobs), m.hypothesis, m.changes(base.knobs)!, m.prov, 'human', m.predicted)
+      this.drafting = this.drafting.filter((d) => d !== changes)
+      const st = this.newStar('S0', m.title(base.knobs), m.hypothesis, changes, prov, 'human', m.predicted)
       this.later(() => this.run(st.id, SEEDS), 500)
     }, 400)
   }
