@@ -30,8 +30,8 @@ export const mockApi: Api = {
     console.warn(`${e.message}; using the library snapshot`)
     return { documents, claims }
   }).then((lib) => (library = lib)),
-  createSession: async (b) => { srv = new MockServer(b.goal || DEFAULT_GOAL, false); return srv.sid },
-  replayDemo: async () => { srv = new MockServer(DEFAULT_GOAL, true); return srv.sid },
+  createSession: async (b) => { srv = new MockServer(b.goal || DEFAULT_GOAL, false, () => library.claims); return srv.sid },
+  replayDemo: async () => { srv = new MockServer(DEFAULT_GOAL, true, () => library.claims); return srv.sid },
   subscribe(_sid, fromSeq, onEvent, onConn) {
     onConn('live')
     return cur().subscribe(fromSeq, onEvent)

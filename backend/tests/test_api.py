@@ -296,3 +296,12 @@ def test_importing_a_paper_into_papiers(engine, monkeypatch):  # noqa: F811
         refused = client.post("/api/papiers/import", json={"url": "https://example.org/refused.pdf"})
         assert refused.status_code == 502 and "cannot import" in refused.text
     assert calls[:2] == [("import", "https://arxiv.org/pdf/2001.00002v1"), ("import-status", "op_1")]
+
+
+def test_cors_allows_the_frontend_on_any_local_port(engine):  # noqa: F811
+    with TestClient(api.app) as client:
+        for origin in ("http://localhost:5173", "http://localhost:5174", "http://127.0.0.1:4173"):
+            preflight = client.options("/api/demo/questions", headers={"Origin": origin, "Access-Control-Request-Method": "POST"})
+            assert preflight.status_code == 200 and preflight.headers["access-control-allow-origin"] == origin
+        assert client.options("/api/demo/questions", headers={"Origin": "https://evil.example",
+                                                               "Access-Control-Request-Method": "POST"}).status_code == 400

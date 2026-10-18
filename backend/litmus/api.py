@@ -23,7 +23,8 @@ from litmus.models import ChatTurn, Library, SessionState
 
 log = logging.getLogger(__name__)
 
-FRONTEND_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
+# any local port: Vite moves to 5174+ when 5173 is taken, and a blocked preflight looks like a dead backend
+FRONTEND_ORIGINS = r"http://(localhost|127\.0\.0\.1)(:\d+)?"
 HEALTH_CACHE_SECONDS = 60
 
 
@@ -35,7 +36,7 @@ async def lifespan(_: FastAPI):
 
 
 app = FastAPI(title="Litmus", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=FRONTEND_ORIGINS, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(CORSMiddleware, allow_origin_regex=FRONTEND_ORIGINS, allow_methods=["*"], allow_headers=["*"])
 
 
 class CreateSession(BaseModel):

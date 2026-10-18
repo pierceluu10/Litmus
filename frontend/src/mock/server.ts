@@ -1,5 +1,5 @@
 import { applyEvent, initialState, type AppState } from '../reducer'
-import type { Decision, Grade, Knobs, LitmusEvent, Predicted, Proposal, Provenance, Question, Selection, Star } from '../types'
+import type { Claim, Decision, Grade, Knobs, LitmusEvent, Predicted, Proposal, Provenance, Question, Selection, Star } from '../types'
 import { agentName, knobText, pts } from '../lib/format'
 import { BASELINE_KNOBS, baselineGrade, grade, progressAccuracy, simulateRun } from './sim'
 import { claims, P } from './library'
@@ -45,6 +45,11 @@ const MOVES: Move[] = [
 // Claims with no test of their own on airbench that another move tests directly. Any other claim without a move (e.g. the
 // P100 setup) cannot run here: the demo says so instead of starting an unrelated agent.
 const SHARED_MOVE: Record<string, Move['key']> = { [P.lsGeneral.id]: 'smoothing', [P.lsCalib.id]: 'smoothing', [P.mixLarge.id]: 'gentle' }
+// The library is live, so a highlight added since the snapshot has no move of its own: it gets the test for what it is about.
+const TOPICS: [RegExp, Move['key']][] = [
+  [/distil/i, 'distil'], [/smooth/i, 'smoothing'], [/mixup/i, 'mixup'], [/crop|test-time|\btta\b/i, 'tta'],
+  [/flip/i, 'flip'], [/whiten/i, 'whiten'], [/identity|dirac/i, 'dirac'],
+]
 
 const uid = (() => { let n = 0; return (p: string) => `${p}_${++n}` })()
 const sameChanges = (a: Partial<Knobs>, b: Partial<Knobs>) => JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort())
@@ -67,7 +72,10 @@ export class MockServer {
   goal: string
   replay: boolean
 
-  constructor(goal: string, replay: boolean) {
+  // library: the claims this session works from (the live Papiers library, or the snapshot)
+  private library: () => Claim[]
+  constructor(goal: string, replay: boolean, library: () => Claim[] = () => claims) {
+    this.library = library
     this.goal = goal
     this.replay = replay
     this.later(() => this.start(), 300)
@@ -131,14 +139,15 @@ export class MockServer {
   // The move whose leading provenance is the claim, or the one that tests it too; never an unrelated claim's move.
   private openClaim(claim_id: string) {
     const base = this.star('S0')
-    const m = MOVES.find((x) => x.prov[0].id === claim_id) ?? MOVES.find((x) => x.key === SHARED_MOVE[claim_id])
+    const claim = this.library().find((c) => c.id === claim_id)
+    const topic = claim && TOPICS.find(([about]) => about.test(`${claim.summary ?? ''} ${claim.text}`))?.[1]
+    const m = MOVES.find((x) => x.prov[0].id === claim_id) ?? MOVES.find((x) => x.key === (SHARED_MOVE[claim_id] ?? topic))
     if (!m) { this.think('The demo has no airbench test for that claim, so no agent was started.'); return }
     const changes = m.changes(base.knobs)
     const planned = [...this.stars.filter((s) => s.parent_id === 'S0').map((s) => s.knob_changes), ...this.drafting]
     if (!changes || planned.some((t) => sameChanges(t, changes))) {
       this.think(`“${m.title(base.knobs)}” already ran from the baseline; its result covers this claim too.`); return
     }
-    const claim = claims.find((c) => c.id === claim_id)
     const prov = m.prov[0].id === claim_id || !claim ? m.prov : [claim.provenance[0], ...m.prov]
     this.drafting.push(changes)
     this.later(() => {
