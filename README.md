@@ -1,64 +1,113 @@
+<p align="center"><img src="devpost/litmus-banner.png" alt="Litmus" width="720"></p>
+
 # Litmus
 
-Turn the claims you highlighted in research papers into real experiments, run them with parallel AI agents, and steer the research at every branch.
+Turn the claims you highlighted in research papers into real experiments, run them with parallel AI agents, and steer
+the research at every step.
 
 Built for the Papiers Human-Centred Autoresearch Challenge at Hack the Valley 11.
 
 ## What it does
 
-Litmus reads your Papiers library and ranks the claims you engaged with most, notes first, since your notes are your doubts. It turns them into experiments on a small image classifier (airbench on CIFAR-10), runs each one with several random seeds on a cloud GPU, and grades the result with a confidence interval.
+Papers are full of claims, and checking whether one holds in your own setup means training, rerunning on more seeds and
+comparing numbers by hand. Litmus does that loop for the claims you already marked.
 
-The research is drawn as a constellation:
+1. **Connect your library.** Litmus reads your highlights and notes from Papiers and keeps the
+   ones about what you are researching. Your notes count most: they are your doubts.
+2. **Pick a claim.** Litmus, the lead researcher, drafts the first experiment and dispatches an agent.
+3. **Agents run real experiments.** Each one trains on CIFAR-10 on an NVIDIA A100, five paired seeds, against its parent
+   re-run at the same settings. A locked statistics module grades it: confirmed, refuted or inconclusive, with a
+   confidence interval.
+4. **You steer.** When a result comes back refuted, the agent searches your library for why and asks you what to do.
+   Each agent suggests its own next experiments; you choose which run, up to four in parallel.
+5. **Ask Litmus.** Chat about one agent or the whole research. **Explore this topic further** searches arXiv for related
+   papers you have not read yet, so the next step can start with reading.
+6. **Write it up.** Litmus writes an abstract in which every sentence cites the experiment and the highlight behind it.
 
-- A **star** is one configuration that was actually run and graded: confirmed, refuted, inconclusive, or baseline.
-- A **line** is one change, labelled with the highlight, note or decision it came from.
-- **Agents** travel along lines to new stars. At each star you pick which directions to dispatch, up to four in parallel.
+The research grows as a map around Litmus: each node is a training run that actually happened, each line one change,
+traced to the highlight, note or decision it came from.
 
-## How a session works
+## How it works
 
-1. The agent measures a baseline (about 94%).
-2. It proposes 2 to 4 directions, each tied to something you read. You choose.
-3. Agents run in parallel. A running star shows live seed and epoch progress.
-4. When a result surprises it, the agent searches your library. If the evidence conflicts, it asks you a question with both sides attached, and only that branch waits.
-5. An abstract agent writes up the findings with citations. Findings go back to Papiers.
-
-Your decisions are recorded next to what the agent would have done alone, and the agent's own pick keeps running as a ghost line so you can see what your judgment changed.
-
-## How Papiers is used
-
-- Claims are ranked by your engagement, with your notes emphasised.
-- Every proposal, line, star, question and abstract sentence carries provenance chips you can open.
-- Library searches are shown with their hits.
-- Conflicts become questions with evidence from two papers.
-- "Explain this" gives a plain-language reading of a finding, with citations.
-- The abstract exports back to Papiers.
-
-## Run it locally
-
-Frontend, with the simulated backend (no setup needed):
-
-```bash
-cd frontend
-npm install
-npm run dev        # http://localhost:5173
+```
+Papiers CLI ──▶ library (highlights, notes)          Modal (A100): airbench94, 5 seeds, epochs streamed live
+                    │                                        ▲
+                    ▼                                        │
+React + three.js ◀──WebSocket── FastAPI ◀── LangGraph engine ┴──▶ grader (paired t-intervals, locked)
+   (you steer)  ──REST────────▶          (one branch per agent:  run → grade → reflect → suggest)
 ```
 
-Run `./dev.sh` (backend on :8000 with a Modal warmup, frontend on :5173): by default every experiment trains live on Modal A100s. The **Demo mode** switch at the top right of the front page uses an in-browser backend instead: a simulated airbench calibrated from a recorded real session, graded by a port of the same locked grader, no keys or GPU needed.
+- **Engine.** A LangGraph graph with one parallel branch per agent. A question pauses only its own branch, and SQLite
+  checkpoints let a restarted server resume every session exactly where it was.
+- **Fair comparisons.** Every child is graded against its parent re-run on the same seeds, and training length is fixed
+  for every experiment, so results compare directly. Borderline results get five more seeds automatically.
+- **Grounded reasoning.** OpenAI structured outputs power Litmus's chat, each agent's next steps, the suggested
+  questions and the abstract. Citations to anything the model was not given are stripped.
+- **Cheap reruns.** Results are cached by configuration and seed, so a repeated run costs nothing.
+- **Demo mode.** A switch on the home page runs the experiments in the browser, simulated and calibrated from a recorded
+  real session, while Litmus still answers with the real model. No GPU time needed.
 
-The statue is the Artemision Bronze, from the public-domain 3D scan by SMK, the National Gallery of Denmark.
+The REST API and event stream are specified in [`shared/contract.md`](shared/contract.md).
 
-## Architecture
+## Tech stack
 
-React + TypeScript frontend (one pure event reducer, a REST + WebSocket client, an in-browser demo backend for the same API, a three.js scene). FastAPI backend orchestrating agents with LangGraph, OpenAI for reasoning, Modal A100s for training, the Papiers CLI for your library, and a locked statistics grader. The API and event stream are defined in `shared/contract.md`.
+| Area | Technologies |
+|---|---|
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS v4, three.js (react-three-fiber, drei), Motion, zustand, d3 |
+| Backend | Python 3.11, FastAPI, Uvicorn, Pydantic, LangGraph with SQLite checkpoints, SQLite |
+| AI | OpenAI Responses API (structured outputs) |
+| Compute | Modal (A100), PyTorch, [airbench94](https://github.com/KellerJordan/cifar10-airbench) on CIFAR-10 |
+| Research data | Papiers CLI, arXiv API |
+| Statistics | SciPy |
 
-## Backend details
+## Getting started
 
-See [AGENTS.md](AGENTS.md).
+### Prerequisites
 
-## The demo library
+- Node.js 22+ and npm
+- Python 3.11 with [uv](https://docs.astral.sh/uv/)
+- For live runs: an OpenAI API key, a [Modal](https://modal.com) account (`uv run modal setup`), and the Papiers CLI
+  (`npm install -g papiers`, then `papiers auth login`)
 
-Jordan, *94% on CIFAR-10 in 3.29 Seconds on a Single GPU*; Szegedy et al., *Rethinking the Inception Architecture*; Müller, Kornblith and Hinton, *When Does Label Smoothing Help?*; Zhang et al., *mixup*; He et al., *Bag of Tricks for Image Classification*.
+### Run
 
-## Credits
+```bash
+cp .env.example backend/.env   # add OPENAI_API_KEY (and PAPIERS_TOKEN if you have not logged in)
+./dev.sh                       # backend on :8000, frontend on http://localhost:5173
+```
 
-airbench by Keller Jordan, the papers above, and Papiers.
+The first live run needs the trainer deployed once: `cd backend && uv run modal deploy litmus/modal_app.py`.
+
+To try it without keys or a GPU, run only the frontend and turn on **Demo mode** at the top right of the home page:
+
+```bash
+cd frontend && npm install && npm run dev
+```
+
+### Tests
+
+```bash
+cd backend && uv run pytest     # engine, API contract, grader (CPU only)
+cd frontend && npm test         # reducer, layout, simulator, grader port
+```
+
+## Project structure
+
+```
+backend/    FastAPI app, LangGraph engine, grader, Papiers and arXiv clients, Modal trainer
+frontend/   React app: workspace, 3D scene, in-browser demo backend
+shared/     API and event contract, recorded demo session
+video/      Remotion overlays and captions for the demo video
+```
+
+Contributor notes, design decisions and the verification log are in [`AGENTS.md`](AGENTS.md).
+
+## Acknowledgements
+
+- [airbench](https://github.com/KellerJordan/cifar10-airbench) by Keller Jordan (MIT; vendored with its license in
+  `backend/litmus/experiments/LICENSE-airbench`)
+- Papiers, whose library and CLI Litmus is built on
+- The papers in the demo library: Jordan, *94% on CIFAR-10 in 3.29 Seconds on a Single GPU*; Szegedy et al.,
+  *Rethinking the Inception Architecture*; Müller, Kornblith and Hinton, *When Does Label Smoothing Help?*; Zhang et al.,
+  *mixup: Beyond Empirical Risk Minimization*; He et al., *Bag of Tricks for Image Classification*
+- The statue is the Artemision Bronze, from the public-domain 3D scan by SMK, the National Gallery of Denmark
