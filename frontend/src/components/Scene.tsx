@@ -156,6 +156,8 @@ type Live = Map<string, Vector3>
 function StarBlob({ star, target, live, dim, selected }: { star: Star; target: Pos; live: Live; dim: boolean; selected: boolean }) {
   const select = useStore((s) => s.select)
   const cardFor = useStore((s) => s.cardFor)
+  // while a question flies to Litmus (and back) the camera swings to the statue: the card steps aside until it is over
+  const consulting = useStore((s) => !!s.thought)
   const fitAll = useStore((s) => s.fitAll)
   const proposals = useStore((s) => s.app.session?.proposals) // the store's own array: filtering inside the selector would return a new one every render
   const options = useMemo(() => (proposals ?? []).filter((p) => p.star_id === star.id && p.status === 'open'), [proposals, star.id])
@@ -207,7 +209,7 @@ function StarBlob({ star, target, live, dim, selected }: { star: Star; target: P
       </mesh>
       <Eyes r={r} running={running} waiting={star.status === 'waiting'} />
       {hasOptions && <Bulb r={r} onClick={openNode} />}
-      {cardFor === star.id && !fitAll && (
+      {cardFor === star.id && !fitAll && !consulting && (
         // the wrapper keeps the card's untransformed box at the node: it must not take clicks, only the card itself
         <Html position={[0, 0, 0]} zIndexRange={[60, 40]} style={{ pointerEvents: 'none' }}>
           <PlacedCard ringPx={ringPx}>{(side) => <NodeCard star={star} items={hasOptions ? options : []} generating={generating} side={side} />}</PlacedCard>
