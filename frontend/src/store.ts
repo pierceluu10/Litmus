@@ -174,7 +174,8 @@ export const useStore = create<Store>((set, get) => {
     togglePause: () => act((sid) => (get().app.session?.status === 'paused' ? current.resume(sid) : current.pause(sid))),
     stopBranch: (star_id) => act((sid) => current.stopBranch(sid, star_id)),
     // Branching from any star, refuted ones included, goes through feedback "suggest": the agent replans from it.
-    generateAbstract: async () => { await act((sid) => current.abstract(sid)); if (get().app.session?.abstract) set({ abstractOpen: true, selectedId: null, chatOpen: false }) },
+    // open it even before abstract.ready lands over the socket; the panel shows it as soon as it does
+    generateAbstract: async () => { await act((sid) => current.abstract(sid)); if (!get().error) set({ abstractOpen: true, selectedId: null, chatOpen: false }) },
   }
 })
 

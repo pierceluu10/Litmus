@@ -49,6 +49,6 @@ export const mockApi: Api = {
   pause: async () => cur().pause(),
   resume: async () => cur().resume(),
   stopBranch: async (_s, id) => cur().stopBranch(id),
-  abstract: async () => { cur().generateAbstract(); const a = cur().state.session?.abstract; return { abstract: a?.text ?? '', findings: a?.findings ?? [] } },
+  abstract: async () => { await cur().generateAbstract(); const a = cur().state.session?.abstract; return { abstract: a?.text ?? '', findings: a?.findings ?? [] } },
   exportMarkdown: async () => cur().exportMarkdown(),
 }

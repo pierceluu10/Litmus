@@ -476,8 +476,11 @@ async def write_abstract(state: SessionState) -> tuple[str, list[str], list[Prov
             evidence.setdefault(p.id, p)
     decisions = [d.model_dump(include={"kind", "star_id", "agent_recommendation", "human_choice", "changed_trajectory", "note"})
                  for d in state.decisions]
-    mode = ("AUTO MODE: no human made choices in this session; do not credit human judgment."
-            if store.config(state.id).get("auto_mode") else "Human-in-the-loop session.")
+    try:
+        auto = store.config(state.id).get("auto_mode")
+    except KeyError:  # a session the server never stored (the frontend's demo backend)
+        auto = False
+    mode = "AUTO MODE: no human made choices in this session; do not credit human judgment." if auto else "Human-in-the-loop session."
     draft = await structured("write_abstract", AbstractDraft, goal=state.goal, mode=mode, tree=tree(state), decisions=decisions,
                              evidence="\n".join(f"{p.id} ({p.doc_title or p.kind}): {p.text[:300]}" for p in evidence.values()))
     known = {s.id for s in state.stars} | set(evidence)

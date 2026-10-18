@@ -1,7 +1,7 @@
 import { LibraryUnavailable, type Api, type Library, type LibraryStage } from './api'
 import type { LitmusEvent } from '../types'
 
-const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8000'
+export const BASE = (import.meta.env.VITE_API_URL as string | undefined) ?? 'http://localhost:8000'
 
 export async function call<T>(method: string, path: string, body?: unknown, text = false): Promise<T> {
   const r = await fetch(BASE + path, { method, headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined })
