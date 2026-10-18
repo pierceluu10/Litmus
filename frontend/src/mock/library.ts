@@ -13,7 +13,7 @@ const note = (id: string): Provenance => claim(id).provenance.find((p) => p.kind
 const ID = {
   mix: 'hl_0c73f204787e1043e26d4b984a8756c2', bot: 'hl_07db8d8d60e86170dda2cc24919b3c35', tta: 'hl_193fdd44b77cd074275ad6e176c7012a',
   flip: 'hl_f00e337c8a98ab91885e251883ed6dd3', ls: 'hl_550c437bfcb2078e75f1d6b912bc3f7f', whiten: 'hl_7cc061c7463f10a7ec432d498aac2595',
-  dirac: 'hl_62d0d70418d9076750cb2eada98e208e',
+  dirac: 'hl_62d0d70418d9076750cb2eada98e208e', distil: 'hl_4e2b627ef691ff5db03de84f431f570e',
 }
 
 export const P = {
@@ -24,4 +24,5 @@ export const P = {
   ls: highlight(ID.ls), lsNote: note(ID.ls),
   whiten: highlight(ID.whiten),
   dirac: highlight(ID.dirac),
+  distil: highlight(ID.distil), distilNote: note(ID.distil),
 }

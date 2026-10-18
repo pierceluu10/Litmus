@@ -35,6 +35,9 @@ const MOVES: Move[] = [
     changes: (k) => (k.label_smoothing ? { label_smoothing: 0 } : null), prov: [P.ls, P.lsNote], note: 'Paper: ImageNet, ~0.2%.' },
   { key: 'whiten', title: () => 'Remove patch whitening', hypothesis: 'Patch whitening is a large part of airbench’s speed.', predicted: 'hurts',
     changes: (k) => (k.whiten ? { whiten: false } : null), prov: [P.whiten], note: 'First conv becomes trainable.' },
+  // airbench has no teacher and student, so the distillation claim is tested by its note, "So not a free win": smoothing harder
+  { key: 'distil', title: () => 'Stronger label smoothing ε = 0.4', hypothesis: 'Label smoothing is not a free win: smoothing harder than the default costs accuracy.', predicted: 'hurts',
+    changes: (k) => (k.label_smoothing === 0.4 ? null : { label_smoothing: 0.4 }), prov: [P.distil, P.distilNote], note: 'Distillation cannot run here; this tests the cost of smoothing.' },
   { key: 'dirac', title: () => 'Remove identity init', hypothesis: 'Identity initialisation helps the deeper convolutions.', predicted: 'hurts',
     changes: (k) => (k.dirac_init ? { dirac_init: false } : null), prov: [P.dirac], note: 'Default PyTorch init instead.' },
 ]
