@@ -77,6 +77,8 @@ uv run litmus --help
 - Never commit secrets. `.env` is gitignored.
 
 ## Backend
+- Library routes: `POST /api/library/import` serves an uploaded library (a refresh no longer replaces it);
+  `POST /api/library/connect` takes the person's own Papiers token (memory only, validated with the CLI).
 
 ### Experiments (`backend/litmus/experiments/`, `backend/litmus/modal_app.py`)
 - Trainer = airbench94 **paper version** (`legacy/airbench94.py`, MIT, vendored with attribution in
@@ -237,6 +239,11 @@ branch subgraph (one agent): run → reflect → (run +5 seeds) | (ask ⟂ → s
   3. `ses_065433f008` (auto, fresh): **`kill -9` of the server mid-wave-1 with 4 branches running → restart →
      "recovering session" → finished**, 9 stars, no duplicates.
   Replay: `GET /api/replay/demo?speed=4` re-streamed 1083 events in 14s; final snapshot 11 stars + abstract.
+- 2026-10-17 library-connect (cloud container; no Modal/OpenAI/Papiers access, so no GPU run): added `POST /api/library/import`
+  and `/connect` (the frontend's Connect page called both, the backend had neither) and made `/api/health` report
+  `openai_ok: false` instead of a 500 when no key is set. Backend `pytest` 37 passed; frontend `tsc -b` clean,
+  `vitest` 31 passed; Chromium on :5173 reached :8000 (CORS ok) and streamed a replay session (1083 events, WS).
+  **Not re-verified here:** Modal A100 training, `cifar-data` volume, OpenAI, live Papiers; run `./dev.sh` where `~/.modal.toml` exists.
 
 ## Frontend
 Vite + React 19 + TypeScript (strict), Tailwind v4, three.js via `@react-three/fiber` + `drei`, `motion`, zustand, d3 (scale/shape), Geist + Geist Mono (self-hosted via `@fontsource-variable`). Lives in `frontend/`.

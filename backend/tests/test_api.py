@@ -118,3 +118,57 @@ def test_replay_restreams_a_recording_with_the_replay_flag(engine, tmp_path, mon
         assert replayed[0].payload["replay"] is True and all(e.session_id == rid for e in replayed)
         with client.websocket_connect(f"/ws/sessions/{rid}?from_seq=0") as ws:
             assert Event.model_validate_json(ws.receive_text()).type == "session.started"
+
+
+def test_library_import_is_served_and_survives_refresh(monkeypatch):
+    from litmus import library
+    monkeypatch.setattr(library, "_memory", None)
+    monkeypatch.setattr(library, "_imported", False)
+
+    async def papiers_must_not_be_read(progress):
+        raise AssertionError("an imported library must not be replaced by Papiers")
+    monkeypatch.setattr(library.papiers_client, "fetch_library", papiers_must_not_be_read)
+
+    doc = {"id": "doc_u", "title": "Uploaded", "authors": [], "highlight_count": 1, "note_count": 0}
+    claim = {"id": "hl_u", "text": "Mixup helps.", "doc_id": "doc_u", "doc_title": "Uploaded", "weight": 2.0, "rank": 1,
+             "provenance": []}
+    with TestClient(api.app) as client:
+        assert client.post("/api/library/import", json={"documents": [doc], "claims": []}).status_code == 422
+        assert client.post("/api/library/import", json={"documents": [doc], "claims": [claim]}).json() == {"ok": True}
+        served = client.get("/api/library", params={"refresh": True}).json()
+    assert [c["id"] for c in served["claims"]] == ["hl_u"]
+    library.use_papiers()
+
+
+def test_library_connect_validates_token_and_resumes_reading_papiers(monkeypatch):
+    from litmus import library, papiers_client
+    monkeypatch.setattr(papiers_client, "_token", None)
+    library.use_imported([], [])
+    seen = []
+
+    async def fake_cli(*args, stdin=None):
+        seen.append((papiers_client._token, args))
+        if papiers_client._token == "bad":
+            raise papiers_client.PapiersError("401 unauthorized")
+        return {"items": []}
+    monkeypatch.setattr(papiers_client, "run_cli", fake_cli)
+
+    with TestClient(api.app) as client:
+        assert client.post("/api/library/connect", json={"token": "  "}).status_code == 422
+        rejected = client.post("/api/library/connect", json={"token": "bad"})
+        assert rejected.status_code == 401 and papiers_client._token is None
+        assert client.post("/api/library/connect", json={"token": "pap_live_x"}).json() == {"ok": True}
+    assert papiers_client._token == "pap_live_x" and library._imported is False
+
+
+def test_health_reports_missing_openai_key_instead_of_crashing(monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("OPENAI_MODEL", "test-model")
+    monkeypatch.setattr(api, "_health", {"at": 0.0})
+
+    async def no_papiers():
+        return False
+    monkeypatch.setattr(api.papiers_client, "doctor", no_papiers)
+    with TestClient(api.app) as client:
+        body = client.get("/api/health").json()
+    assert body["ok"] is True and body["openai_ok"] is False and body["papiers_ok"] is False

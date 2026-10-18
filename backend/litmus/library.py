@@ -30,6 +30,7 @@ class Summaries(BaseModel):
 
 
 _memory: tuple[list[Document], list[Claim]] | None = None
+_imported = False  # _memory came from an upload, so a refresh must not replace it with Papiers
 
 
 async def _conditions_for(claim: Claim) -> str | None:
@@ -69,7 +70,7 @@ async def get_library(refresh: bool = False,
                       progress: papiers_client.Progress = papiers_client._quiet) -> tuple[list[Document], list[Claim]]:
     """Ranked library. Conditions and summaries are written once per claim and reused from the cache afterwards."""
     global _memory
-    if _memory and not refresh:
+    if _memory and (_imported or not refresh):
         return _memory
     try:
         documents, claims = await papiers_client.fetch_library(progress)
@@ -96,3 +97,15 @@ async def get_library(refresh: bool = False,
     papiers_client.save_cache(documents, claims)
     _memory = (documents, claims)
     return _memory
+
+
+def use_imported(documents: list[Document], claims: list[Claim]) -> None:
+    """Serve an uploaded library instead of reading Papiers (until `use_papiers` is called)."""
+    global _memory, _imported
+    _memory, _imported = (documents, claims), True
+
+
+def use_papiers() -> None:
+    """Forget an uploaded library so the next read goes to Papiers again."""
+    global _memory, _imported
+    _memory, _imported = None, False

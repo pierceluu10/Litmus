@@ -10,7 +10,7 @@ from pathlib import Path
 from string import Template
 from typing import TypeVar
 
-from openai import APIError, AsyncOpenAI
+from openai import APIError, AsyncOpenAI, OpenAIError
 from pydantic import BaseModel, ValidationError
 
 from litmus.config import openai_model
@@ -76,5 +76,5 @@ async def ok() -> bool:
     try:
         await client().models.retrieve(openai_model())
         return True
-    except (APIError, RuntimeError):
+    except (OpenAIError, RuntimeError):  # no key at all is an OpenAIError, not an APIError
         return False

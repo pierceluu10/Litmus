@@ -17,8 +17,8 @@ from litmus import llm, papiers_client, replay, store, writeback
 from litmus.config import budget_gpu_seconds
 from litmus.engine import driver
 from litmus.experiments import runner
-from litmus.library import get_library
-from litmus.models import ChatTurn, SessionState
+from litmus.library import get_library, use_imported, use_papiers
+from litmus.models import ChatTurn, Claim, Document, SessionState
 
 log = logging.getLogger(__name__)
 
@@ -83,6 +83,15 @@ class ClaimRef(BaseModel):
     claim_id: str
 
 
+class LibraryBody(BaseModel):
+    documents: list[Document]
+    claims: list[Claim]
+
+
+class ConnectBody(BaseModel):
+    token: str
+
+
 class StarRef(BaseModel):
     star_id: str
 
@@ -134,6 +143,33 @@ async def library(refresh: bool = False):
     except papiers_client.PapiersError as error:
         raise HTTPException(503, str(error)) from error
     return {"documents": [d.model_dump() for d in documents], "claims": [c.model_dump() for c in claims]}
+
+
+@app.post("/api/library/import")
+async def library_import(body: LibraryBody):
+    """Serve an uploaded library (Connect page) instead of reading Papiers; sessions then start from its claims."""
+    if not body.claims:
+        raise HTTPException(422, "the uploaded library has no claims")
+    use_imported(body.documents, body.claims)
+    return {"ok": True}
+
+
+@app.post("/api/library/connect")
+async def library_connect(body: ConnectBody):
+    """Use the person's own Papiers token (held in memory only); rejected unless the CLI can list with it."""
+    token = body.token.strip()
+    if not token:
+        raise HTTPException(422, "paste a Papiers API token")
+    previous = papiers_client._token
+    papiers_client.set_token(token)
+    try:
+        await papiers_client.run_cli("list", "--kind", "document", "--limit", "1")
+    except papiers_client.PapiersError as error:
+        papiers_client.set_token(previous)
+        raise HTTPException(401, f"Papiers rejected that token: {error}") from error
+    use_papiers()
+    _health["at"] = 0.0
+    return {"ok": True}
 
 
 def _sse(payload: dict) -> str:

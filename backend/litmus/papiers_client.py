@@ -39,6 +39,21 @@ class PapiersError(RuntimeError):
     """The Papiers CLI failed, timed out, or returned something unparseable."""
 
 
+_token: str | None = None  # a person's own Papiers token from the Connect page; memory only, never written to disk
+
+
+def set_token(token: str | None) -> None:
+    global _token
+    _token = token
+
+
+def _cli_env() -> dict[str, str]:
+    env = os.environ.copy()
+    if _token:
+        env["PAPIERS_TOKEN"] = _token
+    return env
+
+
 async def run_cli(*args: str, stdin: str | None = None) -> dict:
     """Run `papiers <args> --json` and return parsed JSON. Raises PapiersError with the CLI's stderr."""
     binary = shutil.which("papiers")
@@ -47,7 +62,7 @@ async def run_cli(*args: str, stdin: str | None = None) -> dict:
     process = await asyncio.create_subprocess_exec(
         binary, *args, "--json",
         stdin=asyncio.subprocess.PIPE if stdin is not None else asyncio.subprocess.DEVNULL,
-        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=os.environ.copy(),
+        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE, env=_cli_env(),
     )
     try:
         stdout, stderr = await asyncio.wait_for(

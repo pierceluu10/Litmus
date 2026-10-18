@@ -5,6 +5,9 @@ or remove fields, every change gets a Changelog line (newest first) and lands on
 `docs(contract): ...`.
 
 ## Changelog
+- 2026-10-17 — Additive: `POST /api/library/import {documents, claims}` (sessions then use the uploaded library instead of
+  Papiers; 422 if no claims) and `POST /api/library/connect {token}` (the person's own Papiers token, memory only; 401 if
+  the CLI rejects it). `GET /api/health` now reports `openai_ok: false` when no key is set instead of failing.
 - 2026-10-17 — Additive: `POST /api/sessions/{id}/pivot {claim_id}`: Litmus drafts the plain test of a claim no star has
   tested yet and runs it as a new agent from the baseline (queued for the next wave if one is running; 409 if the
   claim is already on the tree, the session has not started, or no waves are left).
@@ -43,6 +46,8 @@ All JSON is snake_case. Timestamps are ISO 8601 UTC strings. IDs are stable stri
 | POST | `/api/warmup` | | `{ok}` (warms Modal container) |
 | GET | `/api/library` | | `{documents: Document[], claims: Claim[]}` ranked, with provenance |
 | GET | `/api/library/stream` | | `text/event-stream`: `{stage: "papers"\|"highlights"\|"notes"\|"summaries"}` as each stage starts, then `{stage: "done", documents, claims}` or `{stage: "error", message}` |
+| POST | `/api/library/import` | `{documents: Document[], claims: Claim[]}` | `{ok}` |
+| POST | `/api/library/connect` | `{token}` | `{ok}` (401 token rejected) |
 | POST | `/api/sessions` | `{goal?, budget_gpu_seconds?, auto_mode?, auto_timeout_seconds?, max_waves?, fresh?}` | `{session_id}` |
 | GET | `/api/sessions` | | `{sessions: {id, goal, status, created_at, replay}[]}` newest first |
 | GET | `/api/sessions/{id}` | | full `SessionState` snapshot |
